@@ -304,6 +304,18 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
   const busy = new Set<string>()
   const operationLocks = new Map<string, Promise<unknown>>()
   const projectionRegistration = services.projections.register(assistantProjection)
+  function freezeTaskContext(value: MapValue, repository?: MapValue, inherited?: MapValue): MapValue {
+    const normalized = normalizeManagementContext(object(value ?? inherited ?? {}))
+    const contextId = typeof normalized.context_id === 'string' && normalized.context_id
+      ? normalized.context_id
+      : typeof inherited?.context_id === 'string' && inherited.context_id ? inherited.context_id : `ctx-${randomUUID()}`
+    return {
+      ...normalized,
+      context_id: contextId,
+      workspace_id: workspaceIdentity(root).id,
+      ...(repository?.id ? { repository_id: repository.id } : inherited?.repository_id ? { repository_id: inherited.repository_id } : {}),
+    }
+  }
   async function inspect(id: string, signal?: AbortSignal, readOnly = false) {
     if (!id) throw new Error('缺少 Session ID')
     signal?.throwIfAborted()
@@ -407,8 +419,9 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     }
     signal.throwIfAborted()
     // 工具执行已通过 DSH 原生权限链，平台只核对业务预览与执行结果。
-    const proposal = { kind: 'proposal', id: randomUUID(), owner_session_id: id, domain, action, input, preview, state: 'running' }
-    const settlement = await runOperation(id, proposal, signal, (await inspect(id, signal)).state)
+    const operationState = (await inspect(id, signal)).state
+    const proposal = { kind: 'proposal', id: randomUUID(), operation_id: randomUUID(), owner_session_id: id, context_id: operationState.task_context.context_id, domain, action, input, preview, state: 'running' }
+    const settlement = await runOperation(id, proposal, signal, operationState)
     return settledToolResult(proposal, settlement)
   }
 
@@ -664,14 +677,16 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         if (typeof requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,120}$/.test(requestId)) throw new Error('任务提交标识无效')
         return await locked(`submission:${id}`, async () => {
           const { state } = await inspect(id, signal)
-          const fingerprint = createHash('sha256').update(JSON.stringify({ task: body.task ?? null, context: normalizeManagementContext(object(body.context ?? taskContext)) })).digest('hex')
           const previous = state.submissions?.[requestId]
+          const repository = state.repository ?? resolveRepository(root)
+          const frozenContext = previous?.frozen_context ?? freezeTaskContext(object(body.context ?? taskContext), repository, taskContext)
+          const fingerprint = createHash('sha256').update(JSON.stringify({ task: body.task ?? null, context: frozenContext })).digest('hex')
           if (previous && previous.fingerprint !== fingerprint) throw new Error('同一任务提交标识的内容已改变，未重复投递')
-          if (previous?.state === 'accepted') return result(true, { session_id: id, request_id: requestId, accepted: true }) as any
+          if (previous?.state === 'accepted') return result(true, { session_id: id, request_id: requestId, operation_id: previous.operation_id ?? requestId, context_id: previous.context_id ?? frozenContext.context_id, accepted: true }) as any
           if (!previous) {
-            if (body.context) await record(id, { kind: 'context', context: redactAssistant(object(body.context)) })
-            if (body.task) await record(id, { kind: 'task', task: String(body.task), context: redactAssistant(body.context ?? taskContext) })
-            await record(id, { kind: 'submission', owner_session_id: id, request_id: requestId, fingerprint, state: 'pending' })
+            if (body.context || Object.keys(taskContext).length === 0) await record(id, { kind: 'context', context: redactAssistant(frozenContext) })
+            if (body.task) await record(id, { kind: 'task', task: String(body.task), context: redactAssistant(frozenContext) })
+            await record(id, { kind: 'submission', owner_session_id: id, request_id: requestId, operation_id: requestId, context_id: frozenContext.context_id, frozen_context: redactAssistant(frozenContext), fingerprint, state: 'pending' })
           }
           try {
             if (body.task) {
@@ -679,17 +694,21 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
               // 锁定版 DSH 按 requestId 核对收件箱和 user/message，重试沿用原生去重身份。
               await services.controller.prompt({ sessionId: id, requestId, mode: 'queue', content: [{ type: 'text', text: String(body.task) }, ...(body.context ? [{ type: 'text', text: `平台任务上下文：${JSON.stringify(redactAssistant(normalizeManagementContext(object(body.context))))}` }] : [])] }, signal)
             }
-            await record(id, { kind: 'submission', owner_session_id: id, request_id: requestId, fingerprint, state: 'accepted' })
+            await record(id, { kind: 'submission', owner_session_id: id, request_id: requestId, operation_id: previous?.operation_id ?? requestId, context_id: frozenContext.context_id, frozen_context: redactAssistant(frozenContext), fingerprint, state: 'accepted' })
           } catch (error) {
             await record(id, { kind: 'submission', owner_session_id: id, request_id: requestId, fingerprint, state: 'unknown' })
             throw error
           }
-          return result(true, { session_id: id, request_id: requestId, accepted: true }) as any
+          return result(true, { session_id: id, request_id: requestId, operation_id: previous?.operation_id ?? requestId, context_id: frozenContext.context_id, accepted: true }) as any
         })
       }
       const id = String(body.session_id ?? '')
       const { session, state, agent, observedEvents } = await inspect(id, signal, endpoint === 'status')
-      if (endpoint === 'context') { await record(id, { kind: 'context', context: redactAssistant(object(body.context)) }); return result(true, { session_id: id }) as any }
+      if (endpoint === 'context') {
+        const frozen = freezeTaskContext(object(body.context), state.repository, state.task_context)
+        await record(id, { kind: 'context', context: redactAssistant(frozen) })
+        return result(true, { session_id: id, context_id: frozen.context_id, workspace_id: frozen.workspace_id, ...(frozen.repository_id ? { repository_id: frozen.repository_id } : {}) }) as any
+      }
       if (endpoint === 'status') {
         let submission = typeof body.request_id === 'string' ? state.submissions?.[body.request_id] ?? { request_id: body.request_id, state: 'not_received' } : undefined
         if (submission && submission.state !== 'accepted') {

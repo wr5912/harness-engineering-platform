@@ -122,9 +122,30 @@ test('CLI不接受update执行和未知参数，不回显Git凭据诊断', t => 
   const cli = new URL('../cli.mts', import.meta.url).pathname
   for (const args of [['update', '--lab', '/missing'], ['status', '--lab', '/missing', '--force'], ['init', '--destination', '/missing']]) {
     const result = spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' })
-    assert.equal(result.status, 1)
+    assert.equal(result.status, 2)
     assert.ok(result.stderr.startsWith('hep-lab:'))
   }
+})
+test('CLI版本、JSON错误和请求ID符合稳定入口合同', t => {
+  const cli = new URL('../cli.mts', import.meta.url).pathname
+  const version = spawnSync(process.execPath, [cli, '--version', '--json'], { encoding: 'utf8' })
+  assert.equal(version.status, 0)
+  const versionValue = JSON.parse(version.stdout)
+  assert.equal(versionValue.schema_version, 1)
+  assert.equal(versionValue.name, 'hep-lab')
+  assert.match(versionValue.version, /^\d+\.\d+\.\d+$/)
+  assert.match(versionValue.revision, /^[0-9a-f]{40}$/)
+  const failed = spawnSync(process.execPath, [cli, 'status', '--lab', '/missing', '--json', '--request-id', 'req-contract'], { encoding: 'utf8' })
+  assert.equal(failed.status, 2)
+  assert.equal(failed.stderr, '')
+  const failure = JSON.parse(failed.stdout)
+  assert.equal(failure.schema_version, 1)
+  assert.equal(failure.request_id, 'req-contract')
+  assert.equal(failure.error.code, 'invalid_input')
+  const parseFailure = spawnSync(process.execPath, [cli, 'status', '--json', '--unknown'], { encoding: 'utf8' })
+  assert.equal(parseFailure.status, 2)
+  assert.equal(parseFailure.stderr, '')
+  assert.equal(JSON.parse(parseFailure.stdout).error.code, 'invalid_input')
 })
 test('doctor只解析原生Profile，报告不存在引用与机器依赖并容许tokens.txt', t => {
   const f = fixture(t), home = f.repositories.platform_manager_dsh_home.url
