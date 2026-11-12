@@ -9,14 +9,14 @@ const require = createRequire(import.meta.url)
 // 使用平台已锁定 Controller 依赖树中的真实 SDK，不依赖机器的全局安装位置。
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
 const sdk = async name => import(pathToFileURL(sdkRequire.resolve(name)).href)
-const [{ Context }, { SystemPrompt }, { ToolRuntime }, { createScope }] = await Promise.all([
-  sdk('@deepseek-ai/cordis'), sdk('@deepseek-ai/dsh-system-prompt'), sdk('@deepseek-ai/dsh-tools'), sdk('@deepseek-ai/dsh-scope'),
+const [{ Context }, { SystemPrompt }, { ToolRuntime }, { apply: applyNativeToolExecutor }, { createScope }] = await Promise.all([
+  sdk('@deepseek-ai/cordis'), sdk('@deepseek-ai/dsh-system-prompt'), sdk('@deepseek-ai/dsh-tools'), sdk('@deepseek-ai/dsh-tool-executor-native'), sdk('@deepseek-ai/dsh-scope'),
 ])
 
 function fixture(t, { parentPtc = false, actualPlatformTools = false } = {}) {
   const ctx = new Context()
   new SystemPrompt(ctx, {})
-  new ToolRuntime(ctx, { mode: 'native' })
+  new ToolRuntime(ctx); applyNativeToolExecutor(ctx)
   const calls = []
   const definition = name => ({
     name, description: '受控基本数据能力', parameters: { type: 'object', additionalProperties: true },

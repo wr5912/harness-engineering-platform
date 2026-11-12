@@ -79,7 +79,18 @@ public_host=${public_host:-127.0.0.1}
 printf 'AGENT_PORT=%s\nCOMPOSE_PROJECT_NAME=%s\nAGENT_HOST=%s\nAGENT_UID=%s\nAGENT_GID=%s\n' "$port" "$deployment" "$public_host" "$runtime_uid" "$runtime_gid" > "$prefix/state/deployment.env"
 chmod 600 "$prefix/state/deployment.env"
 if [ "$(id -u)" = 0 ]; then chown "$runtime_uid:$runtime_gid" "$prefix/state/deployment.env"; fi
-docker load -i "$prefix/images/dsh-runtime.tar" >/dev/null
+reuse_image=0
+if docker image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
+  existing_arch=$(docker image inspect "$IMAGE_TAG" --format '{{.Architecture}}' 2>/dev/null || true)
+  existing_id=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}' 2>/dev/null || true)
+  existing_fingerprint=$(docker image inspect "$IMAGE_TAG" --format '{{index .Config.Labels "org.ai-agent-harness.dsh.image-build-fingerprint"}}' 2>/dev/null || true)
+  if [ "$existing_arch" = "$AGENT_ARCH" ] && [ -z "${IMAGE_ID:-}" -o "$existing_id" = "$IMAGE_ID" ] && [ -z "${IMAGE_FINGERPRINT:-}" -o "$existing_fingerprint" = "$IMAGE_FINGERPRINT" ]; then
+    reuse_image=1
+  fi
+fi
+if [ "$reuse_image" -ne 1 ]; then
+  docker load -i "$prefix/images/dsh-runtime.tar" >/dev/null
+fi
 actual_arch=$(docker image inspect "$IMAGE_TAG" --format '{{.Architecture}}')
 [ "$actual_arch" = "$AGENT_ARCH" ] || { echo '导入镜像架构不一致；安装结果已保留' >&2; exit 2; }
 actual_id=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')
@@ -95,4 +106,8 @@ else
 fi
 # 镜像已经导入 Docker；安装目录只保留运行资产，原始安装包仍可用于恢复。
 rm -rf -- "$prefix/images" "$prefix/offline"
-echo '已清理安装目录中的镜像归档和 Docker 安装介质；标准镜像、Harness、HOME 与原始安装源保留。'
+if [ "$reuse_image" -eq 1 ]; then
+  echo '已复用主机上已核验的标准 Runtime 镜像，并清理安装目录中的镜像归档和 Docker 安装介质；Harness、HOME 与原始安装源保留。'
+else
+  echo '已导入标准 Runtime 镜像并清理安装目录中的镜像归档和 Docker 安装介质；Harness、HOME 与原始安装源保留。'
+fi

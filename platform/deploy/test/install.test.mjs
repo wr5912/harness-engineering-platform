@@ -10,7 +10,7 @@ import { install } from '../install.mts'
 import { updateBundle } from '../bundle-update.mts'
 import { copyTree } from '../fsutil.mts'
 import { collectEntries } from '../manifest.mts'
-import { inspectImageArchive, loadVerifiedImage, verifyImageInfo } from '../image.mts'
+import { findVerifiedImage, inspectImageArchive, loadVerifiedImage, verifyImageInfo } from '../image.mts'
 
 const root = mkdtempSync(join(tmpdir(), 'hep-install-test-'))
 test.after(() => rmSync(root, { recursive: true, force: true }))
@@ -27,8 +27,8 @@ function bundle(name) {
   write(join(path, 'offline/python/site/yaml.py'), '# 外部解释器依赖夹具\n')
   write(join(path, 'offline/python/bin/python3'), '#!/bin/sh\nunset PYTHONHOME\nexec /usr/bin/python3 "$@"\n', true)
   write(join(path, 'offline/pnpm/bin/pnpm'), '#!/bin/sh\necho 11.28.5\n', true)
-  write(join(path, 'offline/dsh/apps/cli/lib/bin.js'), 'console.log("0.2.1-rc.5")\n')
-  write(join(path, 'program/platform/plugin/package.json'), JSON.stringify({peerDependencies:{'@deepseek-ai/dsh-client-connection':'0.2.1-rc.5'}}))
+  write(join(path, 'offline/dsh/apps/cli/lib/bin.js'), 'console.log("0.2.2-rc.2")\n')
+  write(join(path, 'program/platform/plugin/package.json'), JSON.stringify({peerDependencies:{'@deepseek-ai/dsh-client-connection':'0.2.2-rc.2'}}))
   writeLauncher(path, 'import os, sys\nsys.exit(int(os.environ.get("HEP_TEST_PREPARE_FAILURE", "0")))\n')
   return path
 }
@@ -212,11 +212,24 @@ test('Docker 归档识别标签、ID、多标签同镜像，并拒绝歧义和�
     manifest(path, { archive: 'image.tar' })
     assert.throws(() => install({ ...options(path, prefix), dryRun: true }), /镜像身份不完整/)
     manifest(path, { archive: 'image.tar', tag: 'hep:a', id, fingerprint: 'expected', arch: process.arch === 'arm64' ? 'arm64' : 'amd64' })
-    assert.equal(install(options(path, prefix)).image.id, id)
+    const reused = install(options(path, prefix))
+    assert.equal(reused.image.id, id)
+    assert.equal(reused.image.reused, true)
     manifest(path, { archive: 'image.tar', tag: 'hep:a', id, fingerprint: 'wrong', arch: process.arch === 'arm64' ? 'arm64' : 'amd64' })
     assert.throws(() => install(options(path, prefix + '-failed')), /指纹不符/)
     assert.equal(existsSync(prefix + '-failed'), false)
   } finally { process.env.PATH = previous; delete process.env.HEP_TEST_LOAD }
+})
+
+test('已有标准 Runtime 镜像身份匹配时直接复用，不重复导入归档', () => {
+  const fakeBin = join(root, 'reuse-image-bin'), id = 'sha256:' + 'c'.repeat(64)
+  write(join(fakeBin, 'docker'), `#!${process.execPath}\nconst a=process.argv.slice(2); if(a[0]==='image' && a[1]==='inspect') console.log(JSON.stringify([{Id:'${id}',Architecture:'${process.arch === 'arm64' ? 'arm64' : 'amd64'}',Os:'linux',Config:{Labels:{'org.ai-agent-harness.dsh.image-build-fingerprint':'expected'}}}])); else process.exit(1);\n`, true)
+  const previous = process.env.PATH
+  process.env.PATH = fakeBin + ':' + previous
+  try {
+    assert.equal(findVerifiedImage({ tag: 'hep:standard', id, arch: process.arch === 'arm64' ? 'arm64' : 'amd64', fingerprint: 'expected' })?.id, id)
+    assert.equal(findVerifiedImage({ tag: 'hep:standard', id, arch: process.arch === 'arm64' ? 'arm64' : 'amd64', fingerprint: 'wrong' }), undefined)
+  } finally { process.env.PATH = previous }
 })
 
 test('打包前从 Docker 归档核对标签、配置摘要、架构和构建指纹', () => {

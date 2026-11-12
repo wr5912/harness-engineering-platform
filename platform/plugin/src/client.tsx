@@ -418,7 +418,7 @@ function PlatformSettings({ openSettings, settingsOpen, settingsShortcut }: Sett
   const [target, setTarget] = useState<HTMLElement | null>(null)
   useEffect(() => { setTarget(document.getElementById('harness-settings')) }, [])
   return target && createPortal(<button type="button" aria-haspopup="dialog" aria-expanded={settingsOpen}
-    aria-keyshortcuts={settingsShortcut?.aria} onClick={openSettings}>设置</button>, target)
+    aria-keyshortcuts={settingsShortcut?.aria} onClick={() => openSettings()}>设置</button>, target)
 }
 
 export function apply(ctx: ClientContext) {

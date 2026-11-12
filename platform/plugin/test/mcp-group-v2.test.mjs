@@ -292,8 +292,8 @@ test('v2 拒绝跨来源、上游重复和旧名冲突，离线来源不让出�
 test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，仍校验本地配置', async t => {
   const manager = await managerModule(t)
   const duplicate = await fixtureMcp(t, 'duplicate', [], false, true)
-  const [{ Context }, { ToolRuntime }, { createScope }, { SystemPrompt }] = await Promise.all([
-    '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope', '@deepseek-ai/dsh-system-prompt',
+  const [{ Context }, { ToolRuntime }, { apply: applyNativeToolExecutor }, { createScope }, { SystemPrompt }] = await Promise.all([
+    '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-tool-executor-native', '@deepseek-ai/dsh-scope', '@deepseek-ai/dsh-system-prompt',
   ].map(name => runtimeModule(name)))
   const healthy = await serve(t, (req, res) => res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
     openapi: '3.0.0', info: { title: 'healthy', version: '1' }, paths: {
@@ -328,7 +328,7 @@ test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，
     inner.provide('webServer', { register: () => () => {}, publicPath: path => path })
     inner.provide('connection', { requestRejection: () => undefined })
     new SystemPrompt(inner, {})
-    new ToolRuntime(inner, { mode: 'native' })
+    new ToolRuntime(inner); applyNativeToolExecutor(inner)
   } })
   await services
   const loaded = ctx.plugin({ name: 'mcp-mount-test', inject: ['webServer', 'connection', 'tools'], apply(inner) {
@@ -444,8 +444,8 @@ test('原始 OpenAPI 发现尊重调用方取消信号，包括登录授权过�
 
 test('原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态', async t => {
   const manager = await managerModule(t)
-  const [{ Context }, { ToolRuntime }, { createScope }, { SystemPrompt }] = await Promise.all([
-    '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope', '@deepseek-ai/dsh-system-prompt',
+  const [{ Context }, { ToolRuntime }, { apply: applyNativeToolExecutor }, { createScope }, { SystemPrompt }] = await Promise.all([
+    '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-tool-executor-native', '@deepseek-ai/dsh-scope', '@deepseek-ai/dsh-system-prompt',
   ].map(name => runtimeModule(name)))
   const routes = []
   const denied = await serve(t, (_request, response) => response.writeHead(401).end())
@@ -464,7 +464,7 @@ test('原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态', asyn
       register: route => { routes.push(route); return () => routes.splice(routes.indexOf(route), 1) } })
     inner.provide('connection', { requestRejection: () => undefined })
     new SystemPrompt(inner, {})
-    new ToolRuntime(inner, { mode: 'native' })
+    new ToolRuntime(inner); applyNativeToolExecutor(inner)
   } })
   await services
   const loaded = ctx.plugin({ name: 'native-mcp-mount', inject: ['webServer', 'connection', 'tools'], apply(inner) {

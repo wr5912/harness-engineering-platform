@@ -32,8 +32,8 @@ import { McpConfigStore } from '../src/mcp/store.ts'
 import { mcpCredentialPaths } from '../src/mcp/credential-path.ts'
 import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
 
-const [{ Context }, { SystemPrompt }, { ToolRuntime }, { createScope, scopeParentOf }] = await Promise.all([
-  '@deepseek-ai/cordis', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope',
+const [{ Context }, { SystemPrompt }, { ToolRuntime }, { apply: applyNativeToolExecutor }, { createScope, scopeParentOf }] = await Promise.all([
+  '@deepseek-ai/cordis', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-tool-executor-native', '@deepseek-ai/dsh-scope',
 ].map(name => runtimeModule(name)))
 
 test('受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录并拒绝旧分组目标', async t => {
@@ -234,7 +234,7 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
     inner.provide('connection', { requestRejection: () => undefined })
     inner.provide('businessRuntime', { binding, groupUrl: id => `${origin}/mcp/groups/${id}/v2`, groupFetch: () => fetch })
     new SystemPrompt(inner, {})
-    new ToolRuntime(inner, { mode: 'native' })
+    new ToolRuntime(inner); applyNativeToolExecutor(inner)
   } })
   await services
   const businessManager = await sourceManager(t)

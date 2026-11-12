@@ -60,7 +60,7 @@ try {
 } finally { updateGrant(true) }
 const recovered = await turn('恢复授予后的签名调用', '请用资产工具查询资产 A-1，并依据工具返回回答。')
 assert.match(JSON.stringify(recovered.toolResults), /A-1/); assert.match(JSON.stringify(recovered.toolResults), /正常/); results.push(recovered)
-const proof = { at: new Date().toISOString(), instanceId, runtimeVersion: '0.2.1-rc.5', sourceCommit: 'b830ec950faba0a46dda564be3e2d854afed94f1',
+const proof = { at: new Date().toISOString(), instanceId, runtimeVersion: '0.2.2-rc.2', sourceCommit: 'ddac96760b6edf8fa0fe17cbdcf0b512f4c12b2c',
   environment: '本机隔离容器模拟远程已有实例', model: '确定性模拟OpenAI模型；不证明真实模型或业务效果', resource: '模拟业务资源', results }
 writeFileSync(join(sample, 'verification.json'), JSON.stringify(proof, null, 2) + '\n', { mode: 0o600 })
 process.stdout.write(JSON.stringify({ instanceId, passed: results.map(result => result.name), evidence: join(sample, 'verification.json') }) + '\n')

@@ -22,8 +22,8 @@ const modelRoles = {
 const require = createRequire(import.meta.url)
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
 const sdk = name => import(pathToFileURL(sdkRequire.resolve(name)).href)
-const [{ Context }, { ToolRuntime }, { SystemPrompt }, { createScope }, { LlmRuntime }] = await Promise.all([
-  sdk('@deepseek-ai/cordis'), sdk('@deepseek-ai/dsh-tools'), sdk('@deepseek-ai/dsh-system-prompt'), sdk('@deepseek-ai/dsh-scope'), sdk('@deepseek-ai/dsh-llm'),
+const [{ Context }, { ToolRuntime }, { apply: applyNativeToolExecutor }, { SystemPrompt }, { createScope }, { LlmRuntime }] = await Promise.all([
+  sdk('@deepseek-ai/cordis'), sdk('@deepseek-ai/dsh-tools'), sdk('@deepseek-ai/dsh-tool-executor-native'), sdk('@deepseek-ai/dsh-system-prompt'), sdk('@deepseek-ai/dsh-scope'), sdk('@deepseek-ai/dsh-llm'),
 ])
 test.after(() => rmSync(directory, { recursive: true, force: true }))
 test('生成适配器复用锁定Runtime的真实Provider错误事实和归属头', () => {
@@ -92,7 +92,7 @@ test('图内模型请求保留同一次attempt及真实usage，不能隐藏在�
 function nativeFixture(t, llm) {
   const ctx = new Context()
   new SystemPrompt(ctx, {})
-  new ToolRuntime(ctx, { mode: 'native' })
+  new ToolRuntime(ctx); applyNativeToolExecutor(ctx)
   const agent = { id: 'workflow-agent', session: { id: 'workflow-session' } }
   const scope = createScope(ctx, agent)
   agent.ctx = scope.ctx

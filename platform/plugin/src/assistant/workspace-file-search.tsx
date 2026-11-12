@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { FileTypeIcon, MenuSurface, Tooltip, useAnchoredPosition, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FileTypeIcon, MenuSurface, Tooltip, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 import { fileAddressFor, pathPartsOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller/remote'
@@ -27,7 +27,21 @@ export function WorkspaceFileSearch({ sessionId, absolutePath, listFiles, sideba
   const id = useId()
   const mounted = useSyncExternalStore(sidebar.mounted.subscribe, sidebar.mounted.getSnapshot)
   const visible = open && mounted === sessionId
-  const position = useAnchoredPosition({ open: visible, anchorRef: anchor, panelRef: panel, side: 'bottom', align: 'end', gap: 8, margin: 12 })
+  const [position, setPosition] = useState<{ position: 'fixed'; top: number; left: number; zIndex: number; visibility: 'visible' | 'hidden' } | null>(null)
+  useEffect(() => {
+    if (!visible || !anchor.current) { setPosition(null); return }
+    const update = () => {
+      const rect = anchor.current?.getBoundingClientRect()
+      if (!rect) return
+      const width = Math.min(420, Math.max(0, window.innerWidth - 24))
+      const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12))
+      setPosition({ position: 'fixed', top: Math.min(rect.bottom + 8, Math.max(12, window.innerHeight - 12)), left, zIndex: 1000, visibility: 'visible' })
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => { window.removeEventListener('resize', update); window.removeEventListener('scroll', update, true) }
+  }, [visible])
   const ready = visible && !!position
   useDismissOnOutsidePointer(anchor, visible, setOpen, panel)
   useEffect(() => { setOpen(false); setQuery(''); setResult(undefined) }, [sessionId, absolutePath, mounted])
@@ -68,7 +82,7 @@ export function WorkspaceFileSearch({ sessionId, absolutePath, listFiles, sideba
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
     </button></Tooltip>
     {visible && createPortal(<MenuSurface ref={panel} id={id} role="dialog" aria-label="查找工作区文件" className="harness-file-search"
-      style={{ ...position, visibility: position ? 'visible' : 'hidden' }}
+      style={position ?? { position: 'fixed', visibility: 'hidden' }}
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close() } }}>
       <div className="harness-file-search-heading"><strong>查找文件和文件夹</strong><button type="button" aria-label="关闭文件查找" onClick={close}>×</button></div>
       <p className="harness-file-search-scope" title={absolutePath}>当前工作区：{absolutePath}</p>

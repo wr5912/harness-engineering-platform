@@ -15,8 +15,8 @@ import { managementSkills } from '../src/assistant/business-assets.ts'
 
 const require = createRequire(import.meta.url)
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
-const [{ ToolRuntime }, { createScope }] = await Promise.all([
-  '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-scope',
+const [{ ToolRuntime }, { apply: applyNativeToolExecutor }, { createScope }] = await Promise.all([
+  '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-tool-executor-native', '@deepseek-ai/dsh-scope',
 ].map(name => import(pathToFileURL(sdkRequire.resolve(name)).href)))
 
 test('平台管理 Session 不等待失联 MCP 来源，仍可调用平台工具', { timeout: 8000 }, async t => {
@@ -70,7 +70,7 @@ test('平台管理 Session 不等待失联 MCP 来源，仍可调用平台工具
     new SessionStore(inner)
     new SessionProjectionRegistry(inner)
     new SystemPrompt(inner, {})
-    new ToolRuntime(inner, { mode: 'native' })
+    new ToolRuntime(inner); applyNativeToolExecutor(inner)
   } })
   await services
   const manager = await import('../lib/platform-mcp-manager.js')

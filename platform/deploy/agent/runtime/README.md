@@ -21,7 +21,7 @@
 
 DSH 原生 MCP 客户端负责连接和装载工具、资源；分组和组合编排由随包装载的平台 MCP 服务端插件实现。也可修改 MCP 配置连接可达的平台 MCP 服务，此时依赖该外部服务。Harness 与必要插件通过映射由 DSH Runtime 装载。
 
-导出结束会清除本次临时构建目录和未完成归档；失败或取消同样清理。安装成功会自动删除安装目录内的 `images/` 和 `offline/`，保留源安装包作为重新安装介质。源包与解包目录由其持有人按需删除。`./agent cleanup` 停止该安装并清除容器、网络及残余安装介质，保留共享标准镜像、Harness、配置、HOME 和会话；再次运行 `./agent start` 可恢复。较早版本可在平台程序根执行 `platform/dsh-deploy agent-cleanup --prefix <安装目录>`。
+导出结束会清除本次临时构建目录和未完成归档；失败或取消同样清理。安装器先按镜像 tag、Image ID、架构和构建指纹核对 Docker 中已有的标准 Runtime；身份完全匹配时直接复用，不重复导入归档，也不重新打包镜像。安装成功会自动删除安装目录内的 `images/` 和 `offline/`，保留源安装包作为重新安装介质。源包与解包目录由其持有人按需删除。`./agent cleanup` 停止该安装并清除容器、网络及残余安装介质，保留共享标准镜像、Harness、配置、HOME 和会话；再次运行 `./agent start` 可恢复。较早版本可在平台程序根执行 `platform/dsh-deploy agent-cleanup --prefix <安装目录>`。
 
 ## 修改 Harness
 

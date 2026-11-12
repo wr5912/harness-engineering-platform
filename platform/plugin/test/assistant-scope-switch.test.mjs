@@ -18,8 +18,9 @@ import * as plugin from '../lib/index.js'
 
 const require = createRequire(import.meta.url)
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
-const [{ ToolRuntime }, { createScope }, { createUserMessage }, { SkillRegistry }, { FileSystemSkillProvider }, { SessionQueryEngine }] = await Promise.all([
+const [{ ToolRuntime }, { ToolExecutionPipeline, executeToolBatch }, { createScope }, { createUserMessage }, { SkillRegistry }, { FileSystemSkillProvider }, { SessionQueryEngine }] = await Promise.all([
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-tools')).href),
+  import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-tools/pipeline')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-scope')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-llm')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-skill')).href),
@@ -81,13 +82,23 @@ test('真实HTTP管理任务切换保留全部原生工具、Skill和权限决�
     inner.skills.registerProvider(control => skillProvider = new FileSystemSkillProvider(inner, control, {
       includeDefaultRoots: false, customSkillDirs: [join(assetRoot, '.agents/skills'), extensionSkills], watch: false,
     }))
-    new ToolRuntime(inner, { mode: 'native' })
+    new ToolRuntime(inner)
+    const toolPipeline = new ToolExecutionPipeline(inner)
     new ApprovalService(inner, { policy: 'never' })
     for (const name of ['skill', 'bash', 'read', 'write', 'spawn_agent']) inner.tools.register({
       name, description: '作用域回归工具', parameters: { type: 'object', additionalProperties: true },
       output: { schema: { type: 'object' }, render: () => [{ type: 'text', text: '{}' }] },
       execute(args, execution) { calls.push({ name, args, agentId: execution.agent.id }); return {} },
     })
+    inner.provide('sessionPersistence', { async list() { return [] } })
+    inner.provide('sessionProjectionCache', { cachedSnapshot() { return undefined } })
+    const disposeToolExecutor = inner.tools.setExecutor({
+      describe(definitions) {
+        return { schemas: definitions.map(tool => ({ name: tool.name, description: tool.description, parameters: tool.parameters })), knownNames: definitions.map(tool => tool.name) }
+      },
+      async execute(input) { return executeToolBatch(input, toolPipeline, () => 1) },
+    })
+    inner.effect(() => disposeToolExecutor)
     const compositions = createMcpHandler(assetRoot, { servers: () => [] })
     inner.provide('platformMcp', { servers: { get: () => [] }, groups: { get: () => [] },
       compositionHandler: compositions,
@@ -146,7 +157,10 @@ test('真实HTTP管理任务切换保留全部原生工具、Skill和权限决�
   const id = created.session_id, agent = agents.get(id)
   const schemas = async () => (await ctx.systemPrompt.assemble({ scope: agent, agent })).tools.map(tool => tool.name).sort()
   let sequence = 0
-  const execute = (name, args = {}, target = agent) => ctx.tools.execute({ name, arguments: args, callId: `scope-call-${++sequence}`, agent: target, signal: new AbortController().signal })
+  const execute = async (name, args = {}, target = agent) => {
+    const batch = await ctx.tools.execute({ calls: [{ id: `scope-call-${++sequence}`, name, arguments: JSON.stringify(args) }], agent: target, signal: new AbortController().signal })
+    return batch.results[0]?.result ?? { isError: true }
+  }
   const assertManagement = async () => {
     const names = await schemas()
     for (const name of ['platform_agents', 'platform_instances', 'platform_mcp', 'skill', 'bash', 'read', 'write']) assert.ok(names.includes(name), `${name} 应可用`)
@@ -242,12 +256,10 @@ test('真实HTTP管理任务切换保留全部原生工具、Skill和权限决�
   assert.equal((await rpc('status', { session_id: child.id })).session_id, child.id)
   ctx.emit('agent/disposed', { agent })
   assert.ok(ctx.tools.get('bash', agent), 'agent disposed不改写原生工具')
-  const stop = agent.ctx.tools.presentAs('native')
-  stop()
+  assert.ok(agent.ctx.tools.get('bash', agent), 'rc2 原生工具注册保持可读')
   await rpc('status', { session_id: id })
   await assertCompute()
   await loaded.dispose()
   assert.ok(ctx.tools.get('bash', agent), '插件卸载保持原生工具可用')
-  const stopAfterUnload = agent.ctx.tools.presentAs('native')
-  stopAfterUnload()
+  assert.ok(agent.ctx.tools.get('bash', agent), '插件卸载后原生工具注册保持可读')
 })

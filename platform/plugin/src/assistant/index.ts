@@ -142,7 +142,7 @@ export const assistantProjection = {
     }
     return state
   },
-} satisfies ProjectionDefinition<typeof projectionKey>
+} satisfies ProjectionDefinition<typeof projectionKey, AssistantState>
 
 export function redactAssistant(value: any): any {
   if (Array.isArray(value)) return value.map(redactAssistant)
@@ -303,7 +303,7 @@ function assertNoCredentials(domain: Domain, action: string, input: MapValue) {
 export function createAssistant(root: string, platform: ConnectionRpcHandler, services: AssistantServices) {
   const busy = new Set<string>()
   const operationLocks = new Map<string, Promise<unknown>>()
-  const unregisterProjection = services.projections.register(assistantProjection)
+  const projectionRegistration = services.projections.register(assistantProjection)
   async function inspect(id: string, signal?: AbortSignal, readOnly = false) {
     if (!id) throw new Error('缺少 Session ID')
     signal?.throwIfAborted()
@@ -318,7 +318,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
     const found = await services.controller.resolveAgent(id)
     if (found.error) throw found.error
     const session: Session = found.agent.session
-    const state: AssistantState = services.projections.stateOf(session, projectionKey) ?? assistantProjection.init(session.header, session.inheritedEventCount)
+    const state: AssistantState = services.projections.stateOf(session, projectionKey) as AssistantState | undefined ?? assistantProjection.init(session.header, session.inheritedEventCount) as AssistantState
     return { session, state, agent: found.agent }
   }
   async function record(id: string, value: MapValue) {
@@ -833,5 +833,5 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       },
     })
   }
-  return { handler, registerTools, async dispose() { unregisterProjection() } }
+  return { handler, registerTools, async dispose() { const registration = await projectionRegistration as any; if (typeof registration?.dispose === 'function') await registration.dispose(); else if (typeof registration === 'function') await registration() } }
 }

@@ -10,8 +10,8 @@ import { build } from 'esbuild'
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
 import { toNodeHandler } from '@modelcontextprotocol/node'
 import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
-const [{ Context }, { ToolRuntime }, { SystemPrompt }, { McpResourceRuntime }, { createScope }] = await Promise.all([
-  '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-mcp-resources', '@deepseek-ai/dsh-scope',
+const [{ Context }, { ToolRuntime }, { apply: applyNativeToolExecutor }, { SystemPrompt }, { McpResourceRuntime }, { createScope }] = await Promise.all([
+  '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-tool-executor-native', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-mcp-resources', '@deepseek-ai/dsh-scope',
 ].map(name => runtimeModule(name)))
 const previousEntry = process.env.HARNESS_DSH_ENTRY
 process.env.HARNESS_DSH_ENTRY ??= '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json'
@@ -58,7 +58,7 @@ async function fixture(t, mcp, extension) {
   }, '127.0.0.2')
   await ctx.plugin({ name: 'standalone-fixture-services', apply(inner) {
     new SystemPrompt(inner, {})
-    new ToolRuntime(inner, { mode: 'native' })
+    new ToolRuntime(inner); applyNativeToolExecutor(inner)
     new McpResourceRuntime(inner)
     inner.provide('webServer', { port: gateway.server.address().port, getOrigin: () => gateway.origin, publicPath: path => path,
       register(route) { routes.push(route); return () => { const index = routes.indexOf(route); if (index >= 0) routes.splice(index, 1) } } })

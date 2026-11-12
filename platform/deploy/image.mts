@@ -119,6 +119,22 @@ export function loadVerifiedImage(archive: string, expected: { tag?: string; id?
   return info
 }
 
+/**
+ * Reuse an already imported standard Runtime image when its immutable identity
+ * matches the package. Exported agents share this image across installations;
+ * no image rebuild or archive import is needed for the next agent.
+ */
+export function findVerifiedImage(expected: { tag?: string; id?: string; arch?: Arch; fingerprint?: string }): ImageInfo | undefined {
+  const target = expected.tag || expected.id
+  if (!target) return undefined
+  try {
+    const info = inspectImage(target)
+    return verifyImageInfo(info, expected).length ? undefined : info
+  } catch {
+    return undefined
+  }
+}
+
 export function expectedArch(arch: Arch): string {
   return arch === 'arm64' ? 'arm64' : 'amd64'
 }

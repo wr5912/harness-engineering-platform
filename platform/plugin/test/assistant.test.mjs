@@ -8,6 +8,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { SessionStore, appendPluginRecord, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
+import { apply as applyNativeToolExecutor } from '@deepseek-ai/dsh-tool-executor-native'
 import { build } from 'esbuild'
 import { createAssistant, redactAssistant } from '../src/assistant/index.ts'
 import { managementSkills } from '../src/assistant/business-assets.ts'
@@ -1233,7 +1234,8 @@ test('动作合同可按需查询，describe 不改变原生工具 Schema 或解
   const require = createRequire(import.meta.url)
   const sdk = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
   const { ToolRuntime, assertSupportedJsonSchema } = await import(pathToFileURL(sdk.resolve('@deepseek-ai/dsh-tools')).href)
-  new ToolRuntime(f.ctx, { mode: 'native' })
+  new ToolRuntime(f.ctx)
+  applyNativeToolExecutor(f.ctx)
   for (const tool of f.tools.values()) f.ctx.tools.register(tool)
   const id = (await f.rpc('session', { context: { skill: 'compute-variant-research', planning_intent: 'plan_only' } })).value.session_id
   const schema = async () => (await f.assembly(id)).tools.filter(tool => tool.name.startsWith('platform_'))

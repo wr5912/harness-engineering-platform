@@ -6,7 +6,7 @@ import { copyTree } from './fsutil.mts'
 import { readManifest, verifyEntries } from './manifest.mts'
 import { rewriteDeploymentAddress, rewriteKnownPaths, scanKnownOldPaths } from './paths.mts'
 import { installRuntime } from './runtime.mts'
-import { dockerAvailable, loadVerifiedImage } from './image.mts'
+import { dockerAvailable, findVerifiedImage, loadVerifiedImage } from './image.mts'
 import { assertRealWorkspace } from './data.mts'
 import { restoreRepository } from './repository.mts'
 import { prepareDeploymentFirewall } from './firewall.mts'
@@ -39,7 +39,7 @@ export interface InstallReport {
   warnings: string[]
   rewritten: string[]
   oldReferences: Array<{ file: string; pattern: string }>
-  image?: { tag?: string; id?: string; loaded: boolean }
+  image?: { tag?: string; id?: string; loaded: boolean; reused?: boolean }
   prepare: 'skipped' | 'ok'
   autostart: 'skipped' | 'enabled'
   pendingInstances: string[]
@@ -164,8 +164,14 @@ export function install(options: InstallOptions): InstallReport {
       if (!dockerAvailable()) {
         throw new Error('Docker 不可用；无法导入标准 Runtime 镜像。请启动 Docker 后重试，或显式使用 --skip-image')
       } else {
-        const info = loadVerifiedImage(join(bundleRoot, manifest.image.archive), manifest.image)
-        report.image = { tag: manifest.image.tag, id: info.id, loaded: true }
+        const existing = findVerifiedImage(manifest.image)
+        if (existing) {
+          report.image = { tag: manifest.image.tag, id: existing.id, loaded: false, reused: true }
+          warnings.push('复用主机上已核验的标准 Runtime 镜像；未重复导入镜像归档')
+        } else {
+          const info = loadVerifiedImage(join(bundleRoot, manifest.image.archive), manifest.image)
+          report.image = { tag: manifest.image.tag, id: info.id, loaded: true }
+        }
       }
     } else if (manifest.image && options.skipImage) {
       warnings.push('按要求跳过镜像导入')

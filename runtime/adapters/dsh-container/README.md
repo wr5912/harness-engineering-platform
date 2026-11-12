@@ -32,7 +32,7 @@ export HARNESS_ASSET_ROOT="$HOME/harness-engineering-platform-data"
 
 ## 源码与镜像身份
 
-`source.lock.json` 锁定官方仓库提交、Git tree、`pnpm-lock.yaml` 摘要、包管理器版本和 Node 基础镜像 OCI index digest；当前锁定 `v0.2.1-rc.5`，Web 组合原生包含 Schedule 服务和任务界面。所有 Experiment 共用这份锁。宿主来源解析将 Linux `x86_64`/`amd64` 映射为 `linux/amd64`，将 Linux `aarch64`/`arm64` 映射为 `linux/arm64`，其他系统或架构明确拒绝。构建指纹和本地镜像标签包含解析出的平台，因此同一锁定源码在两种架构上的镜像身份不同，不能混用。宿主来源解析脚本不进入 Runtime 镜像，因此不参与镜像构建指纹。`build-image.sh` 新建临时源码工作树，在宿主侧核对提交、tree 和锁摘要后用 BuildKit named context 构建。官方构建脚本支持显式 `DSH_CLIENT_COMMIT_HASH`；构建器不依赖 named context 是否携带 `.git`，只安装本地 C 编译及 musl 工具，最终镜像不保留这些构建工具或 `.git`。本仓库没有 DSH 源码副本。
+`source.lock.json` 锁定官方仓库提交、Git tree、`pnpm-lock.yaml` 摘要、包管理器版本和 Node 基础镜像 OCI index digest；当前锁定 `v0.2.2-rc.2`，Web 组合原生包含 Schedule 服务和任务界面。所有 Experiment 共用这份锁。宿主来源解析将 Linux `x86_64`/`amd64` 映射为 `linux/amd64`，将 Linux `aarch64`/`arm64` 映射为 `linux/arm64`，其他系统或架构明确拒绝。构建指纹和本地镜像标签包含解析出的平台，因此同一锁定源码在两种架构上的镜像身份不同，不能混用。宿主来源解析脚本不进入 Runtime 镜像，因此不参与镜像构建指纹。`build-image.sh` 新建临时源码工作树，在宿主侧核对提交、tree 和锁摘要后用 BuildKit named context 构建。官方构建脚本支持显式 `DSH_CLIENT_COMMIT_HASH`；构建器不依赖 named context 是否携带 `.git`，只安装本地 C 编译及 musl 工具，最终镜像不保留这些构建工具或 `.git`。本仓库没有 DSH 源码副本。
 
 ```bash
 bash runtime/adapters/dsh-container/build-image.sh

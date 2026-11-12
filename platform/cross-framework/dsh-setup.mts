@@ -13,7 +13,7 @@ const root = resolve(process.argv[2]), sample = resolve(process.argv[3]), creden
 if (!root.includes('/.local/') || !sample.includes('/.local/')) throw new Error('样本只允许使用独立 .local 数据目录')
 const endpoints = readSampleEndpoints(root)
 const target = JSON.parse(readFileSync(join(sample, 'target.json'), 'utf8'))
-if (target.commit !== 'b830ec950faba0a46dda564be3e2d854afed94f1' || target.version !== '0.2.1-rc.5') throw new Error('DSH 样本版本与锁定来源不一致')
+if (target.commit !== 'ddac96760b6edf8fa0fe17cbdcf0b512f4c12b2c' || target.version !== '0.2.2-rc.2') throw new Error('DSH 样本版本与锁定来源不一致')
 const credentials = join(root, '.local/credentials/external'); mkdirSync(credentials, { recursive: true, mode: 0o700 })
 copyFileSync(credentialFile, join(credentials, 'cross-framework-dsh.json'))
 if (!getExternalInstance(root, id)) mutateExternal(root, 'save', { revision: externalInstances(root).revision, requestId: randomUUID(),

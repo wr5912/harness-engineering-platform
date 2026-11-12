@@ -14,8 +14,8 @@ test('MCP 从当前 Runtime 原生客户端闭包加载作用域，保留父作�
   process.env.HARNESS_DSH_ENTRY = entry
   t.after(() => { if (previousEntry === undefined) delete process.env.HARNESS_DSH_ENTRY; else process.env.HARNESS_DSH_ENTRY = previousEntry })
   const host = createRequire(entry), native = createRequire(host.resolve('@deepseek-ai/dsh-mcp-client'))
-  const [{ Context }, { ToolRuntime }, { SystemPrompt }, { createScope, scopeParentOf }] = await Promise.all([
-    '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-scope',
+  const [{ Context }, { ToolRuntime }, { apply: applyNativeToolExecutor }, { SystemPrompt }, { createScope, scopeParentOf }] = await Promise.all([
+    '@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-tool-executor-native', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-scope',
   ].map(name => import(pathToFileURL(native.resolve(name)).href)))
   const parentDirectory = resolve('.local/mcp-runtime-anchor-tests'); mkdirSync(parentDirectory, { recursive: true })
   const directory = mkdtempSync(join(parentDirectory, 'build-')); t.after(() => rmSync(directory, { recursive: true, force: true }))
@@ -41,7 +41,7 @@ test('MCP 从当前 Runtime 原生客户端闭包加载作用域，保留父作�
   await ctx.plugin({ name: 'scope-anchor-native-services', apply(inner) {
     inner.provide('webServer', { register: () => () => {}, publicPath: path => path })
     inner.provide('connection', { requestRejection: () => undefined })
-    new SystemPrompt(inner, {}); new ToolRuntime(inner, { mode: 'native' })
+    new SystemPrompt(inner, {}); new ToolRuntime(inner); applyNativeToolExecutor(inner)
   } })
   const server = { id: 'rc5', serverName: 'Rc5', enabled: true, specUrl: `http://127.0.0.1:${external.address().port}/openapi.json`, tools: { mode: 'all', names: [] } }
   await ctx.plugin({ name: 'scope-anchor-manager', inject: ['webServer', 'connection', 'tools'], apply(inner) {
