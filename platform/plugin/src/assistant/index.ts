@@ -1,6 +1,7 @@
 import { assetText } from '../agents/asset-text.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import { workspaceIdentity } from '../workspace.ts'
+import { listRepositories, resolveRepository } from './repositories.ts'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -59,6 +60,7 @@ const projectionKey = 'harnessPlatformAssistant'
 const assistantStateSchema = z.object({
   session_id: z.string(), workspace_id: z.string().optional(), inherited_event_count: z.number().int().nonnegative(), active: z.boolean(),
   model: z.record(z.string(), z.any()).optional(),
+  repository: z.record(z.string(), z.any()).optional(),
   context: z.record(z.string(), z.any()), task_context: z.record(z.string(), z.any()), task: z.string().optional(),
   proposals: z.array(z.record(z.string(), z.any())), running: z.boolean(), turn_reason: z.any().optional(),
   extraction_json_retry: toolInputJsonRetrySchema.optional(),
@@ -89,7 +91,7 @@ declare module '@deepseek-ai/dsh-session' {
 
 // 框架负责按 Session 增量折叠、冷恢复和 fork；阅读证据按需通过原生只读查询核对。
 export const assistantProjection = {
-  key: projectionKey, stateVersion: 10, stateSchema: assistantStateSchema,
+  key: projectionKey, stateVersion: 11, stateSchema: assistantStateSchema,
   wire: { viewSchema: assistantViewSchema, view: state => ({ session_id: state.session_id,
     ...(state.workspace_id ? { workspace_id: state.workspace_id } : {}),
     pending_proposals: state.proposals.filter(item => item.state === 'awaiting_confirmation').length,
@@ -126,6 +128,7 @@ export const assistantProjection = {
     if (data.kind === 'submission' && data.owner_session_id === state.session_id && pluginRecord.seq >= state.inherited_event_count) return { ...state, submissions: { ...state.submissions, [data.request_id]: data } }
     if (data.kind === 'context') return { ...state, active: true, context: normalizeManagementContext(data.context ?? {}) }
     if (data.kind === 'workspace') return { ...state, active: true }
+    if (data.kind === 'repository' && !state.repository) return { ...state, repository: data.repository }
     if (data.kind === 'tool-contract') return { ...state, tool_contracts: { ...state.tool_contracts, [data.domain]: data.action } }
     if (data.kind === 'automatic-save' && data.owner_session_id === state.session_id && pluginRecord.seq >= state.inherited_event_count) return { ...state, automatic_save: data }
     if (data.kind === 'proposal') {
@@ -619,22 +622,43 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       return settlement
     } finally { busy.delete(proposalId); services.notify([proposal.domain, 'catalog', 'assistant'], [id]) }
   }
+  async function prepareSession(repositoryId: unknown) {
+    if (repositoryId !== undefined && typeof repositoryId !== 'string') throw new Error('repository_id 必须是已登记仓库 ID')
+    const repository = resolveRepository(root, repositoryId)
+    const id = (await services.controller.create({ cwd: repository.workspace, agentPreset: 'standard' })).sessionId
+    const { session } = await inspect(id)
+    if (session.header.cwd !== repository.workspace) throw new Error('原生会话工作目录与目标仓库不一致')
+    await record(id, { kind: 'workspace' })
+    await record(id, { kind: 'repository', repository })
+    return { session_id: id, repository }
+  }
   const handler: ConnectionRpcHandler = async (endpoint, payload, signal) => {
     try {
       const body = object(payload ?? {})
+      if (body.cwd !== undefined || body.workspace_id !== undefined) throw new Error('请使用已登记 repository_id，不接受客户端 cwd 或 workspace_id')
+      if (endpoint === 'repositories') return result(true, listRepositories(root)) as any
+      if (endpoint === 'prepare-session') return result(true, await prepareSession(body.repository_id)) as any
       if (endpoint === 'configuration') return result(true, await assistantConfiguration(root, services.skills, object(body.context ?? {}), undefined, signal)) as any
       if (endpoint === 'session') {
         let id = typeof body.session_id === 'string' ? body.session_id : ''
         let taskContext: MapValue = {}
         if (id) {
-          const { state } = await inspect(id, signal)
+          const { state, session } = await inspect(id, signal)
+          if (body.repository_id !== undefined) {
+            if (state.repository && state.repository.id !== body.repository_id) throw new Error('已有会话不能切换目标仓库，请新建任务')
+            if (!state.repository) {
+              const repository = resolveRepository(root, body.repository_id)
+              if (repository.workspace !== session.header.cwd) throw new Error('已有会话工作目录与目标仓库不一致')
+              await record(id, { kind: 'repository', repository })
+            }
+          }
+          if (!state.repository && body.repository_id === undefined && session.header.cwd === workspaceIdentity(root).root) {
+            await record(id, { kind: 'repository', repository: resolveRepository(root) })
+          }
           taskContext = state.task_context
         }
         else {
-          // 工作区由已装载的平台固定；客户端字段不能将新会话指向其他目录。
-          if (body.workspace_id) throw new Error('请使用平台当前工作区创建助手会话，不接受外部 workspace_id')
-          id = (await services.controller.create({ cwd: workspaceIdentity(root).root, agentPreset: 'standard' })).sessionId
-          await record(id, { kind: 'workspace' })
+          id = (await prepareSession(body.repository_id)).session_id
         }
         const requestId = body.request_id === undefined ? randomUUID() : body.request_id
         if (typeof requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,120}$/.test(requestId)) throw new Error('任务提交标识无效')
@@ -725,7 +749,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         if (args.action === 'context') {
           const modelCatalog = domain === 'agents'
             ? await assistantModelCatalog(() => platform('models/list', {}, exec.signal, managementPeer), exec.signal) : undefined
-          return wireValue({ ok: true, value: { workspace: workspaceIdentity(root), assistant: { session_id: id, model: state.model ?? null }, context: state.context, task_context: state.task_context,
+          return wireValue({ ok: true, value: { workspace: workspaceIdentity(root), ...(state.repository ? { repository: state.repository } : {}), assistant: { session_id: id, model: state.model ?? null }, context: state.context, task_context: state.task_context,
             ...(modelCatalog ? { model_catalog: modelCatalog } : {}), available_actions: actions[domain], next: state.task_context.skill === 'decision-sample-extraction' ? 'datasets/source 读取固定 Run 的来源目录与 extraction_contract' : 'describe(input.action=操作名)可读取单个动作的参数合同' } })
         }
         if (!actions[domain].includes(args.action)) throw new Error('未知的领域操作')

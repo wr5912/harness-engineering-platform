@@ -46,7 +46,29 @@ def asset_root():
 
 
 def platform_home():
+    selected = os.environ.get("HARNESS_MANAGER_DSH_HOME")
+    if not selected:
+        locator = Path.home() / ".config/harness-engineering-platform/workspace.json"
+        if locator.is_file():
+            try:
+                selected = json.loads(locator.read_text()).get("managerDshHome")
+            except (OSError, ValueError):
+                raise PlatformError("无法读取平台管理助手 HOME 定位。") from None
+    if not selected:
+        sibling = asset_root().parent / "platform-manager-dsh-home"
+        if (sibling / "profiles" / PROFILE_NAME / "package.json").is_file():
+            selected = str(sibling)
+    if selected:
+        path = Path(selected).expanduser()
+        if not path.is_absolute() or not path.is_dir():
+            raise PlatformError("平台管理助手 HOME 必须是已存在的绝对目录。")
+        return path.resolve()
     return (asset_root() / ".local" / "platform-home").resolve()
+
+
+def repository_home(home):
+    """原生 HOME 仓库直接装载；不将程序模板覆盖到版本化 Profile。"""
+    return (home / ".git").exists()
 
 
 def check_workspace():
@@ -80,6 +102,32 @@ def runtime_environment(home):
             "HARNESS_PROGRAM_ROOT": str(REPO),
             "HARNESS_PYTHON": sys.executable,
             "HARNESS_SITES_CONFIG": str(asset_root() / "config" / "sites.json")}
+
+
+def native_home_environment(home):
+    environment = runtime_environment(home)
+    skill_dirs = [asset_root() / ".agents/skills"]
+    skill_dirs += [asset_root() / item["path"] / "skills" for item in workspace_extensions()
+                   if (asset_root() / item["path"] / "skills").is_dir()]
+    extensions = [{"id": item["id"], "name": str(extension_output(item, path_only=True) / "plugin.js"),
+                   "disabled": False} for item in workspace_extensions()]
+    environment["HARNESS_MANAGER_SKILL_DIRS"] = json.dumps([str(path) for path in skill_dirs])
+    environment["HARNESS_MANAGER_EXTENSIONS"] = json.dumps(extensions)
+    return environment
+
+
+def check_repository_profile(profile):
+    try:
+        manifest = json.loads((profile / "package.json").read_text())
+        bundles = manifest["dsh"]["profile"]["bundles"]
+        required = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@ai-agent-harness/harness-platform"]
+        if not all(item in bundles for item in required):
+            raise ValueError()
+        for name in ("cordis.patch.yml", "pnpm-workspace.yaml"):
+            if not (profile / name).is_file():
+                raise ValueError()
+    except (OSError, KeyError, ValueError, TypeError):
+        raise PlatformError("DSH HOME 仓库缺少完整的原生 harness-platform Profile。") from None
 
 
 def global_dsh(home):
@@ -827,13 +875,17 @@ def prepare(home, offline=False):
         os.environ["HEP_OFFLINE"] = "1"
     check_workspace()
     executable, version = global_dsh(home)
-    rendered = rendered_profile()
     profile = home / "profiles" / PROFILE_NAME
+    versioned = repository_home(home)
+    if versioned:
+        check_repository_profile(profile)
+    rendered = rendered_profile()
     manifest = profile / "package.json"
-    rendered["package.json"] = merged_profile_manifest(
-        manifest.read_text(encoding="utf-8") if manifest.exists() else rendered["package.json"],
-        rendered["package.json"],
-    )
+    if not versioned:
+        rendered["package.json"] = merged_profile_manifest(
+            manifest.read_text(encoding="utf-8") if manifest.exists() else rendered["package.json"],
+            rendered["package.json"],
+        )
     pnpm = shutil.which("pnpm")
     if not pnpm:
         raise PlatformError("PATH 中没有 pnpm；请先安装插件构建工具。")
@@ -863,8 +915,11 @@ def prepare(home, offline=False):
     if not user_patch.exists():
         user_patch.write_text("[]\n", encoding="utf-8")
     # 在重建 bundle 链接前核对旧 MCP 身份并迁出配置；换链后会丢失旧来源关系。
-    migrate_mcp_patch(profile)
+    if not versioned:
+        migrate_mcp_patch(profile)
     link_bundle(profile)
+    if versioned:
+        rendered = {PLATFORM_PATCH: rendered[PLATFORM_PATCH]}
     for name, content in rendered.items():
         (profile / name).write_text(content, encoding="utf-8")
     print(f"平台准备完成：DSH {version} ({executable})")
@@ -934,9 +989,15 @@ def start(home, host, port, dry_run, public_url=None, applied=False):
                 raise PlatformError(f"已应用 Profile 缺少 {name}，请通过更新工具恢复。")
         json.loads((profile / "package.json").read_text())
     else:
-        rendered = rendered_profile()
         check_artifacts()
-        check_profile(profile, rendered)
+        if repository_home(home):
+            check_repository_profile(profile)
+            bundle = profile / "node_modules/@ai-agent-harness/harness-platform"
+            if not bundle.is_symlink() or bundle.resolve() != PLUGIN:
+                raise PlatformError("原生 Profile 尚未关联当前程序，请运行 prepare。")
+            check_mcp_store()
+        else:
+            check_profile(profile, rendered_profile())
     host = host or default_host()
     if not dry_run:
         check_port(host, port)
@@ -964,7 +1025,7 @@ def start(home, host, port, dry_run, public_url=None, applied=False):
     print(f"平台地址：{public_url or f'http://{host}:{port}{base_path()}'}（打开页面登录）", flush=True)
     print("平台运行中；使用 dsh-platform stop 停止，重启复用同一平台 HOME。", flush=True)
     os.chdir(asset_root())
-    os.execvpe(executable, command, {**runtime_environment(home),
+    os.execvpe(executable, command, {**native_home_environment(home),
                                   "HARNESS_DSH_ENTRY": str(Path(executable).resolve())})
 
 

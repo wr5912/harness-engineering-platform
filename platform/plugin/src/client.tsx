@@ -188,6 +188,7 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, brandingForm, e
     }).catch(() => { if (active) setAccount({ username: '', error: '账号读取失败' }) })
     return () => { active = false }
   }, [rpc])
+  useEffect(() => { void assistant.refreshRepositories?.() }, [assistant])
   useEffect(() => { assistant.restore() }, [assistant, assets?.root])
   const status = useSessionStatus(value => assistantState.sessionId ? value.get(assistantState.sessionId) : undefined)
   const navigate = useCallback((next: PageId | PlatformNavigation) => {
@@ -369,6 +370,10 @@ function PlatformPage({ catalog, rpc, assistant, updates, theme, brandingForm, e
             <button ref={closeAssistant} title="收起助手" onClick={() => { setOpen(false); requestAnimationFrame(() => toggleAssistant.current?.focus()) }}>收起</button>
           </div></header>
           <div className="harness-assistant-context">
+            <label className="harness-assistant-context-row" htmlFor="harness-assistant-repository"><span>目标仓库</span><select id="harness-assistant-repository" value={assistantState.repositoryId} disabled={assistantState.busy || Boolean(assistantState.sessionId)} onChange={event => { try { assistant.selectRepository(event.currentTarget.value) } catch (error) { window.alert(error instanceof Error ? error.message : '目标仓库选择失败') } }}>
+              {(assistantState.repositories ?? []).filter(item => item.available).map(item => <option key={item.id} value={item.id}>{item.id === 'data' ? '平台数据仓库' : item.id}</option>)}
+            </select>
+            </label>
             <div className="harness-assistant-context-row"><span>{sameObject ? '当前查看与任务对象' : '当前查看'}：<strong>{viewedObject}</strong></span><a href={navigationHash(target)} onClick={event => { event.preventDefault(); setOpen(false); navigate(target) }}>定位当前对象</a></div>
             {fixedObject && !sameObject && <div className="harness-assistant-context-row"><span>原任务固定对象：<strong>{fixedObject}</strong></span>{fixedTarget && <a href={navigationHash(fixedTarget)} onClick={event => { event.preventDefault(); setOpen(false); navigate(fixedTarget) }}>查看任务对象</a>}</div>}
             {fixedObject && !sameObject && hasViewedObject && <button type="button" disabled={assistantState.busy} onClick={() => newAssistantTask({ ...target, page })}>以当前对象新建任务</button>}

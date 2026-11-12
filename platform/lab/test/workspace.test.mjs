@@ -1,0 +1,146 @@
+import assert from 'node:assert/strict'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import test from 'node:test'
+import { doctorLab, initializeLab, planUpdate, readLab, repositoryNames, statusLab } from '../workspace.mts'
+
+const git = (root, ...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+function fixture(t) {
+  const root = mkdtempSync(join(tmpdir(), 'hep-lab-test-')), destination = join(root, 'lab'), repositories = {}
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  for (const key of Object.keys(repositoryNames)) {
+    const path = join(root, `${key}-source`)
+    mkdirSync(path)
+    git(path, 'init', '-b', 'main'); git(path, 'config', 'user.name', 'Lab Test'); git(path, 'config', 'user.email', 'lab@example.invalid')
+    writeFileSync(join(path, 'README.md'), 'fixture\n')
+    writeFileSync(join(path, '.gitignore'), '.env\nsessions/\nnode_modules/\n')
+    if (key === 'platform_manager_dsh_home') { mkdirSync(join(path, 'profiles/web'), { recursive: true }); writeFileSync(join(path, 'profiles/web/package.json'), '{"dsh":{"profile":{"bundles":[]}}}\n') }
+    if (key === 'business_agents') { mkdirSync(join(path, 'agents/demo/agent'), { recursive: true }); writeFileSync(join(path, 'agents/demo/agent/harness.yaml'), 'schema_version: 1\n') }
+    git(path, 'add', '.'); git(path, 'commit', '-qm', 'fixture')
+    repositories[key] = { url: path, ref: 'main', commit: git(path, 'rev-parse', 'HEAD') }
+  }
+  const data = repositories.data.url
+  mkdirSync(join(data, 'registry/agents'), { recursive: true })
+  writeFileSync(join(data, 'registry/agents/demo.yaml'), `agent_id: demo\nsource_repository: ${repositories.business_agents.url}\nsource_commit: ${repositories.business_agents.commit}\nagent_path: agents/demo/agent\n`)
+  git(data, 'add', '.'); git(data, 'commit', '-qm', 'registry')
+  repositories.data.commit = git(data, 'rev-parse', 'HEAD')
+  return { root, destination, repositories }
+}
+test('四仓固定SHA并列检出、重复执行幂等，check-only完全不落盘', t => {
+  const f = fixture(t)
+  const plan = initializeLab({ ...f, checkOnly: true })
+  assert.equal(plan.check_only, true); assert.equal(existsSync(f.destination), false)
+  const first = initializeLab(f)
+  assert.equal(first.validation.valid, true, JSON.stringify(first.validation))
+  assert.equal(first.validation.agent_count, 1)
+  assert.equal(first.manifest.paths.dsh_home, join(f.destination, 'platform-manager-dsh-home'))
+  const before = readFileSync(join(f.destination, '.hep-lab/manifest.yaml'), 'utf8')
+  initializeLab({ ...f, reuse: true })
+  assert.equal(readFileSync(join(f.destination, '.hep-lab/manifest.yaml'), 'utf8'), before)
+  assert.equal(doctorLab(f.destination).valid, true)
+  assert.equal(statusLab(f.destination).repositories.business_agents.matches_lock, true)
+  assert.equal(planUpdate(f.destination).repositories.every(item => !item.changed), true)
+})
+test('dirty工作树、非空目录、origin和版本冲突均保留用户内容', t => {
+  const f = fixture(t); initializeLab(f)
+  const path = join(f.destination, 'business-agents/README.md')
+  writeFileSync(path, '用户修改\n')
+  assert.throws(() => initializeLab({ ...f, reuse: true }), /未提交/)
+  assert.equal(readFileSync(path, 'utf8'), '用户修改\n')
+  assert.throws(() => planUpdate(f.destination), /未提交/)
+  assert.equal(doctorLab(f.destination).valid, false)
+  const other = join(f.root, 'not-empty'); mkdirSync(other); writeFileSync(join(other, 'user.txt'), 'keep')
+  assert.throws(() => initializeLab({ ...f, destination: other }), /非 hep-lab/)
+  assert.equal(readFileSync(join(other, 'user.txt'), 'utf8'), 'keep')
+  git(join(f.destination, 'business-agents'), 'remote', 'set-url', 'origin', f.repositories.data.url)
+  assert.throws(() => initializeLab({ ...f, reuse: true }), /未提交|origin/)
+})
+test('显式浮动开发分支仍冻结实际SHA，分支和SHA不一致拒绝', t => {
+  const f = fixture(t)
+  const floating = Object.fromEntries(Object.entries(f.repositories).map(([key, { url, ref }]) => [key, { url, ref }]))
+  assert.throws(() => initializeLab({ ...f, repositories: floating }), /缺少 commit/)
+  const result = initializeLab({ ...f, repositories: floating, allowFloatingRef: true })
+  assert.equal(result.manifest.repositories.business_agents.commit, f.repositories.business_agents.commit)
+  const invalid = structuredClone(f.repositories); invalid.business_agents.commit = 'a'.repeat(40)
+  assert.throws(() => initializeLab({ ...f, destination: join(f.root, 'other'), repositories: invalid }), /ref 与指定 commit/)
+})
+test('lock不一致先拒绝，不写入目标仓库或用户文件', t => {
+  const f = fixture(t), data = f.repositories.data.url
+  mkdirSync(join(data, 'locks'), { recursive: true })
+  writeFileSync(join(data, 'locks/repositories.yaml'), `repositories:\n  business_agents:\n    url: ${f.repositories.business_agents.url}\n    commit: ${'a'.repeat(40)}\n`)
+  git(data, 'add', '.'); git(data, 'commit', '-qm', 'bad lock'); f.repositories.data.commit = git(data, 'rev-parse', 'HEAD')
+  assert.throws(() => initializeLab(f), /输入与仓库锁定/)
+  assert.equal(existsSync(join(f.destination, 'business-agents')), false)
+  assert.equal(existsSync(join(f.destination, '.hep-lab/manifest.yaml')), false)
+})
+test('可选运行隔离使用真实git worktree并锁定来源', t => {
+  const f = fixture(t), result = initializeLab({ ...f, isolateRuntime: true })
+  assert.equal(result.validation.valid, true)
+  const manifest = readLab(f.destination)
+  assert.equal(manifest.paths.dsh_home, join(f.destination, '.hep-lab/runtime/dsh-home'))
+  assert.equal(git(manifest.paths.dsh_home, 'rev-parse', 'HEAD'), f.repositories.platform_manager_dsh_home.commit)
+  initializeLab({ ...f, isolateRuntime: true, reuse: true })
+  writeFileSync(join(manifest.paths.dsh_home, 'README.md'), 'dirty')
+  assert.throws(() => initializeLab({ ...f, isolateRuntime: true, reuse: true }), /未提交/)
+})
+test('doctor拒绝tracked凭据、runtime目录、嵌套repo和Registry错绑', t => {
+  const f = fixture(t); initializeLab(f)
+  const business = join(f.destination, 'business-agents')
+  git(business, 'config', 'user.name', 'Lab Test'); git(business, 'config', 'user.email', 'lab@example.invalid')
+  writeFileSync(join(business, '.env'), 'KEY=fixture\n'); git(business, 'add', '-f', '.env'); git(business, 'commit', '-qm', 'unsafe')
+  mkdirSync(join(business, 'nested')); git(join(business, 'nested'), 'init', '-b', 'main')
+  const report = doctorLab(f.destination)
+  assert.equal(report.valid, false)
+  // 仓库状态冲突同样会阻断；精确治理检查使用与当前HEAD匹配的清单。
+  const manifest = readLab(f.destination); manifest.repositories.business_agents.commit = git(business, 'rev-parse', 'HEAD')
+  rmSync(join(business, 'nested'), { recursive: true })
+  const config = JSON.stringify(manifest)
+  writeFileSync(join(f.destination, '.hep-lab/manifest.yaml'), config)
+  const unsafe = doctorLab(f.destination)
+  assert.ok(unsafe.issues.some(item => item.code === 'runtime_or_secret_path'))
+  assert.ok(unsafe.issues.some(item => item.code === 'agent_reference'))
+  mkdirSync(join(business, 'nested')); git(join(business, 'nested'), 'init', '-b', 'main')
+  writeFileSync(join(business, '.gitignore'), '.env\nsessions/\nnode_modules/\nnested/\n')
+  git(business, 'add', '.gitignore'); git(business, 'commit', '-qm', 'ignore nested'); manifest.repositories.business_agents.commit = git(business, 'rev-parse', 'HEAD')
+  writeFileSync(join(f.destination, '.hep-lab/manifest.yaml'), JSON.stringify(manifest))
+  assert.ok(doctorLab(f.destination).issues.some(item => item.code === 'nested_repository'))
+})
+test('输入拒绝含凭据URL、选项伪装、短SHA和符号链接目的地', t => {
+  const f = fixture(t)
+  for (const url of ['https://user:password@example.invalid/repo', '-upload-pack=bad', 'https://example.invalid/repo?token=secret']) {
+    const repositories = structuredClone(f.repositories); repositories.data.url = url
+    assert.throws(() => initializeLab({ ...f, repositories, checkOnly: true }), /地址/)
+  }
+  const repositories = structuredClone(f.repositories); repositories.data.commit = 'abc'
+  assert.throws(() => initializeLab({ ...f, repositories }), /40 位/)
+  const link = join(f.root, 'link'); symlinkSync(f.root, link)
+  assert.throws(() => initializeLab({ ...f, destination: join(link, 'lab') }), /符号链接/)
+})
+test('CLI不接受update执行和未知参数，不回显Git凭据诊断', t => {
+  const cli = new URL('../cli.mts', import.meta.url).pathname
+  for (const args of [['update', '--lab', '/missing'], ['status', '--lab', '/missing', '--force'], ['init', '--destination', '/missing']]) {
+    const result = spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' })
+    assert.equal(result.status, 1)
+    assert.ok(result.stderr.startsWith('hep-lab:'))
+  }
+})
+test('doctor只解析原生Profile，报告不存在引用与机器依赖并容许tokens.txt', t => {
+  const f = fixture(t), home = f.repositories.platform_manager_dsh_home.url
+  writeFileSync(join(home, 'profiles/web/cordis.patch.yml'), '- id: fixture\n  config:\n    value: !!js process.exit(99)\n')
+  writeFileSync(join(home, 'tokens.txt'), '词元文件\n')
+  git(home, 'add', '.'); git(home, 'commit', '-qm', 'native expression'); f.repositories.platform_manager_dsh_home.commit = git(home, 'rev-parse', 'HEAD')
+  assert.equal(initializeLab(f).validation.valid, true)
+  const localHome = join(f.destination, 'platform-manager-dsh-home')
+  writeFileSync(join(localHome, 'profiles/web/cordis.patch.yml'), '- id: fixture\n  name: /path-that-does-not-exist/plugin.mjs\n')
+  const issue = doctorLab(f.destination)
+  assert.ok(issue.issues.some(item => item.code === 'profile_configuration'))
+  writeFileSync(join(localHome, 'profiles/web/package.json'), '{"dsh":{"profile":{"bundles":[]}},"dependencies":{"fixture":"file:/machine/plugin.tgz"}}')
+  assert.ok(doctorLab(f.destination).issues.some(item => item.code === 'profile_configuration' && item.message.includes('绝对路径')))
+})
+test('损坏YAML只输出格式错误，不泄漏正文内容', t => {
+  const f = fixture(t); initializeLab(f)
+  writeFileSync(join(f.destination, '.hep-lab/manifest.yaml'), 'secret: [DO_NOT_PRINT_THE_PAYLOAD')
+  assert.throws(() => readLab(f.destination), error => error.message.includes('YAML') && !error.message.includes('DO_NOT_PRINT'))
+})

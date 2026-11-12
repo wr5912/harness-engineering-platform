@@ -23,7 +23,7 @@ test('新建会话忽略当前历史工作区，保留原生选项并可卸载�
   assert.equal(uiWorkspace.startSession, original)
 })
 
-test('管理对话只登记数据根，阻止新增与移除，旧会话不被改写且新建固定绑定', async t => {
+test('默认管理对话保留数据根，未登记路径拒绝且旧会话不被改写', async t => {
   const directory = mkdtempSync(join(tmpdir(), 'conversation-workspaces-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   const currentPath = join(directory, 'current'), legacyPath = join(directory, 'legacy')
@@ -51,10 +51,12 @@ test('管理对话只登记数据根，阻止新增与移除，旧会话不被�
   await assert.rejects(services.workspaceRegistry.create('relative-path'), /不能添加其他工作区/)
   await assert.rejects(services.workspaceController.delete({ workspaceId: current.id }), /不能移除/)
   assert.equal(await services.workspaceRegistry.create(currentPath), current)
-  for (const request of [{}, { cwd: legacyPath }, { workspaceId: legacy.id }, { sessionId: 'legacy-session', cwd: legacyPath }, { sessionId: 'unknown-session' }]) {
+  for (const request of [{}, { sessionId: 'unknown-session' }]) {
     await services.sessionController.create({ ...request, agentPreset: 'standard' })
     assert.deepEqual(creations.at(-1), { ...request, agentPreset: 'standard', cwd: undefined, sessionId: undefined, workspaceId: current.id })
   }
+  await assert.rejects(services.sessionController.create({ cwd: legacyPath }), /不能添加其他工作区/)
+  await assert.rejects(services.sessionController.create({ workspaceId: legacy.id }), /目标工作区未登记/)
   assert.equal((await services.sessionController.create({ sessionId: 'current-blank', workspaceId: current.id })).sessionId, 'current-blank')
   assert.throws(() => services.sessionController.create({ cwd: currentPath, workspaceId: current.id }), /not both/)
   dispose()

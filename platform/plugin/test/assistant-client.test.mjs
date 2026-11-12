@@ -458,3 +458,28 @@ test('受理回执迟到时页面已切到其他对象，不自动打开原Sessi
   assert.equal(f.assistant.getSnapshot().pendingSubmission, undefined)
   f.assistant.dispose()
 })
+
+test('目标仓库只影响新任务，预备会话后保留受理身份并恢复原固定目录', async () => {
+  const calls = [], target = { id: 'business-agents', workspace: '/business', commit: 'a'.repeat(40), available: true }
+  const rows = {}
+  const f = fixture(async (_channel, endpoint, body) => {
+    calls.push({ endpoint, body })
+    if (endpoint === 'assistant/repositories') return { ok: true, value: { repositories: [{ id: 'data', workspace: '/repo', available: true }, target] } }
+    if (endpoint === 'assistant/prepare-session') { assert.equal(body.repository_id, target.id); rows.external = { cwd: '/business' }; return { ok: true, value: { session_id: 'external', repository: target } } }
+    if (endpoint === 'assistant/session') return { ok: true, value: { session_id: body.session_id } }
+    return { ok: true, value: { proposals: [], repository: target } }
+  }, undefined, rows)
+  await f.assistant.refreshRepositories()
+  f.assistant.selectRepository('business-agents')
+  await f.assistant.create('读取项目规则')
+  assert.equal(f.nativeCreates.length, 0)
+  assert.equal(f.assistant.getSnapshot().sessionId, 'external')
+  assert.equal(calls.filter(item => item.endpoint === 'assistant/session').length, 1)
+  f.assistant.selectRepository('data')
+  assert.equal(f.assistant.getSnapshot().status.repository.workspace, '/business', '切换下个任务目录不能重绑已有会话')
+  f.setSelection('external')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.assistant.getSnapshot().platformContext, true)
+  assert.throws(() => f.assistant.selectRepository('unregistered'), /不可用/)
+  f.assistant.dispose()
+})

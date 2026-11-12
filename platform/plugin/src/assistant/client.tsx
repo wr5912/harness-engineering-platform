@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { CHANNEL } from '../protocol.ts'
+import type { RepositoryChoice, RepositorySnapshot } from './repositories.ts'
 
 type SessionId = Parameters<Context['sessions']['binding']>[0]
 type SessionReference = ReturnType<Context['sessions']['retain']>
@@ -28,14 +29,18 @@ interface AssistantSnapshot {
   platformContext?: boolean
   busy: boolean
   error: string
+  repositories: RepositoryChoice[]
+  repositoryId: string
+  repositoriesError?: string
+  repositoriesLoading?: boolean
   pendingSubmission?: { sessionId: SessionId; requestId: string }
   statusError?: string
-  status?: { task_context?: Record<string, any>; running?: boolean; proposals?: { id: string; state: 'awaiting_confirmation' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown'; domain: string; action: string; input?: Record<string, any>; error?: string; continuation?: string }[] }
+  status?: { repository?: RepositorySnapshot; task_context?: Record<string, any>; running?: boolean; proposals?: { id: string; state: 'awaiting_confirmation' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown'; domain: string; action: string; input?: Record<string, any>; error?: string; continuation?: string }[] }
 }
 
 /** 浏览器只保留当前会话引用，任务与业务结果由原生 Session 和后端维护。 */
 export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'uiWorkspace' | 'workspaces'>, rpc: ClientConnectionRpc, getRoot: () => string | undefined, getLegacyRoots: () => string[] = () => []) {
-  let snapshot: AssistantSnapshot = { busy: false, error: '' }
+  let snapshot: AssistantSnapshot = { busy: false, error: '', repositories: [], repositoryId: 'data' }
   let storage: Storage | undefined
   let storageUnavailable = false
   try { storage = typeof sessionStorage === 'undefined' ? undefined : sessionStorage } catch { storageUnavailable = true }
@@ -83,7 +88,23 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
   const isProjectSession = (sessionId: SessionId) => {
     const root = getRoot()
     const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
-    return Boolean(root && cwd && [root, ...getLegacyRoots()].includes(cwd))
+    return Boolean(root && cwd && [root, ...getLegacyRoots(), ...snapshot.repositories.map(item => item.workspace), ...(snapshot.status?.repository?.workspace ? [snapshot.status.repository.workspace] : [])].includes(cwd))
+  }
+  let repositoryRequest = 0
+  async function refreshRepositories() {
+    const request = ++repositoryRequest, root = getRoot()
+    publish({ repositoriesLoading: true, repositoriesError: '' })
+    try {
+      const response = await rpc.call(CHANNEL, 'assistant/repositories', {})
+      if (disposed || request !== repositoryRequest || root !== getRoot()) return
+      if (!response.ok) throw new Error(response.error.message)
+      const value = response.value as { repositories: RepositoryChoice[] }
+      if (!Array.isArray(value.repositories)) throw new Error('仓库目录返回无效')
+      publish({ repositories: value.repositories, repositoriesLoading: false })
+      restore()
+    } catch (error) {
+      if (!disposed && request === repositoryRequest && root === getRoot()) publish({ repositoriesLoading: false, repositoriesError: error instanceof Error ? error.message : '目标仓库读取失败' })
+    }
   }
   let refreshing: Promise<void> | undefined
   let refreshPending = false
@@ -196,6 +217,12 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
     getSnapshot: () => snapshot,
     select,
     refresh,
+    refreshRepositories,
+    selectRepository(id: string) {
+      if (snapshot.busy) throw new Error('任务正在准备或核对，请等待当前回执。')
+      if (id !== 'data' && !snapshot.repositories.some(item => item.id === id && item.available)) throw new Error('目标仓库不可用，请刷新核对。')
+      publish({ repositoryId: id })
+    },
     recoverSubmission,
     retrySubmission(): Promise<void> { const value = pendingForRoot(); return value ? this.create(value.task, value.context) : Promise.resolve() },
     startNewTask(nextContext: AssistantContext = context): Promise<void> { if (snapshot.busy) return Promise.reject(new Error('任务正在准备或核对，请等待当前回执。')); const value = pendingForRoot(); if (value) clearPending(value); return this.create(undefined, nextContext) },
@@ -222,10 +249,19 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
         const sessionIdToResume = submission?.sessionId ?? (typeof taskContext.session_id === 'string' ? taskContext.session_id : undefined)
         const root = getRoot()
         if (!root) throw new Error('项目工作区尚未就绪，请稍后重试。')
-        const workspace = sessionIdToResume ? undefined : await ctx.workspaces.create({ path: root })
-        // 续接保留原会话身份；原生 create 只用于新任务，避免历史任务被另建会话。
-        const preparedSessionId = sessionIdToResume as SessionId | undefined
-          ?? await ctx.sessions.create({ workspaceId: workspace!.workspaceId })
+        // 目标仓库由服务端登记解析；预备阶段只建空会话，投递前仍持久保存原提交身份。
+        let preparedSessionId = sessionIdToResume as SessionId | undefined
+        if (!preparedSessionId && snapshot.repositoryId !== 'data') {
+          const prepared = await rpc.call(CHANNEL, 'assistant/prepare-session', { repository_id: snapshot.repositoryId })
+          if (!prepared.ok) throw new Error(prepared.error.message)
+          preparedSessionId = (prepared.value as { session_id: SessionId }).session_id
+          if (!preparedSessionId) throw new Error('目标仓库未返回会话标识')
+          await ctx.sessions.refresh()
+        }
+        if (!preparedSessionId) {
+          const workspace = await ctx.workspaces.create({ path: root })
+          preparedSessionId = await ctx.sessions.create({ workspaceId: workspace.workspaceId })
+        }
         if (!submission) {
           submission = { root, sessionId: preparedSessionId, requestId: submissionRequestId(), ...(task !== undefined ? { task } : {}), context: structuredClone(taskContext) }
         }

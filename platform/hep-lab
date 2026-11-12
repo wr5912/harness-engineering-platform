@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+. "$(dirname -- "$0")/tool-env.sh"
+exec node "$HEP_ROOT/platform/lab/cli.mts" "$@"
