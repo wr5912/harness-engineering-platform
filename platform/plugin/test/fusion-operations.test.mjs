@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { fusionDifference, prepareFusion, resolveFusion, confirmFusion, recoverFusion, fusionOperationStatus } from '../src/agents/fusion-operations.ts'
 import { sha256 } from '../src/tasks/files.ts'
@@ -108,6 +109,25 @@ test('草稿快照变更、链接与 LLM Key 拒绝写入', async t => {
   assert.throws(() => resolveFusion(fx.root, { operation_id: op.operation_id, expected_plan_sha256: op.plan_sha256, resolutions: [{ path: 'input.txt', decision: 'content', content: `OPENAI_API_KEY=sk-${'x'.repeat(40)}`, reason: 'invalid fixture' }] }), /Key/)
   symlinkSync('/tmp', fx.target('link'))
   assert.throws(() => fusionDifference(fx.root, fx.request), /符号链接/)
+})
+
+test('规范 .env 同时进入固定来源与工作树融合，含变量的文件拒绝融合', async t => {
+  const fx = fixture(t), path = 'dsh/workspace/.env'
+  const template = readFileSync(fileURLToPath(new URL('../../../runtime/adapters/dsh-container/verification-home-controls/locked-bootstrap.env', import.meta.url)))
+  process.env.HARNESS_PROGRAM_ROOT = fileURLToPath(new URL('../../../', import.meta.url))
+  write(fx.root, `${prefix(feature)}/${path}`, template)
+  write(fx.root, `${prefix(main)}/${path}`, template)
+  fx.request.parent_ref = `git:${commit(fx.root)}`
+  assert.ok(fusionDifference(fx.root, fx.request).files.some(row => row.path === path))
+  const op = prepareFusion(fx.root, fx.request, {}, 'snapshot')
+  await confirmFusion(fx.root, { operation_id: op.operation_id, expected_plan_sha256: op.plan_sha256, confirmed: true }, metadata)
+  assert.deepEqual(readFileSync(fx.target(path)), template)
+  write(fx.root, `${prefix(main)}/${path}`, 'VALUE=x\n')
+  assert.throws(() => fusionDifference(fx.root, fx.request), /逐字节一致/)
+  write(fx.root, `${prefix(main)}/${path}`, template)
+  write(fx.root, `${prefix(feature)}/${path}`, 'VALUE=x\n')
+  fx.request.parent_ref = `git:${commit(fx.root)}`
+  assert.throws(() => fusionDifference(fx.root, fx.request), /逐字节一致/)
 })
 
 test('270 文件机械阶段五次重复：不把复制全文交给模型，记录真实耗时', async t => {

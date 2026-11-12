@@ -4,6 +4,7 @@ import { callOpenApiTool, loadOpenApi, readOpenApiResource, validateAuthHeader, 
 import { assertConnectionReady, connectionIssue } from './connection.ts'
 import { DiscoveryBudget, MAX_CATALOG_ITEMS } from './limits.ts'
 import { discover } from './discovery.ts'
+import { matchResourceAddress } from './resource-address.ts'
 export { assertConnectionReady } from './connection.ts'
 
 const runtimeRequire = createRequire('/opt/dsh/packages/mcp/mcp-client/package.json')
@@ -344,6 +345,7 @@ async function groupToolBindings(target: GroupTarget, signal?: AbortSignal, unav
   const catalogs = await Promise.all(target.group.members.map(async (member: any) => {
     const server = target.servers.find(item => item.id === member.serverId && item.enabled)
     if (!server) return []
+    if (server.draftBindingError) unavailable.push(`${server.id}: stage=discovery operation=draft-binding state=unavailable; ${server.draftBindingError}`)
     const selected = member.names.filter((name: string) => server.tools?.mode !== 'selected' || server.tools.names.includes(name))
     let tools: any[] = []
     if (selected.length && (!requestedServers || requestedServers.has(server.id))) try { tools = await serverTools({ ...server, platformSignal: signal ?? server.platformSignal }) }
@@ -502,12 +504,16 @@ async function selectedResources(target: GroupTarget, kind: 'r' | 't', signal?: 
   for (const { server, selected, catalog, failed } of catalogs) {
     if (!server) continue
     if (failed) unavailable.push(server.id)
-    for (const uri of selected) if (!catalog.some(item => (kind === 'r' ? item.uri : item.uriTemplate) === uri)) {
-      unavailable.push(`${server.id}: ${uri}（已选资源当前不可用）`)
+    const candidates = new Set<string>(catalog.map(item => kind === 'r' ? item.uri : item.uriTemplate))
+    const resolved = new Set<string>()
+    for (const uri of selected) {
+      const current = matchResourceAddress(uri, candidates)
+      if (current) resolved.add(current)
+      else unavailable.push(`${server.id}: ${uri}（已选资源当前不可用）`)
     }
     for (const item of catalog) {
       const sourceUri = kind === 'r' ? item.uri : item.uriTemplate
-      if (!selected.includes(sourceUri)) continue
+      if (!resolved.has(sourceUri)) continue
       const uri = groupResourceUri(target.group.id, server.id, kind, sourceUri)
       if (uris.has(uri)) throw new Error('MCP 分组 Resource URI 重复')
       uris.add(uri)
@@ -602,8 +608,11 @@ async function readGroupResource(target: GroupTarget, uri: string, signal?: Abor
   const member = target.group.members.find((item: any) => item.serverId === proxy.serverId)
   const selected = proxy.kind === 'r' ? member?.resourceUris ?? [] : member?.resourceTemplates ?? []
   const server = target.servers.find(item => item.id === proxy.serverId && item.enabled)
-  if (proxy.groupId !== target.group.id || !server || !selected.includes(proxy.sourceUri)) throw new Error('Resource URI 不属于当前 MCP 分组')
-  const sources = (await resourceCatalog({ ...server, platformSignal: signal ?? server.platformSignal }, proxy.kind)).filter(item =>
+  if (proxy.groupId !== target.group.id || !server || !selected.length) throw new Error('Resource URI 不属于当前 MCP 分组')
+  const catalog = await resourceCatalog({ ...server, platformSignal: signal ?? server.platformSignal }, proxy.kind)
+  const candidates = new Set<string>(catalog.map(item => proxy.kind === 'r' ? item.uri : item.uriTemplate))
+  if (!selected.some(value => matchResourceAddress(value, candidates) === proxy.sourceUri)) throw new Error('Resource URI 不属于当前 MCP 分组')
+  const sources = catalog.filter(item =>
     (proxy.kind === 'r' ? item.uri : item.uriTemplate) === proxy.sourceUri)
   if (sources.length !== 1) throw new Error(sources.length ? '来源 Resource URI 重复' : '已选 Resource 在来源中不可用')
   let upstreamUri = proxy.sourceUri
@@ -832,7 +841,9 @@ export function apply(ctx: any, config: any): void {
     const target = agents.get(id)
     if (!target) return send(res, 404, { error: 'agent MCP endpoint not found' })
     try { await serveMcp(req, res, target, () => {
-      const server = snapshot(config).servers.find(item => item.id === (target as Extract<Target, { kind: 'agent' }>).server.id)
+      const current = snapshot(config)
+      if (config.mountServers) current.servers = config.mountServers(current.servers)
+      const server = current.servers.find(item => item.id === (target as Extract<Target, { kind: 'agent' }>).server.id)
       return server ? { kind: 'agent', server } : undefined
     }) }
     catch (error) { if (!res.headersSent) send(res, 502, { error: String(error) }); else res.destroy() }
@@ -998,7 +1009,7 @@ export function apply(ctx: any, config: any): void {
         } else await scope.ctx.plugin(McpClient, McpClient.Config({
           transport: 'streamable-http',
           serverName: serverName(server),
-          url: `http://127.0.0.1:${ctx.webServer.port}${publicPath(`/mcp/agents/${id}`)}`,
+          url: new URL(publicPath(`/mcp/agents/${id}`), ctx.webServer.getOrigin()).href,
           headers: { Authorization: `Bearer ${agentToken}` },
         }))
         unavailable.delete(server.id)

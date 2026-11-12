@@ -1,0 +1,21 @@
+{
+  "observedAt": "2026-11-12T09:57:31.238Z",
+  "cli": true,
+  "file": true,
+  "fixture": {
+    "cli": {
+      "specs": 6,
+      "reads": 1,
+      "anonymousSpecProbes": 6,
+      "authenticationRejected": 0
+    },
+    "file": {
+      "specs": 6,
+      "reads": 1,
+      "anonymousSpecProbes": 6,
+      "authenticationRejected": 0
+    }
+  },
+  "restored": true,
+  "sameImage": true
+}

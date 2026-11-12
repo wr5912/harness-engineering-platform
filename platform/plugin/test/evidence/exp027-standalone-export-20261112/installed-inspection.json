@@ -1,0 +1,32 @@
+{
+  "sessionId": "session-27e4ed60-71b0-4b2b-a1f7-69ab0c76271d",
+  "sessionRunning": false,
+  "seq": 695,
+  "nativeTools": 252,
+  "inspectionLoaded": true,
+  "calls": [
+    "mcp__inspection-compositions__get_composition_run",
+    "mcp__inspection-compositions__get_composition_details",
+    "mcp__inspection-compositions__get_composition_run",
+    "mcp__inspection-compositions__get_composition_run",
+    "mcp__inspection-compositions__get_composition_run"
+  ],
+  "run": {
+    "id": "run-c2b090d8-c23d-4dc4-8546-8b381dc10caa",
+    "status": "completed",
+    "startedAt": "2026-11-12T09:59:43.378Z",
+    "updatedAt": "2026-11-12T10:12:29.217Z",
+    "finishedAt": "2026-11-12T10:12:29.217Z",
+    "assets": 121,
+    "metrics": {
+      "requests": 422,
+      "peak_concurrency": 8,
+      "preparation_ms": 332,
+      "elapsed_ms": 766219
+    },
+    "nodeStates": {
+      "completed": 1740
+    },
+    "artifactCount": 4
+  }
+}

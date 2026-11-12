@@ -4,13 +4,26 @@ import { stageManagedProjections } from './projections.mts'
 
 export interface RuntimeBundleOptions { programRoot: string; imageTag: string; imageId?: string; imageFingerprint?: string; arch: 'amd64' | 'arm64'; agentId: string; experimentId: string; presetId: string; profilePatch: string; profile?: 'web' | 'sdk'; harnessRuntime?: any; bridgeRequired?: boolean }
 
+/** 已有预览沿用冻结资产，只刷新同一版本的运行器，不生成归档。 */
+export async function refreshAgentPreview(root: string, programRoot: string, preview: { agentId: string; experimentId: string; candidateSha256: string; arch: string }) {
+  const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'))
+  if (manifest.kind !== 'standalone-agent' || manifest.source.agentId !== preview.agentId
+    || manifest.source.experimentId !== preview.experimentId || manifest.source.candidateSha256 !== preview.candidateSha256
+    || manifest.package.arch !== preview.arch) throw new Error('预览目录与所选智能体版本、资产摘要或架构不一致')
+  if (manifest.source.profile === 'sdk') throw new Error('现有预览运行器刷新仅支持 Web 包；SDK 包请使用正式导出入口')
+  const config = JSON.parse(readFileSync(join(root, 'config-seed/standalone.json'), 'utf8'))
+  await writeRuntimeBundle(root, { programRoot, imageTag: manifest.image.tag, imageId: manifest.image.id,
+    imageFingerprint: manifest.image.fingerprint, arch: manifest.package.arch, agentId: config.agentId,
+    experimentId: config.experimentId, presetId: config.presetId, profilePatch: config.profilePatch, profile: config.profile })
+}
+
 /** 目标机只用 Bash 和 Docker；Node、DSH 与初始化均在同一标准镜像内执行。 */
 export async function writeRuntimeBundle(staging: string, options: RuntimeBundleOptions) {
   if (!options.programRoot) throw new Error('独立运行器需要明确的平台程序根')
   const programRoot = options.programRoot
   const root = join(staging, 'runtime')
   mkdirSync(root, { recursive: true })
-  for (const name of ['standalone-bootstrap.js', 'standalone-plugin.js', 'standalone-bridge.js']) {
+  for (const name of ['standalone-bootstrap.js', 'standalone-plugin.js', 'standalone-bridge.js', 'standalone-connection.js']) {
     const source = join(programRoot, 'platform/plugin/lib', name)
     if (!existsSync(source)) throw new Error(`独立运行器未构建：${name}；请构建平台插件后再导出`)
     cpSync(source, join(root, name))
@@ -26,6 +39,7 @@ export async function writeRuntimeBundle(staging: string, options: RuntimeBundle
   cpSync(join(programRoot, 'runtime/adapters/dsh-container/runtime-compat'), join(root, 'runtime-compat'), { recursive: true })
   cpSync(join(programRoot, 'platform/deploy/bootstrap-docker.sh'), join(root, 'bootstrap-docker.sh'))
   for (const name of ['install.sh', 'agent']) cpSync(join(programRoot, 'platform/deploy/agent/runtime', name), join(staging, name), { preserveTimestamps: true })
+  cpSync(join(programRoot, 'platform/deploy/agent/runtime/README.md'), join(staging, 'README.md'))
   const projections = stageManagedProjections(staging, programRoot)
   const volume = [
     { type: 'bind', source: './assets/workspace', target: '/work/harness/workspace', read_only: true },
@@ -34,7 +48,7 @@ export async function writeRuntimeBundle(staging: string, options: RuntimeBundle
     { type: 'bind', source: '.', target: '/opt/standalone', read_only: true },
     { type: 'bind', source: './state/home', target: '/var/lib/dsh' },
   ]
-  if (sdk) volume.push({ type: 'bind', source: './state/home/profiles/node_modules', target: '/opt/node_modules', read_only: true })
+  volume.push({ type: 'bind', source: './state/home/profiles/node_modules', target: '/opt/node_modules', read_only: true })
   if (sdk && options.harnessRuntime) {
     if (existsSync(join(staging, 'assets/candidate'))) {
       // Docker 不能在只读父挂载内创建子挂载点；仅在制品中准备空目录，源资产不变。

@@ -16,7 +16,7 @@ import { createBusinessControlHandler } from '../business-control/management.ts'
 import { loadOpenApi } from 'harness-mcp-manager-openapi'
 import { McpConfigStore, type McpConfigurationView } from './store.ts'
 import type { BusinessContext } from '../business-control/contracts.ts'
-import { boundDrafts, withDraftInstance } from './draft-bindings.ts'
+import { inspectDraftBinding, withDraftInstance } from './draft-bindings.ts'
 
 export const { name, Config, validateConfiguration } = manager
 export const inject = manager.inject
@@ -88,9 +88,9 @@ export function apply(ctx: Context, suppliedConfig: ManagerConfig) {
   const compositionExtension: CompositionExtension = {}
   const publishedService = () => {
     const catalog = readCompositions(workspaceConfigPath(assetRoot, 'mcp-compositions.json')).catalog
-    const drafts = boundDrafts(assetRoot)
+    const { compositions: drafts, error: draftBindingError } = inspectDraftBinding(assetRoot)
     const available = executableCatalog(catalog, compositionExtension)
-    return publishedCompositionService({ ...available, compositions: [...available.compositions.filter(item => !drafts.some(draft => draft.config.toolName === item.published?.toolName)), ...drafts.map(item => ({ id: item.id, published: item.config }))] })
+    return { ...publishedCompositionService({ ...available, compositions: [...available.compositions.filter(item => !drafts.some(draft => draft.config.toolName === item.published?.toolName)), ...drafts.map(item => ({ id: item.id, published: item.config }))] }), draftBindingError }
   }
   const store = new McpConfigStore(assetRoot, value => {
     if (value.servers.some(server => server.id === COMPOSITION_SERVICE_ID || server.platformComposition)) {

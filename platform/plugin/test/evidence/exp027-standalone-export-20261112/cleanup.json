@@ -1,0 +1,85 @@
+{
+  "removed": [
+    {
+      "path": ".local/exp027-complete-package-extract-rtiw3wzq",
+      "bytes": 2029428736
+    },
+    {
+      "path": ".local/exp027-direct-source-stuflqg0",
+      "bytes": 2029441024
+    },
+    {
+      "path": ".local/exp027-final-package-extract-3i5y5cbx",
+      "bytes": 2029420544
+    },
+    {
+      "path": ".local/exp027-final-source-qofz6jbl",
+      "bytes": 2029371392
+    },
+    {
+      "path": ".local/exp027-native-source-g1z99ie7",
+      "bytes": 2029428736
+    },
+    {
+      "path": ".local/exp027-package-extract-7ysak4m9",
+      "bytes": 2029383680
+    },
+    {
+      "path": ".local/export-exp027-final-source-thryf4",
+      "bytes": 2025467904
+    },
+    {
+      "path": ".local/export-exp027-release-source-66tf2oxi",
+      "bytes": 2025418752
+    },
+    {
+      "artifact": "security-operations-expert-887c231b3510-amd64-online-53552def.tar.gz",
+      "bytes": 1392281137
+    },
+    {
+      "artifact": "security-operations-expert-887c231b3510-amd64-online-ffce790e.tar.gz",
+      "bytes": 1392288837
+    },
+    {
+      "path": ".local/exp027-package-seed.llm-api-key",
+      "bytes": 49152
+    },
+    {
+      "path": ".local/exp027-portable-source-q0r13r0c",
+      "bytes": 1979228875
+    }
+  ],
+  "removed_bytes": 20991208769,
+  "cleaned_installations": [
+    "exp027-direct-install-eltjgkru",
+    "exp027-native-install-hqz5uwll",
+    "exp027-final-package-installed-a9pa0gr8",
+    "export-exp027-install-Sm9njG",
+    "export-exp027-release-install-qbjxzfsj",
+    "exp027-complete-package-installed-9vwinmrx"
+  ],
+  "installation_media_removed_minimum_bytes": 6451080192,
+  "retained": [
+    "current package and checksum",
+    "standard shared Docker image",
+    "all installed HOME and sessions",
+    "real inspection Run and evidence",
+    "current acceptance installation and original preview",
+    "explicit reusable resource cache"
+  ],
+  "real_inspection_executed": false,
+  "automatically_cleaned_new_installation": {
+    "prefix": "exp027-portable-installed-ob3gks48",
+    "installation_media_removed_bytes": 1233819859,
+    "source_extraction_removed": true,
+    "package_staging_empty": true
+  },
+  "observedAt": "2026-11-12T11:36:40.536529+00:00",
+  "removed_total_minimum_bytes": 28676108820,
+  "installation_media_measurement": {
+    "basis": "Identical image tar SHA256 in all six retained installation manifests; offline media excluded from prior installations lower bound.",
+    "image_tar_sha256": "b0afffaa72b18a38a21a78ba0f2878a98c20d5d01582ef3faf87fbeef138b114",
+    "image_tar_bytes": 1075180032,
+    "count": 6
+  }
+}

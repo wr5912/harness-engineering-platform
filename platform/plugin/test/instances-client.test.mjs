@@ -536,6 +536,31 @@ test('创建自动端口从预览冻结到执行请求，失效预览不能执�
   assert.equal(invalid.calls.some(call => call.endpoint === 'instances/run'), false)
 })
 
+test('资产预检失败显示准确恢复动作并保留创建表单，不自动重放', async () => {
+  const ui = page({ respond(endpoint, payload) {
+    if (endpoint === 'instances/run') return { ok: true, value: { name: payload.name, operation: 'create', ok: false,
+      error: { code: 'candidate_assets_invalid', message: 'Candidate 装载资产不完整或不安全', details: {
+        stage: 'candidate-assets', path: 'dsh/workspace/.env', reason: '文件缺失', next_action: '修复来源 Candidate 后重新预览；不会自动重试创建实例',
+      } } } }
+  } })
+  await ui.settle(); openCreate(ui); await ui.settle()
+  ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.onChange({ target: { value: 'invalid-assets' } }); ui.render()
+  chooseAgent(ui, '基础助手 · basic-agent')
+  ui.nodes().find(node => (node.type === 'select' || node.props.role === 'combobox') && node.props['aria-label'] === '选择来源版本').props.onChange({ target: { value: 'experiment:EXP-basic-001' } }); await ui.settle()
+  await ui.button('查看创建预览').props.onClick(); await ui.settle()
+  await ui.button('确认创建').props.onClick(); await ui.settle()
+  assert.match(ui.text(), /来源资产预检/)
+  assert.match(ui.text(), /dsh\/workspace\/\.env/)
+  assert.match(ui.text(), /修复来源 Candidate 后重新预览/)
+  assert.match(ui.text(), /执行回执端口：尚未确认/)
+  assert.doesNotMatch(ui.text(), /请核对当前端口和实例状态/)
+  ui.button('返回修改').props.onClick(); await ui.settle()
+  assert.equal(ui.nodes().find(node => node.type === 'input' && node.props['aria-label'] === '实例名').props.value, 'invalid-assets')
+  assert.equal(ui.nodes().find(node => node.props.role === 'combobox' && node.props['aria-label'] === '选择来源版本').props.value, 'experiment:EXP-basic-001')
+  ui.invalidate(); await ui.settle()
+  assert.equal(ui.calls.filter(call => call.endpoint === 'instances/run').length, 1)
+})
+
 test('受控实例创建预览、列表、详情和回执显示网关深链与无需登录语义', async () => {
   const rows = [{ name: 'existing-guest', agent_id: 'basic-agent', state: 'running', source_id: 'experiment:EXP-basic-001', port: 3084,
     business_gateway: true, access_mode: 'anonymous', identity_mode: 'development', access_url: 'http://business.example:53105/agents/basic-agent/instances/existing-guest/', model_policy: { default: defaultModel } }]

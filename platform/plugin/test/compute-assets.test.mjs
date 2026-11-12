@@ -23,6 +23,7 @@ function fixture(t) {
   put('harness.yaml', 'name: alpha\ncredential_environment_keys: []\nloadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: alpha\n  preset_file: alpha/preset.yml\n  profile_patch: dsh/managed/alpha.patch.yml\n')
   put('dsh/managed/alpha.patch.yml', 'plugin: /opt/dsh-managed/adapter.ts\n')
   put('dsh/presets/alpha/preset.yml', 'preset: alpha\n')
+  put('dsh/workspace/.env', readFileSync(new URL('../../../runtime/adapters/dsh-container/verification-home-controls/locked-bootstrap.env', import.meta.url)))
   put('dsh/managed/compute-workflow/index.ts', "import {value} from '../adapter.ts'; export {value}\n")
   put('dsh/managed/adapter.ts', "import {common} from './common/value.ts'; export const value = common; export const mode = 'shared'\n")
   put('dsh/managed/shared/index.ts', 'export const unrelated = 1\n')

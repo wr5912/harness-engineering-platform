@@ -17,7 +17,7 @@ import { currentBusinessContext, getBusinessControl } from '../business-control/
 import { createBusinessControlHandler } from '../business-control/management.ts'
 import { workflowRuns } from './workflow-runs.ts'
 import { lfxDependencies } from './lfx-assets.ts'
-import { boundDrafts, saveDraftBinding } from './draft-bindings.ts'
+import { boundDrafts, inspectDraftBinding, saveDraftBinding } from './draft-bindings.ts'
 
 const SERVER_INFO = { name: 'harness-platform-mcp-composition', version: '0.1.0' }
 const PROTOCOL_VERSION = '2025-06-18'
@@ -32,6 +32,7 @@ function success<T>(value: T): ConnectionRpcResult<T> {
 
 async function listState(registry: McpRegistry, assetRoot: string, compositionsFile: string) {
   const { catalog, revision } = readCompositions(compositionsFile)
+  const drafts = inspectDraftBinding(assetRoot)
   return {
     workspace_id: workspaceIdentity(assetRoot).id,
     connections: [
@@ -62,7 +63,8 @@ async function listState(registry: McpRegistry, assetRoot: string, compositionsF
       }),
       graphs: Object.fromEntries(await Promise.all((['draft', 'published'] as const).filter(key => entry[key]).map(async key => [key, await compositionStructure(entry[key], catalog, registry.extension, true)]))),
     }))),
-    draftTools: boundDrafts(assetRoot).map(item => ({ ...item.config, inputSchema: compositionInputSchema(item.config, registry.extension) })),
+    draftTools: drafts.compositions.map(item => ({ ...item.config, inputSchema: compositionInputSchema(item.config, registry.extension) })),
+    draftBindingError: drafts.error,
     publishedService: publishedCompositionService(catalog, executableCatalog(catalog, registry.extension ?? (registry.threat ? { threat: registry.threat } : undefined))),
     extension: registry.extension?.id ? { id: registry.extension.id, seed: Boolean(registry.extension.seed), flow: Boolean(registry.extension.flow), stages: Boolean(registry.extension.threat), workflows: Object.entries(registry.extension.workflows ?? {}).map(([id, workflow]) => ({ id, inputSchema: workflow.inputSchema })) } : null,
     revision,
@@ -231,6 +233,23 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
         }
       }
       if (endpoint === 'list') return success(await listState(registry, assetRoot, compositionsFile))
+      if (endpoint === 'compositionTools') {
+        const { catalog } = readCompositions(compositionsFile), drafts = inspectDraftBinding(assetRoot)
+        const available = executableCatalog(catalog, registry.extension ?? (registry.threat ? { threat: registry.threat } : undefined))
+        const tools = [
+          ...available.compositions.filter(entry => !drafts.compositions.some(item => item.config.toolName === entry.published!.toolName)).map(entry => ({
+            config: entry.published!, binding: { compositionId: entry.id, versionId: entry.publishedVersionId,
+              expectedImplementationDigest: compositionImplementationDigest(entry.published, registry.extension, catalog, registry) },
+          })),
+          ...drafts.compositions.map(item => ({ config: item.config, binding: undefined })),
+        ].map(({ config, binding }) => ({ name: config.toolName, description: config.description || config.title,
+          inputSchema: compositionInputSchema(config, registry.extension), annotations: { readOnlyHint: compositionReadonly(config) },
+          _meta: { harness: binding },
+        }))
+        return success({ tools: [...tools, ...compositionQueries.map(config => ({ name: config.toolName, description: config.description,
+          inputSchema: config.inputSchema, annotations: { readOnlyHint: true },
+        }))], ...(drafts.error ? { _meta: { draftBindingError: drafts.error } } : {}) })
+      }
       if (endpoint === 'bindCompositionDrafts') {
         const context = currentBusinessContext()
         if (context && !getBusinessControl(assetRoot).isManagement(context)) return failure('forbidden', '草稿联调绑定由平台管理助手维护')
@@ -286,7 +305,7 @@ export function createMcpHandler(assetRoot: string, options: { stateFile?: strin
         }
         const workflows = workflowRuns(assetRoot), run = workflows.inspect(request.run_id)
         if (!run && !registry.threat) throw new Error('运行不存在或对应运行器尚未装载')
-        if (endpoint === 'compositionRun') return success(run ?? await registry.threat!.inspect(request.run_id))
+        if (endpoint === 'compositionRun') return success(run ? workflows.summary(request.run_id) : await registry.threat!.inspect(request.run_id))
         if (endpoint === 'compositionDetails') return success(workflows.details(request.run_id, request.node_id, request.offset, request.limit))
         if (typeof request.artifactId !== 'string') throw new Error('请选择运行产物')
         const artifact = run ? await workflows.artifact(request.run_id, request.artifactId) : await registry.threat!.artifact(request.run_id, request.artifactId)
@@ -487,16 +506,9 @@ async function handleMcpMessage(handler: ConnectionRpcHandler, assetRoot: string
     return rpcResult(message.id, { protocolVersion: PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: SERVER_INFO })
   }
   if (message.method === 'tools/list') {
-    const listed = await handler('list', {}, signal ?? new AbortController().signal, undefined as never)
+    const listed = await handler('compositionTools', {}, signal ?? new AbortController().signal, undefined as never)
     if (!listed.ok) return rpcError(message.id, -32603, listed.error.message)
-    const service = (listed.value as any).publishedService
-    return rpcResult(message.id, { tools: [...(service?.publishedTools ?? []), ...(service?.builtinTools ?? []), ...((listed.value as any).draftTools ?? [])].map((config: any) => ({
-      name: config.toolName,
-      description: config.description || config.title,
-      inputSchema: config.inputSchema ?? (listed.value as any).compositions.find((entry: any) => entry.published?.toolName === config.toolName)?.inputSchema ?? compositionInputSchema(config),
-      annotations: { readOnlyHint: compositionReadonly(config) },
-      _meta: { harness: (listed.value as any).compositions.find((entry: any) => entry.published?.toolName === config.toolName)?.binding },
-    })) })
+    return rpcResult(message.id, listed.value)
   }
   if (message.method === 'tools/call') {
     const meta = message.params?._meta?.harness
@@ -504,7 +516,7 @@ async function handleMcpMessage(handler: ConnectionRpcHandler, assetRoot: string
       || Object.keys(meta).some(key => !['compositionId', 'versionId', 'expectedImplementationDigest', 'execution'].includes(key)))) return rpcError(message.id, -32602, 'Invalid fixed composition metadata')
     const query = compositionQueries.find(item => item.toolName === message.params?.name)
     const result = query ? await handler(query.toolName === 'get_composition_run' ? 'compositionRun' : query.toolName === 'get_composition_details' ? 'compositionDetails' : 'compositionArtifact', message.params?.arguments ?? {}, signal ?? new AbortController().signal, undefined as never)
-      : await handler(boundDrafts(assetRoot).some(item => item.config.toolName === message.params?.name) ? 'callBoundDraftComposition' : 'callPublishedComposition', { ...meta, toolName: message.params?.name, input: message.params?.arguments ?? {} }, signal ?? new AbortController().signal, undefined as never)
+      : await handler(inspectDraftBinding(assetRoot).compositions.some(item => item.config.toolName === message.params?.name) ? 'callBoundDraftComposition' : 'callPublishedComposition', { ...meta, toolName: message.params?.name, input: message.params?.arguments ?? {} }, signal ?? new AbortController().signal, undefined as never)
     if (!result.ok && result.error.code === 'not_found') return rpcError(message.id, -32602, 'Unknown tool')
     if (!result.ok) return rpcResult(message.id, { content: [{ type: 'text', text: result.error.message }], isError: true })
     const value = (query ? { ok: true, result: result.value } : result.value) as { ok: boolean } & Record<string, unknown>

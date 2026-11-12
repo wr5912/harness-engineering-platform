@@ -7,14 +7,14 @@ import { createInterface } from 'node:readline/promises'
 import { Writable } from 'node:stream'
 import { networkInterfaces } from 'node:os'
 import { dump, load, DEFAULT_SCHEMA, Type } from 'js-yaml'
-import { configPath, readEnvironment, readStandaloneConfig, runtimeRoot, validateStandaloneConfig, writeStandaloneConfig, type StandaloneConfig } from './config.ts'
+import { configPath, configuredServers, readEnvironment, readStandaloneConfig, runtimeRoot, validateStandaloneConfig, writeStandaloneConfig, type StandaloneConfig } from './config.ts'
 import { parseHarnessRuntime } from '../models/harness-runtime.ts'
 import { redactRunText } from '../agents/run-files.ts'
 
 const patchSchema = DEFAULT_SCHEMA.extend(new (Type as any)('tag:yaml.org,2002:js', { kind: 'scalar', construct: (value: string) => ({ __dshExpression: value }), represent: (value: any) => value.__dshExpression, predicate: (value: any) => Boolean(value && typeof value === 'object' && typeof value.__dshExpression === 'string') }))
 const forbidden = /(?:harness-platform|harness-business-runtime|harness-model-runtime|business-runtime\.js|platform-mcp-manager|business\/mcp-manager|\/business-control\/)/
 
-/** 仅投影装载边界；保留业务 Preset、Guard 与工具配置，不修改冻结资产。 */
+/** 仅投影装载边界；保留业务 Preset 与工具配置，移除平台服务，不修改冻结资产。 */
 export function projectManagedPatch(text: string, groupIds: string[] = []): any[] {
   const rows = load(text, { schema: patchSchema }) as any[]
   if (!Array.isArray(rows)) throw new Error('业务 Profile Patch 必须是数组')
@@ -76,9 +76,23 @@ function nativeFallback(home: string, installAnchor: string, sharedPackages: str
   return require
 }
 export function generateProfile(config: StandaloneConfig, home: string, root: string, updateModel = true) {
+  const harnessFile = join(root, 'assets/harness.yaml')
+  const access = existsSync(harnessFile) ? (load(readFileSync(harnessFile, 'utf8')) as any)?.standalone?.web?.access : undefined
+  if (config.profile !== 'sdk' && access !== undefined && access !== 'anonymous-lan') throw new Error('Harness standalone.web.access 只支持 anonymous-lan')
   const managed = join(root, 'assets/managed', config.profilePatch)
   const business = projectManagedPatch(readFileSync(managed, 'utf8'), config.mcp.groups.map(group => group.id))
   const sdk = config.profile === 'sdk'
+  const connection = join(home, 'standalone/connection')
+  if (!sdk) {
+    // 只替换 Host 认证适配；浏览器继续装载同镜像原生连接及其完整依赖声明。
+    const require = createRequire(join(home, 'profiles/standalone/package.json'))
+    const manifest = require.resolve('@deepseek-ai/dsh-client-connection/package.json')
+    const native = JSON.parse(readFileSync(manifest, 'utf8'))
+    const client = native.exports['./client']
+    write(join(connection, 'package.json'), JSON.stringify({ name: native.name, private: true, type: 'module', exports: { '.': './index.mjs', './client': './client.browser.js' }, dsh: { client: native.dsh.client } }) + '\n')
+    write(join(connection, 'index.mjs'), `export * from ${JSON.stringify(pathToFileURL(join(root, 'runtime/standalone-connection.js')).href)};\n`)
+    if (!existsSync(join(connection, 'client.browser.js'))) symlinkSync(join(dirname(manifest), typeof client === 'string' ? client : client.default), join(connection, 'client.browser.js'))
+  }
   const sdkBase = sdk ? load(readFileSync(join(root, 'runtime/sdk-profile.patch.yml'), 'utf8'), { schema: patchSchema }) as any[] : []
   const runtimePatch = [
     { id: 'agent-preset-registry', config: { default: config.presetId } },
@@ -93,6 +107,7 @@ export function generateProfile(config: StandaloneConfig, home: string, root: st
         { id: 'standalone-settings', name: '@deepseek-ai/dsh-api-settings-controller' },
         { id: 'harness-sdk-preset', name: join(root, 'runtime/sdk-preset.mts'), config: { presetId: config.presetId } },
       ] : [
+        { id: 'connection', name: join(connection, 'index.mjs'), disabled: false, inject: ['webStartup'], config: { trustedHosts: { __dshExpression: 'ctx.webStartup.trustedHosts' } } },
         { id: 'webserver', name: join(root, 'runtime/web/container-webserver.mjs'), disabled: false, inject: ['webStartup'], config: { host: { __dshExpression: "ctx.webStartup.host ?? '127.0.0.1'" }, port: { __dshExpression: 'ctx.webStartup.port ?? 3080' } } },
         { id: 'web-runtime', name: join(root, 'runtime/web/container-web-app.mjs'), disabled: false, inject: ['webStartup'], config: {
           openBrowser: false, printUrl: false, surfaceContext: true,
@@ -112,7 +127,10 @@ export function generateProfile(config: StandaloneConfig, home: string, root: st
 }
 export function initializeStandalone({ root = runtimeRoot(), home = process.env.DSH_HOME || '/var/lib/dsh', installAnchor = '/opt/dsh/apps/cli/package.json' } = {}) {
   mkdirSync(home, { recursive: true, mode: 0o700 })
-  if (existsSync(join(home, 'standalone/initialized.json'))) return { initialized: false }
+  if (existsSync(join(home, 'standalone/initialized.json'))) {
+    generateProfile(readStandaloneConfig(home), home, root, false)
+    return { initialized: false }
+  }
   const initial = validateStandaloneConfig(JSON.parse(readFileSync(join(root, 'config-seed/standalone.json'), 'utf8')))
   const seed = existsSync(configPath(home)) ? readStandaloneConfig(home) : initial
   const modelFile = join(home, 'profiles/standalone/cordis.patch.yml')
@@ -131,6 +149,11 @@ export function initializeStandalone({ root = runtimeRoot(), home = process.env.
   }
   if (declaredServers) {
     const enabled = declaredServers.filter(server => typeof server.id === 'string' && server.enabled !== false)
+    for (const server of enabled) {
+      if ((server.url || server.specUrl) && !seed.mcp.groups.some(group => group.id === server.id) && !seed.mcp.servers.some(current => current.id === server.id)) {
+        seed.mcp.servers.push({ ...server, enabled: true, tools: server.tools ?? { mode: 'all', names: [] } })
+      }
+    }
     seed.mcp.mountServerIds = [...new Set(enabled.map(server => server.id))]
     seed.mcp.mountOverrides = Object.fromEntries(enabled.map(server => [server.id, { ...(server.serverName ? { serverName: server.serverName } : {}), ...(server.tools ? { tools: server.tools } : {}) }]))
   }
@@ -157,11 +180,11 @@ export function initializeStandalone({ root = runtimeRoot(), home = process.env.
   write(join(home, 'standalone/initialized.json'), JSON.stringify({ agentId: seed.agentId, experimentId: seed.experimentId, sourceDigest: seed.sourceDigest, initializedAt: new Date().toISOString() }) + '\n')
   return { initialized: true }
 }
-export async function configureStandalone(file: string, { root = runtimeRoot(), home = process.env.DSH_HOME || '/var/lib/dsh' } = {}) {
+export async function configureStandalone(file: string | Record<string, unknown>, { root = runtimeRoot(), home = process.env.DSH_HOME || '/var/lib/dsh' } = {}) {
   const previous = readStandaloneConfig(home)
   const nativeModelPatch = load(readFileSync(join(home, 'profiles/standalone/cordis.patch.yml'), 'utf8'), { schema: patchSchema })
   if (Array.isArray(nativeModelPatch)) previous.modelPatch = nativeModelPatch
-  const supplied = JSON.parse(readFileSync(file, 'utf8'))
+  const supplied = typeof file === 'string' ? JSON.parse(readFileSync(file, 'utf8')) : file
   // 身份和资产入口来自冻结包；重配只接受模型、MCP与其凭据。
   if (!supplied || typeof supplied !== 'object' || Array.isArray(supplied) || Object.keys(supplied).some(key => !['modelPatch', 'defaultModel', 'mcp', 'environment'].includes(key))) throw new Error('重新配置只接受 modelPatch、defaultModel、mcp 与 environment')
   const next = validateStandaloneConfig({ ...previous, ...supplied, environment: undefined })
@@ -172,7 +195,7 @@ export async function configureStandalone(file: string, { root = runtimeRoot(), 
   }
   // 保存前复用原始管理器的纯格式校验，不探测或等待任何外部 MCP。
   const { validateConfiguration } = await import(pathToFileURL(join(root, 'runtime/standalone-plugin.js')).href)
-  validateConfiguration(next.mcp)
+  validateConfiguration({ ...next.mcp, servers: configuredServers(next) })
   if (supplied.environment) {
     if (Object.entries(supplied.environment).some(([key, value]) => !/^[A-Z][A-Z0-9_]*$/.test(key) || typeof value !== 'string')) throw new Error('模型环境凭据格式无效')
     write(join(home, 'standalone/environment.llm-api-key'), JSON.stringify({ ...readEnvironment(join(home, 'standalone/environment.llm-api-key')), ...supplied.environment }) + '\n')
@@ -180,6 +203,29 @@ export async function configureStandalone(file: string, { root = runtimeRoot(), 
   writeStandaloneConfig(next, home)
   generateProfile(next, home, root, supplied.modelPatch !== undefined || supplied.defaultModel !== undefined)
   return { configured: true, restartRequired: next.profile !== 'sdk' }
+}
+function updateMcpConnection(server: any, { url, token }: { url?: string; token?: string }) {
+  if (url !== undefined) {
+    let address: URL
+    try { address = new URL(url) } catch { throw new Error('MCP 地址必须是 HTTP(S) URL') }
+    if (!['http:', 'https:'].includes(address.protocol)) throw new Error('MCP 地址必须是 HTTP(S) URL')
+    server[server.specUrl ? 'specUrl' : 'url'] = url
+  }
+  if (token === undefined) return
+  if (/[\r\n]/.test(token)) throw new Error('MCP Token 不能包含换行')
+  if (server.specUrl) { server.apiKey = token; server.authType = 'credential'; server.authHeader ||= 'Authorization' }
+  else {
+    server.headers = (server.headers || []).filter((header: any) => header.name.toLowerCase() !== 'authorization')
+    if (token) server.headers.push({ name: 'Authorization', value: token.startsWith('Bearer ') ? token : `Bearer ${token}` })
+  }
+}
+export async function configureMcpConnection(input: { id: string; url?: string; token?: string }, options: { root?: string; home?: string } = {}) {
+  if (!input.id || input.url === undefined && input.token === undefined) throw new Error('请指定 MCP 连接 ID 及地址或 Token')
+  const mcp = readStandaloneConfig(options.home).mcp
+  const server = mcp.servers.find(server => server.id === input.id)
+  if (!server) throw new Error('MCP 连接 ID 不存在，请核对 state/home/standalone/config.json 的 mcp.servers[].id')
+  updateMcpConnection(server, input)
+  return configureStandalone({ mcp }, options)
 }
 /** 交互入口只询问业务连接，不要求用户理解 Profile 插件 ID 或内部控制参数。 */
 export async function configureInteractive({ root = runtimeRoot(), home = process.env.DSH_HOME || '/var/lib/dsh' } = {}) {
@@ -219,17 +265,8 @@ export async function configureInteractive({ root = runtimeRoot(), home = proces
       if (!field) continue
       const label = server.description || server.serverName || server.id
       const address = await ask(`MCP ${label} 地址（留空保留 ${server[field]}）：`)
-      if (address) { const url = new URL(address); if (!['http:', 'https:'].includes(url.protocol)) throw new Error('MCP 地址必须是 HTTP(S)'); server[field] = address }
       const key = await ask(`MCP ${label} 凭据（留空保留，输入不显示）：`, true)
-      if (key) {
-        if (server.specUrl) { server.apiKey = key; server.authType ||= 'credential'; server.authHeader ||= 'Authorization' }
-        else {
-          server.headers ||= []
-          const header = server.headers.find((header: any) => header.name.toLowerCase() === 'authorization')
-          if (header) header.value = key.startsWith('Bearer ') ? key : `Bearer ${key}`
-          else server.headers.push({ name: 'Authorization', value: key.startsWith('Bearer ') ? key : `Bearer ${key}` })
-        }
-      }
+      updateMcpConnection(server, { ...(address ? { url: address } : {}), ...(key ? { token: key } : {}) })
     }
     const temporary = join(home, 'standalone/.interactive-config.llm-api-key')
     write(temporary, JSON.stringify({ modelPatch: nativePatch, mcp, environment }))
@@ -303,6 +340,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     const action = process.argv[2] || 'start'
     if (action === 'init') console.log(JSON.stringify(initializeStandalone()))
     else if (action === 'configure') console.log(JSON.stringify(process.argv[3] ? await configureStandalone(process.argv[3]) : await configureInteractive()))
+    else if (action === 'configure-mcp') {
+      // Token 仅经 stdin 传入，不进入 Docker 参数、环境或回执。
+      const fields = readFileSync(0, 'utf8').split('\0')
+      if (![3, 4].includes(fields.length) || fields.at(-1) !== '') throw new Error('MCP 参数格式无效')
+      console.log(JSON.stringify(await configureMcpConnection({ id: fields[0], ...(fields[1] ? { url: fields[1] } : {}), ...(fields.length === 4 ? { token: fields[2] } : {}) })))
+    }
     else if (action === 'start') process.exitCode = await startStandalone()
     else if (action === 'sdk-prepare') { prepareStandaloneSdk(); console.log(JSON.stringify({ prepared: true })) }
     else if (action === 'sdk-run') process.exitCode = await runStandaloneSdk(process.argv[3] || join(process.env.DSH_HOME || '/var/lib/dsh', 'standalone/input.json'))

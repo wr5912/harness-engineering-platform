@@ -1,0 +1,16 @@
+[
+  {
+    "label": "desktop",
+    "observedAt": "2026-11-12T05:57:56.992Z",
+    "text": "Harness 工程平台\nHarness Engineering Platform\n首页\n管理对话\n智能体管理\n评测中心\n实例管理\n统一网关\nMCP 管理\nA\nadmin\n运行 · 交付 · 观察\n实例管理\n\n管理智能体的运行实例，随时核对来源、状态与访问入口。\n\n平台托管\n接入实例\n实例详情\nsecurity-operations-expert-main\n运行中\n访问 DSH Web\n刷新详情\n重载\n返回实例列表\n概览\n网站嵌入\n运行日志\n操作回执\n实例登记来源\n网络安全运营专家 · EXP-security-operations-expert-027-m-reab20c48f610\nexperiment:EXP-security-operations-expert-027-m-reab20c48f610\n复制来源 ID\n登记默认模型\nlocal-qwen3.8-27b · Qwen3.8-27B\n来自本实例登记，当前 Session 的实际模型需单独核对。\n资产生效状态\n资产已生效\n运行代次与加载回执一致\n检查于 2026/11/11 21:57:37\n最近重载尝试：已核验 · 2026/11/11 21:00:16 实际加载已核验\n当前来源资产摘要\nsha256:18986547a21ddb0e5621d0f9aa4ba747092ea259ae4fe530bdff4ff1106a43fb\n最后实际加载回执\nsha256:18986547a21ddb0e5621d0f9aa4ba747092ea259ae4fe530bdff4ff1106a43fb\n加载于 2026/11/11 21:00:16\n容器 26183d4b6efb · 代次 2026-11-12T05:00:09.853496798Z\n历史回执仅适用于对应运行代次。\n智能体\nsecurity-operations-expert\n内部 Web 端口\n18503\n实例阶段\n开发调试\n访问方式\n经过网关，无需认证（共享数据和会话）\n已登记网关入口\nhttp://172.16.138.228:53105/agents/security-operations-expert/instances/security-operations-expert-main/\n\n容器状态来自当前观察；来源和镜像为实例登记记录。当前 Session 的实际装载需通过运行观察核对。\n\nRuntime 与存储信息\n实例模型设置\n更改默认模型\n\n本实例沿用自己的登记默认模型；修改统一默认模型不会改变已登记实例。\n\n会话与数据\n\n会话数据位于实例 HOME；平台不读取会话内容或凭据。\n\n查看来源版本评测",
+    "width": 1440,
+    "scrollWidth": 1440
+  },
+  {
+    "label": "mobile",
+    "observedAt": "2026-11-12T05:57:57.568Z",
+    "text": "Harness 工程平台\nHarness Engineering Platform\n实例管理\n☰\n运行 · 交付 · 观察\n实例管理\n\n管理智能体的运行实例，随时核对来源、状态与访问入口。\n\n平台托管\n接入实例\n实例详情\nsecurity-operations-expert-main\n运行中\n访问 DSH Web\n刷新详情\n重载\n返回实例列表\n概览\n网站嵌入\n运行日志\n操作回执\n实例登记来源\n网络安全运营专家 · EXP-security-operations-expert-027-m-reab20c48f610\nexperiment:EXP-security-operations-expert-027-m-reab20c48f610\n复制来源 ID\n登记默认模型\nlocal-qwen3.8-27b · Qwen3.8-27B\n来自本实例登记，当前 Session 的实际模型需单独核对。\n资产生效状态\n资产已生效\n运行代次与加载回执一致\n检查于 2026/11/11 21:57:56\n最近重载尝试：已核验 · 2026/11/11 21:00:16 实际加载已核验\n当前来源资产摘要\nsha256:18986547a21ddb0e5621d0f9aa4ba747092ea259ae4fe530bdff4ff1106a43fb\n最后实际加载回执\nsha256:18986547a21ddb0e5621d0f9aa4ba747092ea259ae4fe530bdff4ff1106a43fb\n加载于 2026/11/11 21:00:16\n容器 26183d4b6efb · 代次 2026-11-12T05:00:09.853496798Z\n历史回执仅适用于对应运行代次。\n智能体\nsecurity-operations-expert\n内部 Web 端口\n18503\n实例阶段\n开发调试\n访问方式\n经过网关，无需认证（共享数据和会话）\n已登记网关入口\nhttp://172.16.138.228:53105/agents/security-operations-expert/instances/security-operations-expert-main/\n\n容器状态来自当前观察；来源和镜像为实例登记记录。当前 Session 的实际装载需通过运行观察核对。\n\nRuntime 与存储信息\n实例模型设置\n更改默认模型\n\n本实例沿用自己的登记默认模型；修改统一默认模型不会改变已登记实例。\n\n会话与数据\n\n会话数据位于实例 HOME；平台不读取会话内容或凭据。\n\n查看来源版本评测",
+    "width": 390,
+    "scrollWidth": 390
+  }
+]

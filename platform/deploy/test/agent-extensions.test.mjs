@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { stageSelectedExtensions } from '../agent/extensions.mts'
 import { populateStandaloneExtensions } from '../../plugin/src/standalone-extensions/index.ts'
+import { frozenLfxWorkflow } from '../../plugin/src/mcp/lfx-runtime.ts'
+import { lfxDigest } from '../../plugin/src/mcp/lfx-assets.ts'
 
 const programRoot = fileURLToPath(new URL('../../../', import.meta.url))
 const write = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, value) }
@@ -119,4 +121,33 @@ test('巡检独立包只带选中代码和公共依赖，不要求威胁算法�
   await populateStandaloneExtensions(ctx, info, x.staging)
   assert.deepEqual(await ctx.standaloneCompositionExtension.workflows['inspection-status'].execute(), {ok:true})
   assert.match(ctx.standaloneCompositionExtension.workflows['inspection-status'].sourceDigest, /^[a-f0-9]{64}$/)
+})
+
+test('LFX 独立扩展使用发布快照并保留同编排固定旧版，不编译当前草稿', async t => {
+  const x = fixture(t), business = join(x.assetRoot, 'mcp')
+  write(join(x.assetRoot, 'workspace.json'), JSON.stringify({ extensions: [{ id: 'security-operations-compositions', path: 'mcp' }] }))
+  write(join(business, 'src/soc.ts'), 'export const createSoc=()=>async()=>({ok:true});')
+  write(join(business, 'compositions/native/src/index.ts'), 'throw new Error("不编译或执行可变草稿")')
+  const frozen = marker => {
+    const bundle = { engine: 'lfx==1.13.1', flow: { data: { nodes: [{ id: 'result', position: { x: 0, y: 0 }, data: { id: 'result', type: 'HepOutput', node: { is_output: true, template: { code: { value: 'unexecuted' } } } } }], edges: [] } }, modules: {}, children: {},
+      typescript: `export const create=()=>({inputSchema:{type:'object'},connections:()=>[],prepare:async()=>({marker:${JSON.stringify(marker)}})});` }
+    const flowDigest = lfxDigest(bundle)
+    write(join(business, 'compositions/native/versions', flowDigest, 'bundle.json'), JSON.stringify(bundle))
+    return { kind: 'workflow', engine: 'lfx', workflow: 'native', flowDigest }
+  }
+  const old = frozen('old'), current = frozen('published')
+  const info = await stageSelectedExtensions({ ...x.input, compositions: { compositions: [{ id: 'native', published: current, versions: [{ config: old }] }] } })
+  assert.equal(info.lfx, true)
+  assert.equal(info.sources.length, 2)
+  assert.ok(info.sources.every(file => /versions\/[a-f0-9]{64}\/bundle.json$/.test(file.path)))
+  rmSync(x.assetRoot, { recursive: true })
+  const { ctx } = context()
+  ctx.platformMcp.frozenWorkflow = config => frozenLfxWorkflow(x.staging, config, async () => {})
+  await populateStandaloneExtensions(ctx, info, x.staging)
+  const workflow = ctx.standaloneCompositionExtension.workflows.native
+  assert.equal((await workflow.prepare({}, current)).marker, 'published')
+  assert.equal((await workflow.prepare({}, old)).marker, 'old')
+  const file = join(x.staging, 'mcp/compositions/native/versions', old.flowDigest, 'bundle.json')
+  chmodSync(file, 0o644); writeFileSync(file, '{}')
+  await assert.rejects(workflow.prepare({}, old), /发布摘要不一致/)
 })

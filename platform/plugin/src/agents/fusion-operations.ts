@@ -24,9 +24,8 @@ function working(root: string, id: string) {
   const dir = candidate(root, id), files = new Map<string, File>()
   let size = 0
   for (const path of candidateFiles(dir)) {
-    assertAssetPath(path)
-    if (path.split('/').some(part => part.startsWith('.env.'))) fail('环境凭据不能进入融合草稿', { path })
     const file = dataPath(dir, path), content = readFileSync(file)
+    assertAssetPath(path, content)
     size += content.length
     if (files.size >= 10_000 || size > 100 * 1024 * 1024) fail('融合资产超出批次大小限制')
     files.set(path, { content, mode: lstatSync(file).mode & 0o111 ? 0o755 : 0o644 })
@@ -37,8 +36,8 @@ function working(root: string, id: string) {
 function fixed(root: string, id: string, ref: string) {
   const files = readGitCandidate(root, id, ref)
   if (!files) fail('固定 Candidate 不可读取，或包含不支持的文件类型', { experiment_id: id, ref })
-  for (const path of files.keys()) {
-    assertAssetPath(path)
+  for (const [path, file] of files) {
+    assertAssetPath(path, file.content)
     dataPath(root, path)
     if (path.split('/').some(part => part.startsWith('.env.'))) fail('环境凭据不能进入融合草稿', { path })
   }
@@ -256,7 +255,7 @@ export function fusionOperationStatus(root: string, id: string) {
     receipt: op.receipt ?? null, next_action: op.state === 'applying' ? 'fusion/recover' : op.state === 'rolled-back' ? 'fusion/prepare' : op.rows.some(row => !row.resolved) ? 'fusion/resolve' : op.state === 'applied' ? 'fusion/verify' : 'fusion/confirm' }
 }
 
-export async function confirmFusion(root: string, body: any, check: (op: Operation, drafts: { rel: string; content: string }[]) => Promise<string>) {
+export async function confirmFusion(root: string, body: any, check: (op: Operation, drafts: { rel: string; content: Buffer | null }[]) => Promise<string>) {
   const op = readFusionOperation(root, body.operation_id)
   if (body.expected_plan_sha256 !== op.plan_sha256 || body.confirmed !== true) fail('确认需要当前方案摘要和 confirmed=true')
   if (op.state === 'applied') return op.receipt
@@ -268,7 +267,7 @@ export async function confirmFusion(root: string, body: any, check: (op: Operati
   // 提交前验证最终路径集合，避免文件/目录冲突造成半批写入。
   const finalPaths = op.rows.filter(row => row.result).map(row => row.path)
   if (finalPaths.some(path => finalPaths.some(other => other.startsWith(path + '/')))) fail('最终输出仍存在文件与目录冲突')
-  const drafts = files.filter(item => text(item.file)).map(({ row, file }) => ({ rel: prefix + row.path, content: file!.content.toString('utf8') }))
+  const drafts = files.map(({ row, file }) => ({ rel: prefix + row.path, content: file?.content ?? null }))
   const change = await check(op, drafts)
   if (candidateDigest(candidate(root, op.request.target_experiment_id)) !== op.candidate_sha256) fail('目标 Candidate 已变化，请保留草稿并重新预览', { next_action: 'fusion/prepare' })
   if (readFusionOperation(root, op.operation_id).plan_sha256 !== op.plan_sha256) fail('验证期间方案已变化')

@@ -14,6 +14,7 @@ const paths = [
   '/work/harness/workspace/.env',
 ]
 const modulePaths = [
+  '/opt/node_modules',
   '/var/lib/dsh/node_modules',
   '/var/lib/dsh/profiles/node_modules',
   '/var/lib/dsh/profiles/web/node_modules',
@@ -70,7 +71,7 @@ assert.equal(readFileSync('/var/lib/dsh/AGENTS.md').length, 0)
 for (const path of ['/var/lib/dsh/.env', '/work/harness/workspace/.env']) {
   assert.match(readFileSync(path, 'utf8'), /^(?:\s*#[^\n]*\n)+\s*$/)
 }
-for (const path of modulePaths.filter(path => path !== '/var/lib/dsh/profiles/node_modules')) {
+for (const path of modulePaths.filter(path => path !== '/var/lib/dsh/profiles/node_modules' && path !== '/opt/node_modules')) {
   assert.deepEqual(readdirSync(path), ['POLICY.md'])
 }
 

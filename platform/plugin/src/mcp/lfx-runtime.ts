@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { createServer } from 'node:http'
+import { createServer, request } from 'node:http'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { programRoot } from '../workspace.ts'
@@ -44,11 +44,13 @@ async function runtime() {
   if (processState && processState.process.exitCode === null) return processState
   if (starting) return starting
   starting = new Promise<NonNullable<typeof processState>>((resolve, reject) => {
-    const root = programRoot(), lock = readFileSync(join(root, 'platform/mcp/lfx/requirements.txt'))
-    const python = join(root, '.local/lfx', createHash('sha256').update(lock).digest('hex'), 'bin/python')
-    if (!existsSync(python)) return reject(new Error('LFX 运行环境未安装，请通过平台更新工具安装锁定依赖'))
-    const key = randomUUID(), child = spawn(python, [join(root, 'platform/mcp/lfx/server.py')], { stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, LANGFLOW_API_KEY: key, DO_NOT_TRACK: '1', LANGFLOW_DO_NOT_TRACK: 'true' } })
+    const standalone = process.env.STANDALONE_ROOT
+    const directory = standalone ? join(standalone, 'runtime/lfx') : join(programRoot(), 'platform/mcp/lfx')
+    const lock = readFileSync(join(directory, 'requirements.txt'))
+    const python = standalone ? join(directory, 'python3') : join(programRoot(), '.local/lfx', createHash('sha256').update(lock).digest('hex'), 'bin/python')
+    if (!standalone && !existsSync(python)) return reject(new Error('LFX 运行环境未安装，请通过平台更新工具安装锁定依赖'))
+    const key = randomUUID(), child = spawn(python, [join(directory, 'server.py')], { stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...(standalone ? { PYTHONPATH: [join(directory, 'site-packages'), process.env.PYTHONPATH].filter(Boolean).join(':') } : {}), LANGFLOW_API_KEY: key, DO_NOT_TRACK: '1', LANGFLOW_DO_NOT_TRACK: 'true' } })
     const timer = setTimeout(() => { child.kill(); reject(new Error('LFX 启动超时')) }, 60_000)
     child.stderr?.resume() // 第三方错误正文可能包含参数，不进入普通日志。
     const lines = createInterface({ input: child.stdout! })
@@ -109,12 +111,17 @@ async function execute(bundle: LfxBundle, input: any, config: any, context: Work
   try {
     await api(`/hep/runs/${runKey}`, { bundle, input, shared: { ...context.shared, lfxBundle: undefined }, config, callback: `http://127.0.0.1:${port}`, token })
     await api('/flows/upload/', { name: config.title, id: flowId, data: bundle.flow.data })
-    const response = await fetch(host.url + '/api/v2/workflows', { method: 'POST', headers: { ...headers, 'x-hep-run': runKey },
-      body: JSON.stringify({ flow_id: flowId, mode: 'stream', stream_protocol: 'langflow', expose_graph_state: true }), signal: context.signal })
-    if (!response.ok) throw new Error(`LFX 流程执行失败（${response.status}）`)
+    // 长节点可能数分钟没有 SSE 帧；由工作流 signal 控制时限，避免 fetch 的响应体空闲超时。
+    const response = await new Promise<import('node:http').IncomingMessage>((resolve, reject) => {
+      const call = request(host.url + '/api/v2/workflows', { method: 'POST', headers: { ...headers, 'x-hep-run': runKey }, signal: context.signal }, resolve)
+      call.once('error', reject)
+      call.end(JSON.stringify({ flow_id: flowId, mode: 'stream', stream_protocol: 'langflow', expose_graph_state: true }))
+    })
+    if (response.statusCode !== 200) { response.resume(); throw new Error(`LFX 流程执行失败（${response.statusCode}）`) }
+    response.setEncoding('utf8')
     const outputIds = new Set(bundle.flow.data.nodes.filter((node: any) => node.data.node.is_output).map((node: any) => node.id))
     let pending = '', result: any, ended = false
-    for await (const chunk of response.body!.pipeThrough(new TextDecoderStream())) {
+    for await (const chunk of response) {
       pending += chunk
       let boundary: number
       while ((boundary = pending.indexOf('\n\n')) >= 0) {
@@ -136,6 +143,9 @@ async function execute(bundle: LfxBundle, input: any, config: any, context: Work
     }
     if (ended && result && typeof result === 'object') return result
     throw new Error('LFX 未返回结构化输出')
+  } catch (error) {
+    context.signal.throwIfAborted()
+    throw error
   } finally {
     await Promise.allSettled([api(`/hep/runs/${runKey}`, undefined, 'DELETE', AbortSignal.timeout(3000)), api(`/flows/${flowId}`, undefined, 'DELETE', AbortSignal.timeout(3000))])
     server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()))
@@ -154,4 +164,12 @@ export function lfxWorkflow(root: string, id: string, previous: CompositionWorkf
     },
     execute: (input, config, context) => config.engine === 'lfx' ? execute(context.shared.lfxBundle, input, config, context, invoke) : previous.execute!(input, config, context),
   }
+}
+
+/** 独立运行只导入已发布字节，不重新编译或读取工作区草稿。 */
+export async function frozenLfxWorkflow(root: string, config: any, invoke: Invoke): Promise<CompositionWorkflow> {
+  if (config.engine !== 'lfx' || !config.flowDigest) throw new Error('独立运行需要已冻结的 LFX 发布版本')
+  const bundle = loadLfxBundle(root, config.workflow, config), workflow = await typedWorkflow(bundle, invoke)
+  if (!workflow) throw new Error('冻结 LFX 编排缺少独立运行合同')
+  return lfxWorkflow(root, config.workflow, { ...workflow, sourceDigest: lfxDigest(bundle) }, invoke)
 }

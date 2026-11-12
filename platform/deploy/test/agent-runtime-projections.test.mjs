@@ -4,10 +4,30 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, statSync }
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { projectLegacyFixedBindings, stageManagedProjections } from '../agent/runtime/projections.mts'
+import { projectLegacyFixedBindings, projectStandaloneBoundary, stageManagedProjections } from '../agent/runtime/projections.mts'
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url))
 const source = `const definition = { fixedCompositions: { a: {} } };\nfunction fixedCompositionToolName(name,binding) { return name + binding.group_target_digest; }\nexport function registerFixedCompositionTools(ctx,bindings) {\n const aliases = new Map();\n for(const [name,supplied] of Object.entries(bindings)) {\n  const binding = structuredClone(supplied);\n  const alias = fixedCompositionToolName(name,binding);\n  aliases.set(name,{ alias, async execute() { return binding; } });\n }\n return aliases;\n}\n`
+
+test('独立部署不装载平台 Guard，也不需要 businessRuntime 占位服务', async () => {
+  const code = `export const name='security-operations-guard'; export const inject=['tools','businessRuntime']; export const helper=42; export function apply(ctx){ctx.get('businessRuntime'); ctx.tools.guard(()=> 'denied')}`
+  const projected = projectStandaloneBoundary(code, repo)
+  const loaded = await import('data:text/javascript;base64,' + Buffer.from(projected.content).toString('base64'))
+  assert.deepEqual(loaded.inject, [])
+  assert.equal(loaded.helper, 42)
+  loaded.apply(new Proxy({}, { get() { throw new Error('平台 Guard 不应运行') } }))
+  const ui = projectStandaloneBoundary(`export const inject=['webServer','businessRuntime']; export function apply() {}`, repo)
+  assert.doesNotMatch(ui.content, /businessRuntime/)
+})
+
+test('独立威胁工具使用包内 MCP 管理器连接，不依赖平台 Session 和网关地址', async () => {
+  const code = `export function runtimeGroupConnection(ctx,config,sessionId){return ctx.get('businessRuntime').groupFetch(config.connections.runtimeGroup.id,sessionId)}`
+  const projected = projectStandaloneBoundary(code, repo)
+  const loaded = await import('data:text/javascript;base64,' + Buffer.from(projected.content).toString('base64'))
+  const direct = () => {}
+  assert.deepEqual(loaded.runtimeGroupConnection({ mcpSessionManager: { groupUrl: id => 'http://local/' + id, groupFetch: () => direct } }, { connections: { runtimeGroup: { id: 'soc', url: 'http://old-platform/' } } }), { groupUrl: 'http://local/soc', fetch: direct })
+  assert.equal(projectStandaloneBoundary(projected.content, repo).changed, false)
+})
 
 test('旧编译接缝保留源别名与业务版本，实际绑定采用部署摘要', async () => {
   const projected = projectLegacyFixedBindings(source, repo)
@@ -41,4 +61,6 @@ test('归档投影不改冻结源文件，伴随数据保留相对路径，清�
   assert.equal(readFileSync(join(stage, 'runtime/projections/managed/workflow/fixtures.json'), 'utf8'), '{"asset":"example"}\n')
   assert.notEqual(statSync(join(stage, 'assets/managed/workflow/index.mjs')).ino, statSync(join(stage, 'runtime/projections/managed/workflow/index.mjs')).ino)
   assert.equal(JSON.parse(readFileSync(join(stage, 'runtime/managed-projection.json'))).files[0].sourcePath, 'assets/managed/workflow/index.mjs')
+  assert.deepEqual(stageManagedProjections(stage, repo), records)
+  assert.equal(readFileSync(join(stage, 'assets/managed/workflow/index.mjs'), 'utf8'), source)
 })

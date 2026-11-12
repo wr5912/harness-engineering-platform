@@ -21,7 +21,7 @@ async function loadMcpModule(native = false) {
   const outfile = join(outdir, 'index.mjs')
   await symlink(join(process.cwd(), 'node_modules'), join(outdir, 'node_modules'), 'dir')
   await build({
-    stdin: { contents: `export * from './src/mcp/${native ? 'native' : 'index'}.ts'; export { managementDispatch } from './src/mcp/control.ts'; export { withBusinessContext } from './src/business-control/core.ts'`, resolveDir: process.cwd(), loader: 'ts' },
+    stdin: { contents: `export * from './src/mcp/${native ? 'native' : 'index'}.ts'; export { managementDispatch } from './src/mcp/control.ts'; export { withBusinessContext } from './src/business-control/core.ts'; export * from './src/mcp/draft-bindings.ts'`, resolveDir: process.cwd(), loader: 'ts' },
     outfile,
     bundle: true,
     platform: 'node',
@@ -162,13 +162,13 @@ async function withServer(handler, fn) {
   }
 }
 
-async function setup(module, baseUrl) {
+async function setup(module, baseUrl, root = join(process.cwd(), '../..')) {
   const temp = await mkdtemp(join(tmpdir(), 'mcp-test-'))
   const credentialPath = join(temp, 'token.txt')
   await writeFile(credentialPath, 'secret-token\n', 'utf8')
   const compositionsFile = join(temp, 'compositions.json')
   await writeFile(compositionsFile, await readFile(new URL('./fixtures/mcp-compositions.json', import.meta.url)))
-  const handler = module.createMcpHandler(join(process.cwd(), '../..'), { stateFile: join(temp, 'state.json'), compositionsFile })
+  const handler = module.createMcpHandler(root, { stateFile: join(temp, 'state.json'), compositionsFile })
   const rpc = (endpoint, payload) => handler(endpoint, payload, new AbortController().signal, undefined)
   const registered = await rpc('registerOpenApi', {
     id: 'security-readonly-api',
@@ -661,6 +661,31 @@ test('编排草稿持久化，旧发布版保持可调用，dry 发布后 Gatewa
     const current = await request('tools/call', { name: draft.toolName, arguments: { asset: 'host-a' } })
     assert.equal(JSON.parse(current.result.content[0].text).version.definition.toolName, draft.toolName)
     assert.deepEqual((await reload('list', {})).value.compositions, published.value.compositions)
+  })
+})
+
+test('过期草稿不阻断公开工具发现与执行，发现无需生成编辑器图或Git状态', async t => {
+  const module = await loadMcpModule()
+  await withFixture(async ({ baseUrl }) => {
+    const root = join(tmpdir(), `mcp-stale-${Date.now()}`)
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const { handler } = await setup(module, baseUrl, root)
+    const instance = { instanceId: 'acceptance', sourceDigest: 'old' }
+    module.saveDraftBinding(root, { ...instance, compositions: [{ id: 'draft', config: { toolName: 'draft_only' }, implementationDigest: 'old' }] })
+    const client = module.createPublishedCompositionClient(root, async (endpoint, ...args) => {
+      assert.notEqual(endpoint, 'list', '工具发现不能依赖完整编辑器状态')
+      return handler(endpoint, ...args)
+    })
+    await module.withDraftInstance({ ...instance, sourceDigest: 'changed' }, async () => {
+      const discovered = await client.listTools()
+      assert.deepEqual(discovered.tools.map(tool => tool.name), ['query_asset_related_alerts', ...queryNames])
+      assert.match(discovered._meta.draftBindingError, /来源不一致/)
+      const strict = await handler('callBoundDraftComposition', { toolName: 'draft_only', input: {} })
+      assert.equal(strict.ok, false)
+      assert.match(strict.error.message, /来源不一致/)
+      const result = await client.callTool({ name: 'query_asset_related_alerts', arguments: { asset: 'host-a' } })
+      assert.equal(result.isError, false)
+    })
   })
 })
 

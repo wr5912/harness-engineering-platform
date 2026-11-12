@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
-import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, readSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, readSync, realpathSync, renameSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -210,10 +210,15 @@ export async function prepareControlledHome() {
   const existingFallback = validateFallback(fallbackDir, expected, true)
   if (typeof healProfilesModuleFallback === 'function') {
     await healProfilesModuleFallback({ installAnchor, home })
-    validateFallback(fallbackDir, expected, false)
-  } else if (existingFallback) {
-    throw new Error('legacy installation fallback is not valid for native profile resolution')
+  } else if (!existingFallback) {
+    // 新版 Runtime 取消原生 healer 后，仍由同一镜像安装闭包提供外置插件的依赖。
+    for (const [name, target] of expected) {
+      const link = join(fallbackDir, name)
+      mkdirSync(dirname(link), { recursive: true })
+      symlinkSync(target, link)
+    }
   }
+  validateFallback(fallbackDir, expected, false)
 
   console.log(JSON.stringify({
     status: 'controlled-home-targets-prepared',

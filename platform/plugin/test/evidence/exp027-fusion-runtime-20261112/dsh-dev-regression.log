@@ -1,0 +1,30 @@
+........dsh-dev failed: 迁移 HOME 前必须先完整复制原数据至实例 dsh-home/；拒绝使用空 HOME
+dsh-dev failed: 迁移 HOME 前必须先完整复制原数据至实例 dsh-home/；拒绝使用空 HOME
+.................................dsh-dev failed: --analysis-workspace 内不得包含符号链接
+........dsh-dev failed: mode 只能是 eval
+dsh-dev failed: mode 只能是 eval
+dsh-dev failed: mode 只能是 eval
+.....dsh-dev failed: 所选来源未声明可解析的 preset ID，无法确定待评估目标
+.........................dsh-dev failed: 实例 soe-verify 已存在且来源/模式不同或归因 Run 不同；拒绝替换并保持原实例运行，请改用新的实例名
+..dsh-dev failed: 实例名必须使用小写 kebab-case
+.........dsh-dev failed: 实例来源与 Candidate MCP 种子不一致
+.....................dsh-dev failed: Compose 模板缺少预期锚点：name: ai-agent-harness-dsh-verification
+..dsh-dev failed: 归因实例不能装载业务插件依赖
+....dsh-dev failed: --trusted-host 必须是有效的 HOST 或 HOST:PORT，不含协议、路径或通配符
+dsh-dev failed: --trusted-host 必须是有效的 HOST 或 HOST:PORT，不含协议、路径或通配符
+dsh-dev failed: --trusted-host 必须是有效的 HOST 或 HOST:PORT，不含协议、路径或通配符
+dsh-dev failed: --trusted-host 必须是有效的 HOST 或 HOST:PORT，不含协议、路径或通配符
+.........{"hint": "DSH Web 首次打开需要在界面注册工作区：点击“选择工作区”→ 目录对话框的“编辑路径”→ 粘贴 “/work/harness/workspace” → “打开”，随后即可直接对话。该注册写入本实例 DSH_HOME 数据卷并跨重启保留；换用新的实例名等于新的 HOME 卷，需要重新选择一次。", "workspace_to_register": "/work/harness/workspace"}
+......dsh-dev failed: 28998–28999 没有可用 TCP 端口；请显式指定端口
+................{"replacing": "probe", "previous_state_schema": "1.2"}
+.{"hint": "DSH Web 首次打开需要在界面注册工作区：点击“选择工作区”→ 目录对话框的“编辑路径”→ 粘贴 “/work/harness/workspace” → “打开”，随后即可直接对话。该注册写入本实例 DSH_HOME 数据卷并跨重启保留；换用新的实例名等于新的 HOME 卷，需要重新选择一次。", "workspace_to_register": "/work/harness/workspace"}
+.警告：标准输出含本次进程认证 URL（敏感），调用方负责管道与终端记录。
+.警告：标准输出含本次进程认证 URL（敏感），调用方负责管道与终端记录。
+...警告：标准输出含本次进程认证 URL（敏感），调用方负责管道与终端记录。
+.dsh-dev failed: 标准输出不是交互终端；认证 URL 含本次进程 Token。确需由脚本或 IDE 消费时显式加 --non-interactive，并自行保护标准输出
+..警告：标准输出含本次进程认证 URL（敏感），调用方负责管道与终端记录。
+.....
+----------------------------------------------------------------------
+Ran 162 tests in 125.904s
+
+OK

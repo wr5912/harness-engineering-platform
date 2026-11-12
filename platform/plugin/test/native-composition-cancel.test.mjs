@@ -32,7 +32,7 @@ async function managerModule(t) {
   // 仅载入生产构建插件的定义，不执行 build.mjs 顶层的整套构建。
   const source = await readFile(new URL('../build.mjs', import.meta.url), 'utf8')
   const start = source.indexOf('export const managerSource =')
-  const end = source.indexOf('\nconst { name } =', start)
+  const end = source.indexOf('\nasync function main()', start)
   assert.ok(start > 0 && end > start, '构建插件定义边界应保持明确')
   const adapter = join(directory, 'adapter.mjs')
   await writeFile(adapter, "import { readFile } from 'node:fs/promises'; import { resolve } from 'node:path';\n" + source.slice(start, end).replace(/fileURLToPath\(new URL\('..\/..\/plugins\/mcp-manager', import.meta.url\)\)/, JSON.stringify(new URL('../../../plugins/mcp-manager', import.meta.url).pathname)))

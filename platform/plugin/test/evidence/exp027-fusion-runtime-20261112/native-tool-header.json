@@ -1,0 +1,10 @@
+{
+  "session_id": "session-a3a2d544-00fd-4ab8-8a41-9d8580877a55",
+  "request_header_record_count": 1,
+  "tool_entry_count": 333,
+  "unique_tool_count": 333,
+  "policy_change_present": true,
+  "emergency_action_present": true,
+  "policy_response_raw_tool_count": 27,
+  "tool_call_records": 0
+}

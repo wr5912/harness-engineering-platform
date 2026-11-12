@@ -1,0 +1,16 @@
+{
+  "observedAt": "2026-11-12T11:35:41.123Z",
+  "cookie": "",
+  "url": "http://172.16.138.228:28033/assistant/",
+  "dialogs": 0,
+  "presetButtons": 0,
+  "workspace": "security-operations-expert",
+  "previewNotice": false,
+  "composer": true,
+  "afterWorkspaceClick": {
+    "dialogs": [],
+    "options": [],
+    "workspaceButtonVisible": true
+  },
+  "nativeWorkspaceButtonLimitation": true
+}

@@ -1,0 +1,81 @@
+{
+  "observedAt": "2026-11-12T11:36:08.589672+00:00",
+  "archive": "/home/cmp/harness-engineering-platform-data/.local/artifacts/agent-deployments/security-operations-expert-12017d4587d1-amd64-online-d22dd66e.tar.gz",
+  "sha256": "88fc1a73691023e360c937140adf9882954a02aa98f6ae6c99e7efd455254027",
+  "sizeBytes": 1392276131,
+  "candidateSha256": "12017d4587d12005c289d777dae060289070d8bfec8544dd4e397e7ad106814f",
+  "installRoot": "/home/cmp/work/harness-engineering-platform/.local/exp027-portable-installed-ob3gks48",
+  "page": "http://172.16.138.228:28033/assistant/",
+  "container": "hep-agent-security-operations-expert-1794483101-9610-dsh-1",
+  "healthy": true,
+  "imageId": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece",
+  "checksummedFileCount": 23559,
+  "installerCheckedFileChecksums": true,
+  "installationMediaAutomaticallyRemoved": true,
+  "homePreserved": true,
+  "mounts": [
+    {
+      "destination": "/var/lib/dsh",
+      "readOnly": false
+    },
+    {
+      "destination": "/work/harness/workspace",
+      "readOnly": true
+    },
+    {
+      "destination": "/opt/dsh-presets",
+      "readOnly": true
+    },
+    {
+      "destination": "/opt/dsh-managed",
+      "readOnly": true
+    }
+  ],
+  "ports": {
+    "3080/tcp": [
+      {
+        "HostIp": "0.0.0.0",
+        "HostPort": "28033"
+      },
+      {
+        "HostIp": "::",
+        "HostPort": "28033"
+      }
+    ]
+  },
+  "cli": [
+    {
+      "args": [
+        "-h"
+      ],
+      "exitCode": 0,
+      "helpDisplayed": true
+    },
+    {
+      "args": [
+        "start",
+        "--unknown"
+      ],
+      "exitCode": 2,
+      "helpDisplayed": true
+    },
+    {
+      "args": [
+        "restart",
+        "--mcp-server"
+      ],
+      "exitCode": 2,
+      "helpDisplayed": true
+    },
+    {
+      "args": [
+        "configure",
+        "--mcp-server",
+        "report-write"
+      ],
+      "exitCode": 2,
+      "helpDisplayed": true
+    }
+  ],
+  "realInspectionExecuted": false
+}

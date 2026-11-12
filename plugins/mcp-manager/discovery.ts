@@ -23,6 +23,8 @@ function pump() {
 export async function discover<T>(server: any, kind: string, run: (server: any) => Promise<T>): Promise<T> {
   const callerSignal = server.platformSignal as AbortSignal | undefined
   callerSignal?.throwIfAborted()
+  // 本地分组把发现转交给上游；外层占用同一队列会让内层永久等待名额。
+  if (server.platformGroup) return run(server)
   const fingerprint = Object.fromEntries(Object.entries(server).filter(([key, value]) => typeof value !== 'function'
     && (!key.startsWith('platform') || ['platformWorkspaceId', 'platformComposition', 'platformToolResources'].includes(key))))
   const key = createHash('sha256').update(JSON.stringify([kind, fingerprint])).digest('hex')

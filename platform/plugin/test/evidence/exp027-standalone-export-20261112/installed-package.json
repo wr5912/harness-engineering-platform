@@ -1,0 +1,76 @@
+{
+  "archive": "/home/cmp/harness-engineering-platform-data/.local/artifacts/agent-deployments/security-operations-expert-887c231b3510-amd64-online-f9e24402.tar.gz",
+  "sha256": "e68f3249150592fa9fd6eff8f41b4c64f0ce9f417e798ad250904328c260ad35",
+  "sizeBytes": 1392287535,
+  "installRoot": "/home/cmp/work/harness-engineering-platform/.local/exp027-complete-package-installed-9vwinmrx",
+  "page": "http://172.16.138.228:28031/assistant/",
+  "container": "hep-agent-security-operations-expert-1794480142-25133-dsh-1",
+  "healthy": true,
+  "imageId": "sha256:c06d4e1fecc66f175a2fbeaa51e96ea0b2af8f58be22f89edac73df3c779bece",
+  "checksummedFileCount": 23559,
+  "installerCheckedFileChecksums": true,
+  "mounts": [
+    {
+      "destination": "/work/harness/workspace",
+      "readOnly": true
+    },
+    {
+      "destination": "/opt/dsh-presets",
+      "readOnly": true
+    },
+    {
+      "destination": "/opt/dsh-managed",
+      "readOnly": true
+    },
+    {
+      "destination": "/var/lib/dsh",
+      "readOnly": false
+    }
+  ],
+  "ports": {
+    "3080/tcp": [
+      {
+        "HostIp": "0.0.0.0",
+        "HostPort": "28031"
+      },
+      {
+        "HostIp": "::",
+        "HostPort": "28031"
+      }
+    ]
+  },
+  "cli": [
+    {
+      "args": [
+        "-h"
+      ],
+      "exitCode": 0,
+      "helpDisplayed": true
+    },
+    {
+      "args": [
+        "start",
+        "--unknown"
+      ],
+      "exitCode": 2,
+      "helpDisplayed": true
+    },
+    {
+      "args": [
+        "restart",
+        "--mcp-server"
+      ],
+      "exitCode": 2,
+      "helpDisplayed": true
+    },
+    {
+      "args": [
+        "configure",
+        "--mcp-server",
+        "report-write"
+      ],
+      "exitCode": 2,
+      "helpDisplayed": true
+    }
+  ]
+}

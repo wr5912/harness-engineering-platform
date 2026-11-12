@@ -21,6 +21,6 @@ export async function populateStandaloneExtensions(ctx: any, config: { extension
     if (!extension || extension.id) throw new Error('独立智能体业务扩展登记冲突')
     const plugin = await import(pathToFileURL(resolve(entry)).href)
     if (typeof plugin.populate !== 'function') throw new Error('独立智能体业务扩展入口无效')
-    plugin.populate(ctx, { root: base, sourceDigest: item.sourceDigest })
+    await plugin.populate(ctx, { root: base, sourceDigest: item.sourceDigest })
   }
 }

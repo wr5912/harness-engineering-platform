@@ -2,6 +2,7 @@ import { validateCaseIds, type CaseCatalog } from '../evaluation/case-ids.ts'
 import { reuseParentDependencies } from './plugin-dependency-reuse.ts'
 import { documentOperation } from './document-operations.ts'
 import { assetText } from './asset-text.ts'
+import { assertCandidateAssets, validateCandidateChanges, type CandidateChange } from './candidate-assets.ts'
 import { createRequire } from 'node:module'
 import { execFile, spawnSync } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -1171,7 +1172,7 @@ async function createVersion(root: string, payload: JsonMap, variant?: ComputeVa
     harness.loadable_assets = inheritedLoadableAssets(parentSource, parentExperiment)
     harness.credential_environment_keys = [...new Set([...(parentSource.required_env_names as string[] ?? []), ...(parentSource.optional_env_names as string[] ?? [])])]
     writeYamlMap(harnessFile, harness)
-    const source = versionSource(root, experimentId)
+    const source = assertCandidateAssets(root, experimentId)
     for (const rel of [`${source.candidate_root}/managed/${source.patch}`, `${source.candidate_root}/presets/${source.preset}`, ...(source.guard ? [`${source.candidate_root}/managed/${source.guard}`] : [])]) {
       const file = repoPath(root, rel)
       assertNoSymlinkPath(root, file)
@@ -1335,12 +1336,19 @@ function editableText(file: string) {
   return value
 }
 
-async function validateDraft(root: string, payload: JsonMap, drafts: { rel: string; content: string }[], signal?: AbortSignal) {
+async function validateDraft(root: string, payload: JsonMap, changes: CandidateChange[], signal?: AbortSignal) {
+  const drafts = changes.flatMap(change => {
+    if (change.content === null) return []
+    const bytes = Buffer.from(change.content)
+    try { return [{ rel: change.rel, content: new TextDecoder('utf-8', { fatal: true }).decode(bytes) }].filter(() => !bytes.includes(0)) }
+    catch { return [] }
+  })
   for (const draft of drafts) {
     try {
       if (['.ts', '.tsx', '.mts', '.cts'].includes(extname(draft.rel))) {
         const ts = createRequire(join(programRoot(), 'platform/plugin/package.json'))('typescript') as typeof import('typescript')
-        const result = ts.transpileModule(draft.content, { fileName: draft.rel, reportDiagnostics: true, compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } })
+        // 声明文件只检查语法，避免 transpileModule 尝试为 .d.ts/.d.mts/.d.cts 生成输出。
+        const result = ts.transpileModule(draft.content, { fileName: draft.rel.replace(/\.d\.(ts|mts|cts)$/, '.$1'), reportDiagnostics: true, compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } })
         if (result.diagnostics?.some(item => item.category === ts.DiagnosticCategory.Error)) throw new Error('TypeScript 语法无效')
       }
       if (extname(draft.rel) === '.json') JSON.parse(draft.content)
@@ -1348,6 +1356,7 @@ async function validateDraft(root: string, payload: JsonMap, drafts: { rel: stri
     } catch { throw new RpcError('invalid_request', '草稿格式无效', { path: draft.rel }) }
   }
   const experimentId = experimentIdField(payload)
+  validateCandidateChanges(root, experimentId, changes)
   const temp = mkdtempSync(join(tmpdir(), 'harness-edit-dry-'))
   try {
     for (const draft of drafts) atomicWrite(join(temp, draft.rel), draft.content)
@@ -1371,9 +1380,10 @@ async function validateDraft(root: string, payload: JsonMap, drafts: { rel: stri
         throw new RpcError('invalid_request', 'JavaScript 草稿语法校验失败', { path: draft.rel, checker: 'node --check', reason: redact(reason || 'Node 语法检查未通过') })
       }
     }
-    return { mode: 'dry', preflight_scope: 'changed-files',
-      checks: ['草稿格式', ...(javascriptDrafts.length ? ['JavaScript 语法（仅本次草稿）'] : [])],
-      note: '仅检查本次文件；未执行源码、评测、模型或业务工具，未启动实例或创建 Run。' }
+    const candidateChanged = changes.some(change => change.rel.startsWith(`evolution/experiments/${experimentId}/candidate/`))
+    return { mode: 'dry', preflight_scope: candidateChanged ? 'complete-candidate' : 'changed-files',
+      checks: [...(candidateChanged ? ['完整 Candidate 装载结构'] : []), '草稿格式', ...(javascriptDrafts.length ? ['JavaScript 语法（仅本次草稿）'] : [])],
+      note: `${candidateChanged ? '已检查最终 Candidate 的装载结构与本次文本语法' : '已检查本次文本语法'}；未执行源码、评测、模型或业务工具，未启动实例或创建 Run。` }
   } finally { rmSync(temp, { recursive: true, force: true }) }
 }
 
@@ -1391,7 +1401,9 @@ async function previewEdit(root: string, payload: JsonMap, signal?: AbortSignal)
     if (target.rel.endsWith('/evaluation.md')) validateEvaluationEdit(root, beforeText, edit.content)
     return { path: target.rel, ...(edit.moveTo ? { previous_path: source.rel } : {}), exists: beforeHash !== null, before_sha256: beforeHash, after_sha256: sha256(edit.content), changed: !!edit.moveTo || beforeHash === null || before !== edit.content, diff: simpleDiff(target.rel, assetText(source.rel, beforeText!).content, assetText(target.rel, edit.content).content), redacted: assetText(source.rel, beforeText!).redacted || assetText(target.rel, edit.content).redacted }
   })
-  const dryRun = await validateDraft(root, payload, targets.filter(({ edit }) => edit.content !== null).map(({ edit, target }) => ({ rel: target.rel, content: edit.content! })), signal)
+  const dryRun = await validateDraft(root, payload, targets.flatMap(({ edit, source, target }) => [
+    ...(edit.moveTo ? [{ rel: source.rel, content: null }] : []), { rel: target.rel, content: edit.content },
+  ]), signal)
   return ok({ edits: result, dry_run: dryRun })
 }
 
@@ -1437,8 +1449,13 @@ async function applyEdit(root: string, payload: JsonMap, signal?: AbortSignal, b
       content: edit.content, expected: edit.expected, before: beforeHash === null ? null : before }
   })
   assertUniqueResolved(resolved)
-  const dryRun = await validateDraft(root, payload, resolved.filter(item => item.content !== null).map(item => ({ rel: item.rel, content: item.content! })), signal)
+  const candidateBefore = resolved.some(item => item.rel.startsWith(`evolution/experiments/${experimentIdField(payload)}/candidate/`))
+    ? candidateDigest(root, experimentIdField(payload)) : undefined
+  const dryRun = await validateDraft(root, payload, resolved.flatMap(item => [
+    ...(item.moved ? [{ rel: item.source.rel, content: null }] : []), { rel: item.rel, content: item.content },
+  ]), signal)
   if (signal?.aborted) throw new RpcError('aborted', '草稿保存已取消')
+  if (candidateBefore !== undefined && candidateDigest(root, experimentIdField(payload)) !== candidateBefore) throw new RpcError('conflict', 'Candidate 在校验期间已变化，请重新预览')
   if (payload.expected_candidate_sha256 !== undefined && candidateDigest(root, experimentIdField(payload)) !== payload.expected_candidate_sha256) throw new RpcError('conflict', 'Candidate 已变化，请重新预览')
   if (payload.expected_change_sha256 !== undefined && sha256(readText(changePath(root, experimentIdField(payload)))) !== payload.expected_change_sha256) throw new RpcError('conflict', '研究计划已变化，请重新预览')
   editLocations(root, payload)

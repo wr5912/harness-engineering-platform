@@ -10,7 +10,8 @@ import { businessCasesSchema, businessCasesMarkdown } from './business-cases.ts'
 import { inheritedLoadableAssets, versionIdentity, versionSource } from './version-source.ts'
 import { VERSION_ID, assertInheritableVersion } from '../version-id.ts'
 import { allocateVersion, governanceSnapshot, withVersionLock } from './version-governance.ts'
-import { candidateDigest, candidateFiles, dataPath, sha256 } from '../tasks/files.ts'
+import { assertAssetPath, BOOTSTRAP_ENV, candidateDigest, candidateFiles, dataPath, sha256 } from '../tasks/files.ts'
+import { assertCandidateAssets } from './candidate-assets.ts'
 import { instanceStateRoot, workspaceOwnsInstance } from '../workspace.ts'
 import { inspectAssetBuild } from './asset-build.ts'
 import { migrationRunEvidence } from './migrations-evidence.ts'
@@ -95,7 +96,7 @@ function targetAssetPath(path: unknown) {
   const value = safeSourcePath(path)
   if (value !== 'harness.yaml' && !/^dsh\/(?:workspace|presets|managed)\/.+/.test(value)) fail('目标资产必须位于 Candidate 的 harness.yaml 或三棵 DSH 资产目录')
   const reason = excludedMigrationPath(value)
-  if (reason) fail(`目标路径不适合作为 Harness 资产：${reason}`)
+  if (reason && value !== BOOTSTRAP_ENV) fail(`目标路径不适合作为 Harness 资产：${reason}`)
   return value
 }
 function copyFixedParent(root: string, parent: ReturnType<typeof parentTarget>, candidate: string) {
@@ -106,10 +107,11 @@ function copyFixedParent(root: string, parent: ReturnType<typeof parentTarget>, 
     const match = /^(\d+) (\S+) [0-9a-f]+\t([\s\S]+)$/.exec(row)
     if (!match || match[2] !== 'blob' || match[1] === '120000') fail('固定父版不能包含链接或子模块')
     const path = match[3].slice(prefix.length)
-    if (excludedMigrationPath(path)) continue
+    if (excludedMigrationPath(path) && path !== BOOTSTRAP_ENV) continue
     // 历史附加资产可以继续继承，但不把运行目录和凭据带入新版本。
     safeSourcePath(path)
     const bytes = fixedGit(root, ['show', `${parent.ref.slice(4)}:${match[3]}`], 64 * 1024 * 1024)
+    assertAssetPath(path, bytes)
     total += bytes.length; if (total > 64 * 1024 * 1024) fail('固定父版资产超过 64 MiB，请先整理来源')
     if (assetText(path, bytes.toString()).redacted) fail('固定父版含凭据常量，请先清理父版', 'secret_rejected')
     const file = dataPath(candidate, path); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, bytes, { mode: parseInt(match[1], 8) & 0o111 ? 0o755 : 0o644 })
@@ -122,7 +124,7 @@ function copyFixedParent(root: string, parent: ReturnType<typeof parentTarget>, 
   writeYaml(file, harness)
 }
 function assertLoadable(stage: string, id: string) {
-  const source = versionSource(stage, id)
+  const source = assertCandidateAssets(stage, id)
   for (const path of [`${source.candidate_root}/presets/${source.preset}`, `${source.candidate_root}/managed/${source.patch}`, ...(source.guard ? [`${source.candidate_root}/managed/${source.guard}`] : [])]) {
     const file = dataPath(stage, path)
     if (!existsSync(file) || !lstatSync(file).isFile()) fail('迁移后的 DSH 装载入口不存在')

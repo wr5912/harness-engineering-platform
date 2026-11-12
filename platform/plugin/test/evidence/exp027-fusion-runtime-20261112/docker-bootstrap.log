@@ -1,0 +1,10 @@
+✔ 只读 workspace 的子文件挂载必须有实体占位，规范占位保持只读 (24428.146017ms)
+✔ UID 1000 初始化全新依赖卷后，Managed 插件只读复用同一镜像依赖 (5681.366987ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30204.675079

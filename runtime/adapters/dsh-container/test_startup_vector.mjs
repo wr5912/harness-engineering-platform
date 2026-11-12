@@ -47,6 +47,9 @@ for (const mode of ['verification']) {
   assert.ok(config.services.dsh.command.includes('/opt/dsh-adapter/verification-home-controls/web-base-path.patch.yml'))
   assert.ok(config.services.dsh.volumes.some(volume =>
     volume.target === '/opt/dsh-web' && volume.source === required.DSH_WEB_ADAPTER_HOST && volume.read_only))
+  const managedModules = config.services.dsh.volumes.find(volume => volume.target === '/opt/node_modules')
+  assert.equal(managedModules.read_only, true)
+  assert.equal(config.services['home-init'].volumes.find(volume => volume.target === '/var/lib/dsh/profiles/node_modules').source, managedModules.source)
   assert.equal(config.services.dsh.environment.DSH_EVAL_TARGET_PRESET, required.DSH_EVAL_TARGET_PRESET)
   assert.deepEqual(config.services['home-init'].entrypoint,
     ['node', '/opt/dsh-adapter/prepare-verification-home.mjs'])

@@ -1,0 +1,162 @@
+{
+  "observedAt": "2026-11-12T11:53:41.959696+00:00",
+  "removedProjects": [
+    "hep-agent-security-operations-expert-1794472937-14659",
+    "hep-agent-security-operations-expert-1794477264-23506",
+    "hep-exp027-export-probe",
+    "hep-agent-rc5-ui-acceptance-20261102-1793852230-10643",
+    "hep-agent-rc5-ui-acceptance-20261102-1793851340-32296",
+    "hep-agent-rc5-ui-acceptance-20261102-1793792288-28130"
+  ],
+  "removedContainers": 12,
+  "remainingTargetContainers": [],
+  "remainingTargetNetworks": 0,
+  "closedPorts": [
+    {
+      "port": 28027,
+      "tcpConnects": false,
+      "httpStatus": null
+    },
+    {
+      "port": 28028,
+      "tcpConnects": false,
+      "httpStatus": null
+    }
+  ],
+  "homeChecks": [
+    {
+      "prefix": "/home/cmp/work/harness-engineering-platform/.local/exp027-final-install-gi9jh12d",
+      "homeFilesChecked": 29,
+      "missing": [],
+      "changed": []
+    },
+    {
+      "prefix": "/home/cmp/work/harness-engineering-platform/.local/exp027-package-installed-n8ot33zy",
+      "homeFilesChecked": 20,
+      "missing": [],
+      "changed": []
+    },
+    {
+      "prefix": "/home/cmp/work/harness-engineering-platform/.local/export-exp027-verify-u5as5h",
+      "homeFilesChecked": 11,
+      "missing": [],
+      "changed": []
+    },
+    {
+      "prefix": "/home/cmp/work/harness-engineering-platform/.local/operations/plan-closure-20261105/agent-installed",
+      "homeFilesChecked": 20,
+      "missing": [],
+      "changed": []
+    },
+    {
+      "prefix": "/home/cmp/work/harness-engineering-platform/.local/governance-20261104/agent-installed",
+      "homeFilesChecked": 17,
+      "missing": [],
+      "changed": []
+    }
+  ],
+  "retainedCurrentAcceptance": {
+    "port": 28033,
+    "prefix": "/home/cmp/work/harness-engineering-platform/.local/exp027-portable-installed-ob3gks48",
+    "purpose": "Current package page awaiting user acceptance; cleanup when acceptance ends."
+  },
+  "otherInstallationsPreserved": [
+    {
+      "port": 18501,
+      "reason": "other user deployment"
+    },
+    {
+      "port": 28032,
+      "reason": "other user deployment"
+    }
+  ],
+  "realInspectionExecuted": false,
+  "obsoleteStatelessSourcesRemoved": [
+    {
+      "path": ".local/operations/plan-closure-20261105/agent-source",
+      "bytes": 1269010987
+    }
+  ],
+  "finalCheckedAt": "2026-11-12T11:56:07.329641+00:00",
+  "remainingStandaloneInstallations": [
+    {
+      "name": "hep-agent-security-operations-expert-1794483494-7643-dsh-1",
+      "root": "/home/zhouyang/security-operations-expert-887c231b3510",
+      "status": "running",
+      "ports": {
+        "3080/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "18501"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "18501"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hep-agent-security-operations-expert-1794483494-7643-init-1",
+      "root": "/home/zhouyang/security-operations-expert-887c231b3510",
+      "status": "exited",
+      "ports": {}
+    },
+    {
+      "name": "hep-agent-security-operations-expert-1794483101-9610-dsh-1",
+      "root": "/home/cmp/work/harness-engineering-platform/.local/exp027-portable-installed-ob3gks48",
+      "status": "running",
+      "ports": {
+        "3080/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "28033"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "28033"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hep-agent-security-operations-expert-1794483101-9610-init-1",
+      "root": "/home/cmp/work/harness-engineering-platform/.local/exp027-portable-installed-ob3gks48",
+      "status": "exited",
+      "ports": {}
+    },
+    {
+      "name": "hep-agent-security-operations-expert-1794481235-26877-dsh-1",
+      "root": "/home/caowencheng/threat-analysis-agent",
+      "status": "running",
+      "ports": {
+        "3080/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "28032"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "28032"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hep-agent-security-operations-expert-1794481235-26877-init-1",
+      "root": "/home/caowencheng/threat-analysis-agent",
+      "status": "exited",
+      "ports": {}
+    }
+  ],
+  "closedPortsConfirmedOnHosts": [
+    "127.0.0.1",
+    "172.16.138.228",
+    "::1"
+  ],
+  "currentAcceptanceHttpStatus": 200,
+  "cleanupTests": {
+    "passed": 6,
+    "failed": 0
+  }
+}

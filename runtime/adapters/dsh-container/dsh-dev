@@ -1089,14 +1089,14 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
         text = text.replace(business_patch, "")
     if plugin_node_modules:
         managed_mount = (
-            "      - type: bind\n"
-            "        source: ${DSH_MANAGED_HOST:?managed 根由所选来源注入}\n"
-            "        target: /opt/dsh-managed\n"
+            "      - type: volume\n"
+            f"        source: {project}-fallback{fallback_suffix}\n"
+            "        target: /opt/node_modules\n"
             "        read_only: true\n"
         )
         if text.count(managed_mount) != 1:
             fail("Compose 模板缺少唯一的 managed 挂载锚点")
-        text = text.replace(managed_mount, managed_mount + (
+        text = text.replace(managed_mount, (
             "      - type: bind\n"
             "        source: ${DSH_PLUGIN_NODE_MODULES_HOST:?插件依赖由启动器注入}\n"
             "        target: /opt/node_modules\n"
@@ -1709,7 +1709,7 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     args.skip_testing_notice = not args.analysis_workspace
     validate_trusted_host(getattr(args, "trusted_host", None))
     source_ref = getattr(args, "source_ref", None)
-    contract = resolve(args.source, repo=REPO, **({"source_ref": source_ref} if source_ref else {}))
+    contract = resolve(args.source, repo=REPO, web_bootstrap=not bool(args.analysis_workspace), **({"source_ref": source_ref} if source_ref else {}))
     fixture_file = getattr(args, "mcp_fixture", None)
     if fixture_file:
         if business_file or args.analysis_workspace:
@@ -3212,7 +3212,7 @@ def existing_instance(name: str) -> tuple[Path, dict] | None:
         return None
     manifest_path = target / "instance.json"
     if not manifest_path.is_file():
-        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml", "profile-compat", "runtime-presets", "harness-runtime.json", "project-workspace", "project-workspace-source.json", "project-workspace.pending", "sdk.lock", "sdk-launch.json", "sdk-runtime"}:
+        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml", "profile-compat", "asset-load", "runtime-presets", "harness-runtime.json", "project-workspace", "project-workspace-source.json", "project-workspace.pending", "sdk.lock", "sdk-launch.json", "sdk-runtime"}:
             return None
         fail(f"实例目录已存在但缺少 instance.json：{target}")
     return load_instance(name)
@@ -3294,8 +3294,14 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
 def check_managed_plugin_dependencies(contract: dict, external_modules: str | None = None) -> None:
     """本地插件的运行依赖必须能从已挂载目录解析。"""
     managed = Path(contract["managed"])
+    runtime_dependencies = None
     for manifest in managed.glob("*/package.json"):
-        dependencies = json.loads(manifest.read_text(encoding="utf-8")).get("dependencies") or {}
+        package = json.loads(manifest.read_text(encoding="utf-8"))
+        dependencies = set((package.get("dependencies") or {}).keys())
+        lock_files = ("package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock")
+        lock_file = next((name for name in lock_files if (manifest.parent / name).is_file()), None)
+        hint = f"请在 {manifest.parent} 按 {lock_file} 恢复锁定依赖后重试" if lock_file else \
+            f"请在 {manifest.parent} 准备与 package.json 匹配的 node_modules 后重试"
         for name in dependencies:
             roots = (manifest.parent / "node_modules", managed / "node_modules")
             if external_modules:
@@ -3305,8 +3311,20 @@ def check_managed_plugin_dependencies(contract: dict, external_modules: str | No
                 if mount.get("target") in (expected, "/opt/dsh-managed/node_modules"):
                     roots += (Path(mount["source"]),)
             if not any((root / name).is_dir() for root in roots):
-                fail(f"插件 {manifest.parent.name} 缺少运行依赖 {name}；"
-                     f"请在 {manifest.parent} 按 package-lock.json 执行 npm ci 后重试")
+                if not external_modules:
+                    if runtime_dependencies is None:
+                        result = run([
+                            "docker", "run", "--rm", "--network", "none", "--read-only",
+                            "--mount", f"type=bind,source={ADAPTER},target=/opt/dsh-adapter,readonly",
+                            "--entrypoint", "node", contract["image"]["local_image_tag"],
+                            "--input-type=module", "-e",
+                            "import { installationClosure } from '/opt/dsh-adapter/prepare-verification-home.mjs';"
+                            "console.log(JSON.stringify([...installationClosure('/opt/dsh/apps/cli/package.json').keys()]))",
+                        ])
+                        runtime_dependencies = set(json.loads(result.stdout))
+                    if name in runtime_dependencies:
+                        continue
+                fail(f"插件 {manifest.parent.name} 缺少运行依赖 {name}；{hint}")
 
 
 def migrate_existing_instance(args: argparse.Namespace, contract: dict,
@@ -3518,7 +3536,10 @@ def main() -> None:
     SOURCES = source_catalog(REPO)
     STATE_ROOT = instances_root(REPO)
     os.environ["HARNESS_ASSET_ROOT"] = str(REPO)
-    args.handler(args)
+    try:
+        args.handler(args)
+    except ValueError as error:
+        fail(str(error))
 
 
 if __name__ == "__main__":

@@ -92,6 +92,12 @@ function failure(code: string, message: string, details: Record<string, unknown>
   return { ok: false, error: { code, message, details } }
 }
 
+function instanceError(error: unknown, code: string) {
+  const failed = error as Error & { diagnostic?: { code: string; message: string; stage?: string; path?: string; reason?: string; next_action?: string } }
+  return { code: failed.diagnostic?.code ?? code, message: failed.diagnostic?.message ?? failed.message,
+    ...(failed.diagnostic ? { details: failed.diagnostic } : {}) }
+}
+
 function payloadObject(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('请求参数必须是对象')
   return payload as Record<string, unknown>
@@ -222,8 +228,15 @@ async function runDsh(assetRoot: string, args: string[], signal?: AbortSignal, m
       .reduce((value, secret) => value.replaceAll(secret, '<redacted>'), text)
     const message = failed.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' ? '实例命令输出超过读取上限，请检查实例响应规模。'
       : failed.stderr || failed.message
+    let diagnostic: Record<string, unknown> | undefined
+    try {
+      const line = message.split('\n').find(line => line.startsWith('dsh-dev failed: {'))
+      const parsed = line && JSON.parse(removeValues(line.slice('dsh-dev failed: '.length)))
+      if (parsed?.code === 'candidate_assets_invalid') diagnostic = parsed
+    } catch { /* 非结构化命令错误保留原始说明。 */ }
     throw Object.assign(new Error(bounded(removeValues(message))), {
-      code: failed.code,
+      code: diagnostic?.code ?? failed.code,
+      ...(diagnostic ? { diagnostic } : {}),
       stdout: bounded(removeValues(failed.stdout || '')),
       stderr: bounded(removeValues(failed.stderr || '')),
     })
@@ -583,13 +596,13 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
       return { name, operation: request.operation, ok: true, value: parseCommandOutput(result.stdout, result.stderr) }
     })
   } catch (error) {
-    const message = (error as Error).message
+    const failed = instanceError(error, 'operation_failed')
     return {
       name,
       operation: request.operation,
       ok: false,
-      status: /未知|未确认|未核验|无法确认|无法复查/.test(message) ? 'unknown' : 'failed',
-      error: { code: 'operation_failed', message },
+      status: /未知|未确认|未核验|无法确认|无法复查/.test(failed.message) ? 'unknown' : 'failed',
+      error: failed,
     }
   }
 }
@@ -696,7 +709,7 @@ function invalidItem(item: unknown, error: unknown): InstanceActionReceipt {
     name: typeof object.name === 'string' ? object.name : '<invalid>',
     operation: typeof object.operation === 'string' ? object.operation : '<invalid>',
     ok: false,
-    error: { code: 'invalid_request', message: (error as Error).message },
+    error: instanceError(error, 'invalid_request'),
   }
 }
 
@@ -788,7 +801,8 @@ export function createInstancesHandler(assetRoot: string, modelPolicy?: ModelPol
       }
       return failure('not_found', '未知的实例操作')
     } catch (error) {
-      return failure('instances_failed', (error as Error).message)
+      const failed = instanceError(error, 'instances_failed')
+      return failure(failed.code, failed.message, failed.details)
     }
   }
 }

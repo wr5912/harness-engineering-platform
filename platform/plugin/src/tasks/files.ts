@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { versionIdentity } from '../agents/version-source.ts'
+import { programRoot } from '../workspace.ts'
 
 export const EXPERIMENT = VERSION_ID
 export const RUN = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -116,8 +117,12 @@ export function candidateFiles(candidate: string, extraExcluded: readonly string
   return files
 }
 
-export function assertAssetPath(path: string): void {
-  if (path.split('/').some(name => EXCLUDED.has(name) || name === '.env' || name.endsWith('.llm-api-key'))) {
+export const BOOTSTRAP_ENV = 'dsh/workspace/.env'
+export function assertAssetPath(path: string, content?: string | Buffer): void {
+  if (path.split('/').some(name => EXCLUDED.has(name) || (name === '.env' && path !== BOOTSTRAP_ENV) || name.startsWith('.env.') || name.endsWith('.llm-api-key'))) {
     throw new Error('运行状态、依赖、环境凭据和 LLM API Key 不能作为装配资产')
+  }
+  if (path === BOOTSTRAP_ENV && content !== undefined && !Buffer.from(content).equals(readFileSync(join(programRoot(), 'runtime/adapters/dsh-container/verification-home-controls/locked-bootstrap.env')))) {
+    throw new Error('dsh/workspace/.env 必须与 Runtime 注释型占位模板逐字节一致，不能写入环境变量或凭据')
   }
 }

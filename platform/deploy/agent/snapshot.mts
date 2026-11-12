@@ -147,7 +147,9 @@ function dependencyPackages(candidate: string, input: AgentPackageInput, extraDi
     const manifest = join(path, 'package.json')
     if (existsSync(manifest)) {
       const pkg = JSON.parse(readFileSync(manifest, 'utf8'))
+      // Web 客户端的 React 由原生 ModuleLoader 提供，不是容器内的 Node 依赖。
       const dependencies = [...new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {}).filter(name => !pkg.peerDependenciesMeta?.[name]?.optional
+        && !(name === 'react' && pkg.dsh?.client?.platform === 'web')
         && !(name.startsWith('@deepseek-ai/') && (sharedSdk && name === '@deepseek-ai/dsh-sdk-client' || existsSync(join(input.programRoot, 'platform/plugin/node_modules', name, 'package.json')))))])]
       if (dependencies.length) {
         const relativePath = portableDependencyPath(candidate, path)

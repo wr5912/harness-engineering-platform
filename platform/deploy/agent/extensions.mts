@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { sha256File } from '../manifest.mts'
 import type { StandaloneExtension } from '../../plugin/src/standalone-extensions/index.ts'
 import { sourceTreeDigest } from '../../plugin/src/mcp/source-digest.ts'
+import { lfxDependencies, loadLfxBundle } from '../../plugin/src/mcp/lfx-assets.ts'
 
 const id = 'security-operations-compositions'
 const hash = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex')
@@ -14,16 +15,21 @@ interface Options { programRoot: string; assetRoot: string; staging: string; com
 interface SourceFile { path: string; sha256: string }
 
 /** 只遍历已选目录的发布项与其明确引用的固定子版本。 */
-function requiredBusiness(catalog: any) {
-  const result = { threat: false, flow: false, workflows: new Set<string>() }
+function requiredBusiness(catalog: any, root: string) {
+  const result = { threat: false, flow: false, workflows: new Set<string>(), lfx: new Map<string, any>() }
   function visit(config: any, path = new Set<string>()) {
     if (!config) return
     if (config.workflow) {
-      if (!/^inspection-(?:status|baseline|vulnerabilities|reachability|routine|deep)$/.test(config.workflow)) throw new Error('此工作流尚未提供独立运行扩展')
-      result.workflows.add(config.workflow)
+      if (config.engine === 'lfx') {
+        if (!config.flowDigest) throw new Error('独立导出需要冻结的 LFX 发布版本，不使用当前草稿')
+        result.lfx.set(`${config.workflow}:${config.flowDigest}`, config)
+      } else {
+        if (!/^inspection-(?:status|baseline|vulnerabilities|reachability|routine|deep)$/.test(config.workflow)) throw new Error('此工作流尚未提供独立运行扩展')
+        result.workflows.add(config.workflow)
+      }
     }
     if (config.kind === 'threat-stage') result.threat = true
-    else if (config.kind === 'composite') for (const step of config.steps ?? []) {
+    else if (config.kind === 'composite' || config.engine === 'lfx') for (const step of lfxDependencies(root, config)) {
       const key = `${step.compositionId}:${step.versionId}`
       if (path.has(key)) throw new Error('独立部署组合存在循环版本依赖')
       const child = catalog.compositions.find((item: any) => item.id === step.compositionId)?.versions?.find((item: any) => item.versionId === step.versionId)?.config
@@ -35,7 +41,7 @@ function requiredBusiness(catalog: any) {
       result.flow = true
     }
   }
-  for (const entry of catalog?.compositions ?? []) visit(entry.published)
+  for (const entry of catalog?.compositions ?? []) { visit(entry.published); for (const version of entry.versions ?? []) if (version.config.engine === 'lfx') visit(version.config) }
   return result
 }
 
@@ -52,8 +58,8 @@ function git(root: string, args: string[]) {
 
 /** 仅静态构建平台明确装载的安全运营扩展；不执行数据工作区的 build 或安装脚本。 */
 export async function stageSelectedExtensions(options: Options) {
-  const needed = requiredBusiness(options.compositions)
-  if (!needed.threat && !needed.flow && !needed.workflows.size) return { extensions: [] as StandaloneExtension[], sources: [] as SourceFile[] }
+  const needed = requiredBusiness(options.compositions, options.assetRoot)
+  if (!needed.threat && !needed.flow && !needed.workflows.size && !needed.lfx.size) return { extensions: [] as StandaloneExtension[], sources: [] as SourceFile[] }
   options.signal?.throwIfAborted()
   options.onProgress?.({ stage: 'extensions', message: '正在冻结所用业务编排实现与固定算法' })
   const assetRoot = realpathSync(options.assetRoot), programRoot = realpathSync(options.programRoot)
@@ -63,6 +69,15 @@ export async function stageSelectedExtensions(options: Options) {
   const business = realpathSync(join(assetRoot, declared.path))
   if (!business.startsWith(assetRoot + sep)) throw new Error('业务扩展不在当前数据工作区内')
   const sources: SourceFile[] = []
+  for (const config of needed.lfx.values()) {
+    const path = `mcp/compositions/${config.workflow}/versions/${config.flowDigest}/bundle.json`
+    const source = plainFile(assetRoot, join(assetRoot, path)), bytes = readFileSync(source)
+    const bundle = loadLfxBundle(assetRoot, config.workflow, config)
+    if (!bundle.typescript) throw new Error('冻结 LFX 编排缺少独立运行合同')
+    const target = join(options.staging, path)
+    mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, bytes, { mode: 0o444 })
+    sources.push({ path, sha256: hash(bytes) })
+  }
   function collect(directory: string) {
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const file = join(directory, entry.name)
@@ -132,29 +147,36 @@ export async function stageSelectedExtensions(options: Options) {
   const { build } = require('esbuild')
   const runtime = join(business, 'src/threat/runtime.ts'), services = join(business, 'src/threat-services.ts'), flow = join(business, modern ? 'compositions/security-asset-related-alerts-readonly/src/index.ts' : 'src/asset-alerts.ts')
   const includeThreat = needed.threat || !modern, includeFlow = needed.flow || !modern
+  const includeSoc = needed.workflows.size || needed.lfx.size
+  const includeProposals = [...needed.lfx.values()].some(config => config.workflow.startsWith('troubleshooting-'))
   const workflowDigests = Object.fromEntries([...needed.workflows].map(workflow => [workflow, sourceTreeDigest(business, [join(business, 'compositions', workflow, 'src'), join(business, 'src/inspection'), join(business, 'src/soc.ts'), join(business, 'build.mjs')])]))
   const entry = `import { populateSecurityOperations } from ${JSON.stringify(join(adapter, 'security-operations.ts'))};\n`
     + (includeThreat ? `import { createThreatRuntime } from ${JSON.stringify(runtime)};\nimport { createNativeThreatServices } from ${JSON.stringify(services)};\n` : '')
     + (includeFlow ? `import { assetAlertsFlow } from ${JSON.stringify(flow)};\n` : '')
-    + (needed.workflows.size ? `import { createSoc } from ${JSON.stringify(join(business, 'src/soc.ts'))};\n` : '')
+    + (includeSoc ? `import { createSoc } from ${JSON.stringify(join(business, 'src/soc.ts'))};\n` : '')
+    + (includeProposals ? `import { diagnosticProposalService } from ${JSON.stringify(join(business, 'src/diagnostic-services.ts'))};\n` : '')
     + [...needed.workflows].map((workflow, index) => `import { create as workflow${index} } from ${JSON.stringify(join(business, 'compositions', workflow, 'src/index.ts'))};\n`).join('')
-    + `export const populate=(ctx,options)=>populateSecurityOperations(ctx,options,{${includeThreat ? 'createThreatRuntime,createNativeThreatServices,' : ''}${includeFlow ? 'assetAlertsFlow,' : ''}${needed.workflows.size ? 'createSoc,' : ''}workflows:{${[...needed.workflows].map((workflow, index) => `${JSON.stringify(workflow)}:soc=>({...workflow${index}(soc),sourceDigest:${JSON.stringify(workflowDigests[workflow])}})`).join(',')}}});\n`
+    + `export const populate=(ctx,options)=>populateSecurityOperations(ctx,options,{${includeThreat ? 'createThreatRuntime,createNativeThreatServices,' : ''}${includeFlow ? 'assetAlertsFlow,' : ''}${includeSoc ? includeProposals ? "createSoc:(dispatch,servers,ctx)=>Object.assign(createSoc(dispatch,servers),{propose:diagnosticProposalService(ctx.llm,()=>ctx.settingsController.describe().namespaces.find(item=>item.ns==='agent-default-model')?.value)})," : 'createSoc,' : ''}frozenWorkflows:${JSON.stringify([...needed.lfx.values()])},workflows:{${[...needed.workflows].map((workflow, index) => `${JSON.stringify(workflow)}:soc=>({...workflow${index}(soc),sourceDigest:${JSON.stringify(workflowDigests[workflow])}})`).join(',')}}});\n`
   options.signal?.throwIfAborted()
   const output = await build({ stdin: { contents: entry, resolveDir: business, sourcefile: 'standalone-security-operations.ts', loader: 'ts' }, bundle: true, write: false,
-    platform: 'node', target: 'node24', format: 'esm', packages: 'external', metafile: true, logLevel: 'silent',
+    platform: 'node', target: 'node24', format: 'esm', metafile: true, logLevel: 'silent',
+    nodePaths: [join(programRoot, 'platform/plugin/node_modules')],
     define: { __STANDALONE_THREAT_SOURCE_COMMIT__: JSON.stringify(commit ?? ''), __STANDALONE_THREAT_SOURCE_DIRECTORY__: JSON.stringify(sourceDirectory ?? ''), __STANDALONE_THREAT_SOURCE_DIGEST__: JSON.stringify(fixed?.digest ?? '') },
     plugins: [{ name: 'standalone-business-boundaries', setup(builder: any) {
       builder.onResolve({ filter: /^@harness-platform\/mcp\// }, (args: any) => ({ path: join(programRoot, 'platform/plugin/src/mcp', args.path.split('/').at(-1) + '.ts') }))
       builder.onResolve({ filter: /^@mcp\/inspection$/ }, () => ({ path: join(business, 'src/inspection/index.ts') }))
       builder.onResolve({ filter: /(?:^|\/)source\.ts$/ }, (args: any) => resolve(args.resolveDir, args.path) === join(business, 'src/threat/source.ts') ? { path: join(adapter, 'source.ts') } : undefined)
-      builder.onLoad({ filter: /\.ts$/ }, (args: any) => {
+      builder.onLoad({ filter: /\.[cm]?[jt]s$/ }, (args: any) => {
         const absolute = realpathSync(args.path), contents = readFileSync(absolute, 'utf8')
         const prefix = absolute.startsWith(programRoot + sep) ? 'program' : absolute.startsWith(assetRoot + sep) ? 'data' : undefined
         if (!prefix) throw new Error('业务扩展引用了当前程序与数据工作区以外的源码')
         compiledInputs.push({ path: `${prefix}/${relative(prefix === 'program' ? programRoot : assetRoot, absolute).split(sep).join('/')}`, sha256: hash(contents), absolute })
-        return { contents, loader: 'ts', resolveDir: dirname(absolute) }
+        return { contents, loader: absolute.endsWith('.ts') ? 'ts' : 'js', resolveDir: dirname(absolute) }
       })
     } }],
+  }).catch((error: any) => {
+    if (error.errors?.some((item: any) => item.text?.startsWith('Could not resolve'))) throw new Error('业务扩展仍有未准备的外部 Node 依赖')
+    throw error
   })
   for (const outputFile of Object.values(output.metafile.outputs) as any[]) for (const item of outputFile.imports) if (item.external && !builtinModules.includes(item.path) && !item.path.startsWith('node:')) throw new Error('业务扩展仍有未准备的外部 Node 依赖')
   options.signal?.throwIfAborted()
@@ -165,5 +187,5 @@ export async function stageSelectedExtensions(options: Options) {
   const entryPath = `runtime/extensions/${id}/plugin.mjs`
   writeFileSync(join(options.staging, entryPath), output.outputFiles[0].contents, { mode: 0o444 })
   const extensions: StandaloneExtension[] = [{ id, entry: entryPath, sha256: sha256File(join(options.staging, entryPath)), sourceDigest }]
-  return { extensions, sources, implementation, ...(fixed ? { fixedSource: { commit: fixed.commit, directory: fixed.directory, digest: fixed.digest, files: fixed.files } } : {}) }
+  return { extensions, sources, implementation, ...(needed.lfx.size ? { lfx: true } : {}), ...(fixed ? { fixedSource: { commit: fixed.commit, directory: fixed.directory, digest: fixed.digest, files: fixed.files } } : {}) }
 }

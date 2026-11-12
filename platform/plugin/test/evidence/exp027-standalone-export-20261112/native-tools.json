@@ -1,0 +1,27 @@
+{
+  "directReportConfigurationPreserved": true,
+  "externalReportServiceAvailable": false,
+  "observedAt": "2026-11-12T10:49:10.409Z",
+  "installRoot": "/home/cmp/work/harness-engineering-platform/.local/exp027-complete-package-installed-9vwinmrx",
+  "page": "http://172.16.138.228:28031/assistant/",
+  "sessionId": "session-159d6bea-18d9-4ad6-a5fc-c52f8bc7dd13",
+  "nativeToolCount": 259,
+  "selectedToolNames": [
+    "mcp__inspection-compositions__get_composition_artifact",
+    "mcp__inspection-compositions__get_composition_details",
+    "mcp__inspection-compositions__get_composition_run",
+    "mcp__inspection-compositions__inspection_baseline",
+    "mcp__inspection-compositions__inspection_deep",
+    "mcp__inspection-compositions__inspection_reachability",
+    "mcp__inspection-compositions__inspection_routine",
+    "mcp__inspection-compositions__inspection_vulnerabilities",
+    "mcp__policy-response-acceptance__emergency_action",
+    "mcp__policy-response-acceptance__policy_change",
+    "mcp__troubleshooting-compositions__diagnose_business_access",
+    "mcp__troubleshooting-compositions__diagnose_device_offline",
+    "mcp__troubleshooting-compositions__get_composition_artifact",
+    "mcp__troubleshooting-compositions__get_composition_details",
+    "mcp__troubleshooting-compositions__get_composition_run"
+  ],
+  "businessToolCalls": 0
+}

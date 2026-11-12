@@ -811,7 +811,9 @@ class EvaluationModeContractTest(unittest.TestCase):
         return contract
 
     def test_managed_plugin_dependencies_are_present_before_start(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory() as temp, mock.patch.object(
+            dev, "run", return_value=subprocess.CompletedProcess([], 0, stdout="[]", stderr="")
+        ) as probe:
             managed = Path(temp)
             plugin = managed / "voice"
             plugin.mkdir()
@@ -828,6 +830,21 @@ class EvaluationModeContractTest(unittest.TestCase):
             external = managed / "external"
             (external / "ws").mkdir(parents=True)
             dev.check_managed_plugin_dependencies(contract, str(external))
+            (plugin / "package.json").write_text(
+                '{"dependencies":{"@deepseek-ai/schemastery":"^3"},'
+                '"peerDependencies":{"react":"^18"}}', encoding="utf-8"
+            )
+            (plugin / "node_modules" / "@deepseek-ai/schemastery").rmdir()
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.check_managed_plugin_dependencies(contract)
+            self.assertIn("@deepseek-ai/schemastery", error.getvalue())
+            probe.return_value.stdout = '["@deepseek-ai/schemastery"]'
+            dev.check_managed_plugin_dependencies(contract)
+            self.assertIn("--network", probe.call_args.args[0])
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.check_managed_plugin_dependencies(contract, str(external))
+            (plugin / "node_modules" / "@deepseek-ai/schemastery").mkdir()
+            dev.check_managed_plugin_dependencies(contract)
 
     def test_only_eval_mode_is_supported(self):
         self.assertEqual(dev.normalize_mode("eval"), "verification")
@@ -2422,6 +2439,16 @@ class UpPortOwnershipTest(unittest.TestCase):
                 dev.command_up(self.args(replace=True))
         self.assertEqual(order, ["preflight", "stop"])
 
+    def test_invalid_candidate_stops_before_instance_writes_and_stop(self):
+        self.write_existing()
+        with mock.patch.object(dev, "resolve", side_effect=ValueError('{"code":"candidate_assets_invalid","path":"dsh/workspace/.env"}')), \
+                mock.patch.object(dev, "migrate_existing_instance") as stopper, \
+                mock.patch.object(dev, "write_instance") as writer:
+            with self.assertRaisesRegex(ValueError, "candidate_assets_invalid"):
+                dev.command_up(self.args(replace=True))
+        stopper.assert_not_called()
+        writer.assert_not_called()
+
     def test_replace_stops_own_instance_before_starting(self):
         self.write_existing()
         order = []
@@ -2981,6 +3008,8 @@ class BindHomeMigrationTests(unittest.TestCase):
             dev.write_instance("probe", mode="verification", contract=contract, port=3081)
             session = directory / "session-fixture.json"
             session.write_text('{"fixture":true}')
+            (target / "asset-load").mkdir()
+            (target / "asset-load/expected.json").write_text('{"nonce":"old-load"}')
             compose = (target / "compose.yaml").read_text()
             self.assertEqual(compose.count("source: ${DSH_HOME_HOST:"), 2)
             self.assertIn("HARNESS_SITES_CONFIG=/opt/harness-config/sites.json", compose)
@@ -2990,9 +3019,14 @@ class BindHomeMigrationTests(unittest.TestCase):
             self.assertTrue(report["home_preserved"])
             self.assertFalse((target / "instance.json").exists())
             self.assertEqual(session.read_text(), '{"fixture":true}')
+            self.assertEqual((target / "asset-load/expected.json").read_text(), '{"nonce":"old-load"}')
             (target / "profile-compat").mkdir()
             (target / "profile-compat" / "web-profile.package.json").write_text("{}")
             self.assertIsNone(dev.existing_instance("probe"))
+            (target / "unknown-registration").write_text("unrelated")
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.existing_instance("probe")
+            (target / "unknown-registration").unlink()
             dev.write_instance("probe", mode="verification", contract=contract, port=3081)
             self.assertEqual(session.read_text(), '{"fixture":true}')
 

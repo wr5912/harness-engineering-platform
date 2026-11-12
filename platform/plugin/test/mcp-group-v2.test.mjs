@@ -10,7 +10,7 @@ import { Client, StreamableHTTPClientTransport, UriTemplate } from '@modelcontex
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
 import { toNodeHandler } from '@modelcontextprotocol/node'
 import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
-import { boundDrafts, saveDraftBinding, withDraftInstance } from '../src/mcp/draft-bindings.ts'
+import { boundDrafts, inspectDraftBinding, saveDraftBinding, withDraftInstance } from '../src/mcp/draft-bindings.ts'
 import { migrateServiceOrigins } from '../../../plugins/mcp-manager/resource-address.ts'
 
 async function waitFor(check) {
@@ -27,7 +27,7 @@ async function managerModule(t) {
   await symlink(join(process.cwd(), 'node_modules'), join(directory, 'node_modules'), 'dir')
   const source = await readFile(new URL('../build.mjs', import.meta.url), 'utf8')
   const start = source.indexOf('export const managerSource =')
-  const end = source.indexOf('\nconst { name } =', start)
+  const end = source.indexOf('\nasync function main()', start)
   assert.ok(start > 0 && end > start)
   const adapter = join(directory, 'adapter.mjs')
   await writeFile(adapter, "import { readFile } from 'node:fs/promises'; import { resolve } from 'node:path';\n"
@@ -144,11 +144,13 @@ test('分组 HTTP 路由在实例上下文内生成快照，草稿发现和调�
   t.after(() => rm(root, { recursive: true, force: true }))
   const binding = { instanceId: 'acceptance', sourceDigest: 'source-a' }
   saveDraftBinding(root, { ...binding, compositions: [{ id: 'policy-change', config: { toolName: 'policy_change' } }] })
-  const tools = () => boundDrafts(root).map(item => ({ name: item.config.toolName, inputSchema: { type: 'object' } }))
-  const groups = [{ id: 'drafts', members: [{ serverId: 'platform-compositions', names: ['policy_change'] }] }]
+  const tools = () => inspectDraftBinding(root).compositions.map(item => ({ name: item.config.toolName, inputSchema: { type: 'object' } }))
+  const raw = { id: 'raw', serverName: 'raw', enabled: true, url: await fixtureMcp(t, 'raw', []), tools: { mode: 'all', names: [] } }
+  const groups = [{ id: 'drafts', members: [{ serverId: 'platform-compositions', names: ['policy_change'] }, { serverId: 'raw', names: ['echo'] }] }]
   const { origin, token } = await groupServer(t, manager, [], groups, [], [], {
     servers: { get: () => [{ id: 'platform-compositions', serverName: 'compositions', enabled: true,
-      platformComposition: true, publishedTools: tools(), tools: { mode: 'selected', names: tools().map(item => item.name) } }] },
+      draftBindingError: inspectDraftBinding(root).error,
+      platformComposition: true, publishedTools: tools(), tools: { mode: 'selected', names: tools().map(item => item.name) } }, raw] },
     platformClient: { listTools: async () => ({ tools: tools() }),
       callTool: async request => { assert.ok(tools().some(item => item.name === request.name)); return { content: [{ type: 'text', text: 'draft-ok' }] } } },
     withGroupTransport: (req, run) => withDraftInstance({ ...binding, instanceId: req.headers['x-test-instance'] || 'other' }, run),
@@ -162,10 +164,16 @@ test('分组 HTTP 路由在实例上下文内生成快照，草稿发现和调�
     return value
   }
   const [selected, other] = await Promise.all([open('acceptance'), open('other')])
-  assert.deepEqual((await selected.listTools()).tools.map(item => item.name), ['policy_change'])
-  assert.deepEqual((await other.listTools()).tools, [])
+  assert.deepEqual((await selected.listTools()).tools.map(item => item.name), ['policy_change', 'echo'])
+  assert.deepEqual((await other.listTools()).tools.map(item => item.name), ['echo'])
   assert.equal((await selected.callTool({ name: 'policy_change', arguments: {} })).content[0].text, 'draft-ok')
   await assert.rejects(other.callTool({ name: 'policy_change', arguments: {} }), /不属于当前 MCP 范围/)
+  saveDraftBinding(root, { ...binding, sourceDigest: 'old', compositions: [{ id: 'policy-change', config: { toolName: 'policy_change' } }] })
+  const stale = await selected.listTools()
+  assert.deepEqual(stale.tools.map(item => item.name), ['echo'])
+  assert.match(JSON.stringify(stale._meta), /来源不一致/)
+  assert.equal((await selected.callTool({ name: 'echo', arguments: { value: 'still-available' } })).content[0].text, 'raw:still-available')
+  assert.throws(() => withDraftInstance(binding, () => boundDrafts(root)), /来源不一致/)
 })
 
 test('v2 分组名称与显示名解耦，资源代理隔离同 URI 来源并拒绝失效选择', async t => {
@@ -364,13 +372,14 @@ test('业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，
   delete servers[0].specUrl
   servers[0].url = updated
   const existingTool = ctx.tools.get('mcp__Healthy__echo', first.agent)
-  assert.equal((await existingTool.execute({ value: 'current' }, {})).content[0].text, 'updated:current',
-    '现有 Session 的已注册工具使用当前连接，不因地址变更被旧快照拒绝')
+  await assert.rejects(existingTool.execute({ value: 'current' }, {}), /连接或工具范围已变化/,
+    '已注册工具保留发现时的接口定义，目标变化后须在新 Session 重新发现')
+  servers[0] = { ...original }
   servers[0].enabled = false
-  await assert.rejects(existingTool.execute({}, {}), /已停用/)
+  await assert.rejects(existingTool.execute({}, {}), /已变化|已停用/)
   servers[0].enabled = true
   servers[0].tools = { mode: 'selected', names: [] }
-  await assert.rejects(existingTool.execute({}, {}), /不属于当前 MCP 范围/)
+  await assert.rejects(existingTool.execute({}, {}), /已变化|不属于当前 MCP 范围/)
   servers[0] = original
   const [stillOffline, concurrentOffline] = await Promise.all([
     session('still-offline', parent), session('concurrent-offline', parent),
@@ -451,7 +460,7 @@ test('原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态', asyn
   })
   const ctx = new Context()
   const services = ctx.plugin({ name: 'native-mcp-mount-services', apply(inner) {
-    inner.provide('webServer', { port: Number(new URL(origin).port), publicPath: path => path,
+    inner.provide('webServer', { port: Number(new URL(origin).port), getOrigin: () => origin, publicPath: path => path,
       register: route => { routes.push(route); return () => routes.splice(routes.indexOf(route), 1) } })
     inner.provide('connection', { requestRejection: () => undefined })
     new SystemPrompt(inner, {})

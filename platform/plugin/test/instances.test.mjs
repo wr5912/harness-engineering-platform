@@ -100,6 +100,7 @@ if (args[0] === 'ps') {
   const business = args.includes('--business-control')
   const name = args[args.indexOf('--name') + 1]
   const source = args[args.indexOf('--source') + 1]
+  if (name === 'invalid-assets') { process.stderr.write('dsh-dev failed: ' + JSON.stringify({code:'candidate_assets_invalid',message:'Candidate 装载资产不完整或不安全',stage:'candidate-assets',path:'dsh/workspace/.env',reason:'文件缺失',next_action:'修复来源 Candidate 后重新预览；不会自动重试创建实例'})); process.exit(1) }
   if (dry) out({args, name, source_id:source, image_tag:'dsh:locked', port:3199, mounts:[{container:'/work/harness/workspace', mode:'ro'}], state_dir:'state', ...(business ? { business_control: { source_digest: sourceDigest } } : {})})
   else {
     const delay = require('node:path').join(__dirname, 'delay-start')
@@ -751,6 +752,27 @@ test('确认创建时把预览端口作为显式端口交给 CLI', async t => {
   assert.equal(result.value.ok, true)
   const calls = readFileSync(join(fx.root, 'runtime/adapters/dsh-container/dsh-dev.calls'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
   assert.deepEqual(calls[0].slice(calls[0].indexOf('--port'), calls[0].indexOf('--port') + 2), ['--port', '3265'])
+})
+
+test('来源资产预检错误保留结构化阶段、路径和恢复动作，不编造执行端口', async t => {
+  const { module, cleanup } = await loadModule(), fx = fixture()
+  t.after(() => { fx.cleanup(); cleanup() })
+  const result = await module.createInstancesHandler(fx.root)('run', {
+    operation: 'create', name: 'invalid-assets', source: 'experiment:EXP-real-agent-001',
+    expected_source_id: 'experiment:EXP-real-agent-001', port: 3265, expected_source_digest: 'sha256:' + 'a'.repeat(64),
+  }, new AbortController().signal)
+  assert.equal(result.value.ok, false)
+  assert.equal(result.value.error.code, 'candidate_assets_invalid')
+  assert.equal(result.value.error.details.stage, 'candidate-assets')
+  assert.equal(result.value.error.details.path, 'dsh/workspace/.env')
+  assert.match(result.value.error.details.next_action, /修复来源 Candidate/)
+  assert.equal(result.value.value, undefined)
+  const preview = await module.createInstancesHandler(fx.root)('preview', {
+    operation: 'create', name: 'invalid-assets', source: 'experiment:EXP-real-agent-001',
+  }, new AbortController().signal)
+  assert.equal(preview.ok, false)
+  assert.equal(preview.error.code, 'candidate_assets_invalid')
+  assert.equal(preview.error.details.path, 'dsh/workspace/.env')
 })
 
 test('run parses two stdout JSON objects and redacts bounded logs', async () => {

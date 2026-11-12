@@ -1,0 +1,1 @@
+{"status":"engine-subfile-bind-proof","dsh_mode":"verification","home_mount":"rw","controlled_file_mounts":5,"controlled_module_mounts":4,"writable_profile_module_paths":0,"read_only_context_mounts":0,"controlled_patch_sha256":"3dfcce27df471fb86105b14ce968bbf01cff44547579f39846a1516f33b3e1ba","note":"Docker mount semantics only; no DSH Profile or Plugin activation was tested."}

@@ -10,6 +10,7 @@ import { inspectAgentResources, defaultAgentResourcesDir } from './prepare.mts'
 import { agentSeed } from './seed.mts'
 import { agentCommand } from './process.mts'
 import { stageSelectedExtensions } from './extensions.mts'
+import { stageLfxRuntime } from './lfx.mts'
 import { writeRuntimeBundle } from './runtime/index.mts'
 import { stageSdkRuntime } from './runtime/sdk.mts'
 import type { AgentPackageHooks, AgentPackageInput, AgentPackageManifest, AgentSourceSnapshot } from './types.mts'
@@ -75,6 +76,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
   mkdirSync(stagingParent, { recursive: true, mode: 0o700 })
   const staging = mkdtempSync(join(stagingParent, 'agent-'))
   const archive = join(out, `${name}.tar.gz`), partial = archive + '.partial'
+  let result: { archive: string; size: number; sha256: string; manifest: AgentPackageManifest }
   try {
     hooks.onProgress?.({ stage: 'snapshot', message: '正在冻结所选版本的实际资产', total: snapshot.files.length })
     // 与资产一起冻结环境；后续知识下载期间不再读取源 .env。
@@ -110,6 +112,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
 
     const extensions = await stageSelectedExtensions({ programRoot: input.programRoot, assetRoot: input.assetRoot, staging,
       compositions: supplied.compositions, signal: hooks.signal, onProgress: hooks.onProgress })
+    if ('lfx' in extensions && extensions.lfx) await stageLfxRuntime({ programRoot: input.programRoot, staging, arch: input.arch, image: resourceManifest.image.tag! }, hooks)
     const environment = supplied.environment ?? {}
     const pythonPaths = snapshot.dependencies.filter(item => item.kind === 'python').map(item => `/opt/standalone/runtime/${item.path}/site-packages`)
     if (pythonPaths.length) environment.PYTHONPATH = [...pythonPaths, ...(environment.PYTHONPATH ? [environment.PYTHONPATH] : [])].join(':')
@@ -160,10 +163,12 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
     hooks.signal?.throwIfAborted()
     renameSync(partial, archive)
     writeFileSync(archive + '.sha256', `${sha256}  ${name}.tar.gz\n`, { mode: 0o600 })
-    hooks.onProgress?.({ stage: 'completed', message: '独立运行包已生成' })
-    return { archive, size: statSync(archive).size, sha256, manifest }
+    result = { archive, size: statSync(archive).size, sha256, manifest }
   } finally {
     rmSync(staging, { recursive: true, force: true })
     if (existsSync(partial)) rmSync(partial)
+    hooks.onProgress?.({ stage: 'cleanup', message: '本次导出的临时资产和半包已清理' })
   }
+  hooks.onProgress?.({ stage: 'completed', message: '独立运行包已生成，临时资产已清理' })
+  return result
 }

@@ -240,7 +240,7 @@ class SourceContractTest(unittest.TestCase):
         expected = source_contract._read_source_lock(source_contract.LOCK)
         fingerprints = set()
         for source in catalog["sources"]:
-            contract = resolve(source)
+            contract = resolve(source, require_assets=False)
             self.assertEqual(contract["image"]["commit"], expected["commit"])
             self.assertEqual(contract["runtime_lock"], str(source_contract.LOCK))
             candidate = Path(contract["candidate_root"]).parent
@@ -292,7 +292,7 @@ class SourceContractTest(unittest.TestCase):
             original = yaml.safe_load(file.read_text())
             for field, value, message in (("credential_environment_keys", ["invalid-name"], "环境变量"),
                                          ("profile_patch", "../other.yml", "相对路径"),
-                                         ("profile_manifest", "dsh/workspace/package.json", "profile manifest")):
+                                         ("profile_manifest", "dsh/workspace/package.json", "dsh/workspace/package.json")):
                 manifest = json.loads(json.dumps(original))
                 if field == "credential_environment_keys": manifest[field] = value
                 else: manifest["loadable_assets"][field] = value
@@ -360,6 +360,7 @@ class SourceContractTest(unittest.TestCase):
                 (root / name).mkdir(parents=True)
             (root / "presets/second-harness/agent.cordis.yml").write_text("guard", encoding="utf-8")
             (root / "managed/second.patch.yml").write_text("[]", encoding="utf-8")
+            shutil.copyfile(source_contract.ADAPTER / "verification-home-controls/locked-bootstrap.env", root / "workspace/.env")
             catalog = {"schema_version": "1.1", "sources": {source_id: {
                 "agent_id": "second-harness",
                 "candidate_root": f"evolution/experiments/{source_id}/candidate/dsh",
@@ -387,6 +388,7 @@ class SourceContractTest(unittest.TestCase):
                 (root / name).mkdir(parents=True)
             (root / "presets/second-harness-variant/agent.cordis.yml").write_text("guard", encoding="utf-8")
             (root / "managed/second.patch.yml").write_text("[]", encoding="utf-8")
+            shutil.copyfile(source_contract.ADAPTER / "verification-home-controls/locked-bootstrap.env", root / "workspace/.env")
             catalog = {"schema_version": "1.1", "sources": {source_id: {
                 "agent_id": "second-harness",
                 "candidate_root": f"evolution/experiments/{source_id}/candidate/dsh",
@@ -433,7 +435,7 @@ class SourceContractTest(unittest.TestCase):
             base = root.parent
             (base.parent / "change.yaml").write_text(f"experiment_id: {source_id}\nagent_id: second-harness\n")
             (base / "harness.yaml").write_text(yaml.safe_dump({"loadable_assets": {"workspace": "dsh/workspace", "preset_root": "dsh/presets", "managed_root": "dsh/managed", "preset_id": item["preset"].split("/")[0], "preset_file": item["preset"], "profile_patch": "dsh/managed/" + item["patch"]}, "credential_environment_keys": []}))
-            with self.assertRaisesRegex(ValueError, "unsafe source file"):
+            with self.assertRaisesRegex(ValueError, 'candidate_assets_invalid.*dsh/presets/linked/agent.cordis.yml'):
                 resolve(source_id, repo=repo, sources=catalog_path)
 
     def test_hardlinked_selected_asset_is_rejected(self):
@@ -460,7 +462,7 @@ class SourceContractTest(unittest.TestCase):
             base = root.parent
             (base.parent / "change.yaml").write_text(f"experiment_id: {source_id}\nagent_id: second-harness\n")
             (base / "harness.yaml").write_text(yaml.safe_dump({"loadable_assets": {"workspace": "dsh/workspace", "preset_root": "dsh/presets", "managed_root": "dsh/managed", "preset_id": item["preset"].split("/")[0], "preset_file": item["preset"], "profile_patch": "dsh/managed/" + item["patch"]}, "credential_environment_keys": []}))
-            with self.assertRaisesRegex(ValueError, "source file"):
+            with self.assertRaisesRegex(ValueError, 'candidate_assets_invalid.*dsh/managed/second.patch.yml'):
                 resolve(source_id, repo=repo, sources=catalog_path)
 
 

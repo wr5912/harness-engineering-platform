@@ -13,7 +13,10 @@ function fixture(t, mappings = '') {
   mkdirSync(join(source, 'runtime'), { recursive: true }); mkdirSync(bin)
   copyFileSync(new URL('../agent/runtime/install.sh', import.meta.url), join(source, 'install.sh'))
   writeFileSync(join(source, 'runtime/bundle.env'), `AGENT_ID=port-fixture\nAGENT_ARCH=${process.arch === 'arm64' ? 'arm64' : 'amd64'}\nIMAGE_TAG=fixture\nIMAGE_ID=sha256:fixture\nIMAGE_FINGERPRINT=fixture\n`)
-  writeFileSync(join(source, 'agent'), '#!/bin/bash\nprintf "%s\\n" "$*" >> "$PORT_TEST_AGENT_LOG"\n')
+  writeFileSync(join(source, 'agent'), '#!/bin/bash\nprintf "%s\\n" "$*" >> "$PORT_TEST_AGENT_LOG"\nexit "${PORT_TEST_START_EXIT:-0}"\n')
+  mkdirSync(join(source, 'images')); mkdirSync(join(source, 'offline'))
+  writeFileSync(join(source, 'images/dsh-runtime.tar'), 'fixture-image')
+  writeFileSync(join(source, 'offline/docker.tgz'), 'fixture-docker')
   const files = ['install.sh', 'runtime/bundle.env', 'agent']
   writeFileSync(join(source, 'SHA256SUMS'), files.map(path => `${createHash('sha256').update(readFileSync(join(source, path))).digest('hex')}  ${path}`).join('\n') + '\n')
   writeFileSync(join(bin, 'docker'), `#!/bin/bash
@@ -91,4 +94,29 @@ test('无效显式端口和 Docker 端口核对失败均在复制前退出', t =
   assert.equal(result.status, 2); assert.match(result.stderr, /端口无效/); assert.equal(existsSync(invalid.prefix), false)
   const unavailable = fixture(t, '3080/tcp 18500\n'), failure = unavailable.execute([], { PORT_TEST_INSPECT_FAIL: '1' })
   assert.equal(failure.status, 2); assert.match(failure.stderr, /Docker 已有端口映射/); assert.equal(existsSync(unavailable.prefix), false)
+})
+
+test('安装命令支持 -h，参数错误显示帮助且不开始安装', t => {
+  const f = fixture(t)
+  for (const args of [['-h'], ['--help']]) {
+    const r = f.execute(args); assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /用法：/)
+  }
+  for (const args of [['--unknown'], ['--port'], ['--port', '0'], ['--host', 'bad/address']]) {
+    const r = f.execute(args); assert.equal(r.status, 2, r.stderr); assert.match(r.stderr, /用法：/)
+  }
+  assert.equal(existsSync(f.prefix), false)
+  assert.equal(existsSync(f.log), false)
+})
+
+test('安装成功清除目标介质，失败保留恢复材料，源包始终不删除', t => {
+  const success = fixture(t), result = success.execute()
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(existsSync(join(success.prefix, 'images')), false)
+  assert.equal(existsSync(join(success.prefix, 'offline')), false)
+  assert.ok(existsSync(join(success.source, 'images/dsh-runtime.tar')))
+  assert.ok(existsSync(join(success.prefix, 'state/deployment.env')))
+  const failed = fixture(t), failure = failed.execute([], { PORT_TEST_START_EXIT: '1' })
+  assert.equal(failure.status, 1)
+  assert.ok(existsSync(join(failed.prefix, 'images/dsh-runtime.tar')))
+  assert.ok(existsSync(join(failed.prefix, 'offline/docker.tgz')))
 })

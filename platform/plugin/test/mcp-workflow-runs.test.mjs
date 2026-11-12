@@ -173,3 +173,47 @@ test('准备失败不创建已接受运行，原请求可在修复后重试', as
   assert.equal((await runs.start(request, workflow, async () => ({}))).status, 'accepted')
   for (let i = 0; i < 100 && runs.active().length; i++) await delay(5)
 })
+
+test('get_composition_run有界投影可完整解析并保留原结果与分页入口', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'mcp-workflow-summary-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  mkdirSync(join(root, 'mcp/.local/runs'), { recursive: true })
+  const id = 'run-00000000-0000-4000-8000-000000000099'
+  const items = Array.from({ length: 500 }, (_, i) => ({ id: i, status: i % 3 ? 'normal' : 'unknown', facts: { blob: 'x'.repeat(500) } }))
+  const nodes = { root: { status: 'failed', result: { checks: { routine: { checks: { status: { items } } } } } }, ...Object.fromEntries(Array.from({ length: 800 }, (_, i) => [`root/n${i}`, { status: i === 3 ? 'failed' : i < 3 ? 'running' : 'completed', result: { items } }])) }
+  const original = {
+    engine: 'workflow', run_id: id, composition_id: 'inspection-routine', workflow: 'inspection-routine', status: 'failed',
+    created_at: '2026-11-11T11:30:24.502Z', started_at: '2026-11-11T11:30:24.585Z', finished_at: '2026-11-11T11:40:15.685Z',
+    error: 'terminated', input: { scope: { all: true }, huge: 'h'.repeat(200_000) }, progress: { completed: 20, total: 108, huge: 'p'.repeat(100_000) }, metrics: { requests: 310, peak_concurrency: 8, huge: 'm'.repeat(100_000) },
+    version: { versionId: 'v1', toolName: 'inspection_routine', definition: { huge: 'z'.repeat(200_000) }, implementationDigest: 'd'.repeat(64) },
+    scope: { requested: { all: true }, count: 108, frozen_at: '2026-11-11T11:30:23.717Z', assetIds: Array.from({ length: 500 }, (_, i) => i + 1) },
+    result: { huge: 'r'.repeat(100_000), checks: Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`c${i}`, { status: 'unknown', items, nested: { huge: 'n'.repeat(100_000) } }])) },
+    nodes, artifacts: [{ id: 'report', filename: 'inspection-report.html', contentType: 'text/html', body: 'x'.repeat(100_000) }],
+    metrics: { requests: 310, peak_concurrency: 8, elapsed_ms: 592256 },
+  }
+  writeFileSync(join(root, 'mcp/.local/runs', id + '.json'), JSON.stringify(original))
+  const store = workflowRuns(root), summary = store.summary(id)
+  const encoded = JSON.stringify({ ok: true, result: summary })
+  assert.doesNotThrow(() => JSON.parse(encoded))
+  assert.ok(encoded.length < 200_000, 'bounded output size')
+  assert.equal(summary.status, 'failed')
+  assert.equal(summary.error, 'terminated')
+  assert.equal(summary.scope.count, 108)
+  assert.equal(summary.scope.assetIds.length, 200)
+  assert.equal(summary.scope.assetIds_truncated, 300)
+  assert.equal(summary.nodes_summary.total, 801)
+  assert.ok(summary.nodes_summary.failed.includes('root/n3'))
+  assert.equal(summary.nodes_summary.completed, 796)
+  assert.equal(summary.result.checks_truncated, 100)
+  assert.equal(summary.result.huge, undefined)
+  assert.equal(summary.input.huge, undefined)
+  assert.equal(summary.progress.huge, undefined)
+  assert.equal(summary.metrics.huge, undefined)
+  assert.equal(summary.result.checks.c0.nested, undefined)
+  assert.ok(encoded.length <= 24 * 1024, 'summary budget')
+  assert.equal(summary.artifacts[0].body, undefined)
+  assert.equal(summary.version.definition, undefined)
+  assert.equal(store.read(id).version.definition.huge.length, 200_000)
+  assert.equal(store.details(id, 'root/n0', 0, 2).items.length, 2)
+  assert.equal(store.artifact(id, 'report').body.length, 100_000)
+})

@@ -1,13 +1,17 @@
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { load as yaml } from 'js-yaml'
+import { DEFAULT_SCHEMA, Type, load } from 'js-yaml'
 import { assertAssetPath, candidateDigest, dataPath, sha256, sourceInfo } from './files.ts'
 import { assertInheritableVersion } from '../version-id.ts'
 import { versionIdentity, versionSource } from '../agents/version-source.ts'
 import { assertVersionEditable, VersionGovernanceError } from '../agents/version-governance.ts'
 import { containsLiteralLlmKey } from './llm-key.ts'
 import { AssetOperationError } from './asset-error.ts'
+import { validateCandidateChanges } from '../agents/candidate-assets.ts'
+
+const schema = DEFAULT_SCHEMA.extend(new Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: value => value }))
+const yaml = (text: string) => load(text, { schema })
 
 export interface TaskAssemblyInput {
   target_source: string
@@ -22,7 +26,7 @@ function prepare(root: string, input: TaskAssemblyInput) {
   catch (error) {
     if (error instanceof AssetOperationError || error instanceof VersionGovernanceError) throw error
     const message = (error as Error).message
-    const pathError = ['路径必须是工作区内的 POSIX 相对路径', '不允许符号链接路径', 'Candidate 不能包含符号链接', '运行状态、依赖、环境凭据和 LLM API Key 不能作为装配资产'].includes(message)
+    const pathError = ['路径必须是工作区内的 POSIX 相对路径', '不允许符号链接路径', 'Candidate 不能包含符号链接', '运行状态、依赖、环境凭据和 LLM API Key 不能作为装配资产', 'dsh/workspace/.env 必须与 Runtime 注释型占位模板逐字节一致，不能写入环境变量或凭据'].includes(message)
     throw new AssetOperationError('assembly_validation_failed', pathError ? message : '装配预检失败，请核对该阶段的来源、路径和配置格式', { ...context, filesystem_code: (error as NodeJS.ErrnoException).code ?? null, next_action: 'tasks/assembly-preview' })
   }
 }
@@ -50,6 +54,7 @@ function prepareAssets(root: string, input: TaskAssemblyInput, context: { stage:
     seen.add(to)
     if (!lstatSync(from).isFile() || lstatSync(from).size > 1024 * 1024) reject('仅支持不超过 1 MiB 的普通资产文件')
     const content = readFileSync(from)
+    assertAssetPath(item.path, content); assertAssetPath(targetPath, content)
     if (sha256(content) !== item.expected_source_sha256) reject('复用来源已变化，请重新选择', { expected_sha256: item.expected_source_sha256, actual_sha256: sha256(content) })
     if (containsLiteralLlmKey(item.path, content.toString('utf8'))) reject('资产包含 LLM API Key 常量，不能装配')
     context.stage = 'target-file'; context.path = targetPath
@@ -66,6 +71,7 @@ function prepareAssets(root: string, input: TaskAssemblyInput, context: { stage:
     if (seen.has(to)) reject('装配目标路径重复')
     seen.add(to)
     if (typeof edit.content !== 'string' || Buffer.byteLength(edit.content) > 1024 * 1024) reject('配置编辑内容无效或过大')
+    assertAssetPath(edit.path, edit.content)
     if (containsLiteralLlmKey(edit.path, edit.content)) reject('配置不能包含 LLM API Key 常量')
     const before = existsSync(to) ? readFileSync(to) : null
     if ((before === null ? null : sha256(before)) !== edit.expected_target_sha256) reject('装配配置已变化，请重新预览', { expected_sha256: edit.expected_target_sha256, actual_sha256: before === null ? null : sha256(before) })
@@ -76,6 +82,7 @@ function prepareAssets(root: string, input: TaskAssemblyInput, context: { stage:
       previousMode: before ? lstatSync(to).mode & 0o777 : null, source: target.source, source_path: edit.path,
       sha256: sha256(edit.content), operation: before === null ? 'create' : 'replace' })
   }
+  validateCandidateChanges(root, target.id, files.map(file => ({ rel: `evolution/experiments/${target.id}/candidate/${file.path}`, content: file.content })))
   // 用整批草稿检查目标配置的实际文件引用；只声明目录存在不算运行验证。
   const read = (path: string) => {
     context.stage = 'configuration-references'; context.path = path

@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { publishedCompositionService, type Catalog } from '../mcp/compositions.ts'
 
 export interface StandaloneConfig {
   agentId: string
@@ -17,6 +18,14 @@ export interface StandaloneConfig {
   offlineKnowledge?: unknown
   sourceDigest?: string
   extensions?: Array<{ id: string; entry: string; sha256: string; sourceDigest: string }>
+}
+
+export function compositionCatalog(config: StandaloneConfig): Catalog {
+  const value = config.compositions
+  return value?.schema_version === '1.0' && Array.isArray(value.compositions) ? value : { schema_version: '1.0', compositions: [] }
+}
+export function configuredServers(config: StandaloneConfig) {
+  return [...config.mcp.servers.filter(server => !server.platformComposition && server.id !== 'platform-compositions'), publishedCompositionService(compositionCatalog(config))]
 }
 
 export const configPath = (home = process.env.DSH_HOME || '/var/lib/dsh') => join(home, 'standalone/config.json')

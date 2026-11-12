@@ -77,6 +77,8 @@ test('单 Agent 包归档、SHA与安装脚本完整，凭据不进入 manifest 
   assert.equal(JSON.stringify(result.manifest).includes('private-package-fixture'), false)
   assert.equal(JSON.stringify(result.manifest).includes('mcp-fixture-token'), false)
   assert.ok(messages.includes('completed'))
+  assert.ok(messages.indexOf('cleanup') < messages.indexOf('completed'))
+  assert.deepEqual(readdirSync(join(f.out, '.staging')), [])
   const extracted = join(f.root, 'extracted')
   tarExtract(result.archive, extracted)
   assert.equal(readFileSync(join(extracted, 'assets/workspace/AGENTS.md'), 'utf8'), '# 当前已保存且未提交的业务规则\n')

@@ -164,7 +164,113 @@ export function workflowRuns(root: string) {
       artifacts: value.artifacts.map(({ body: _body, ...artifact }: any) => ({ ...artifact, bytes: artifact.bytes ?? Buffer.byteLength(_body ?? '') })) }
   }
   function inspect(id: string, fullResult = false) { const value = read(id); return value ? publicRun(value, fullResult) : undefined }
-  function resultForNode(result: any, nodeId: string): any {
+  /** get_composition_run 的默认有界投影；完整 result/nodes 仍由 read/details/artifact 读取。 */
+  function summary(id: string) {
+    const value = read(id)
+    if (!value) return undefined
+    const MAX_BYTES = 24 * 1024
+    const str = (value: any, max = 500) => typeof value === 'string' ? value.slice(0, max) : undefined
+    const arr = (value: any, max = 200) => Array.isArray(value) ? value.slice(0, max) : undefined
+    const numbers = (value: any) => value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([, item]) => typeof item === 'number').slice(0, 50)) : undefined
+    const boundedScope = (scope: any) => {
+      if (!scope || typeof scope !== 'object') return scope
+      const out: any = {}
+      for (const key of ['count', 'frozen_at', 'ruleTypes']) if (scope[key] !== undefined) out[key] = scope[key]
+      if (scope.requested && typeof scope.requested === 'object') out.requested = Object.fromEntries(Object.entries(scope.requested).filter(([, v]) => ['string', 'number', 'boolean'].includes(typeof v)).slice(0, 12).map(([k, v]) => [k, typeof v === 'string' ? str(v, 300) : v]))
+      if (scope.source && typeof scope.source === 'object') out.source = { connectionId: str(scope.source.connectionId, 200), sourceDigest: str(scope.source.sourceDigest, 200), fingerprint: str(scope.source.fingerprint, 200) }
+      if (scope.connection_fingerprints && typeof scope.connection_fingerprints === 'object') out.connection_fingerprints = Object.fromEntries(Object.entries(scope.connection_fingerprints).filter(([, v]) => typeof v === 'string').slice(0, 12).map(([k, v]) => [k, str(v, 300)]))
+      if (Array.isArray(scope.assetIds)) { out.assetIds = arr(scope.assetIds, 200); if (scope.assetIds.length > 200) out.assetIds_truncated = scope.assetIds.length - 200 }
+      return out
+    }
+    const boundedCheck = (check: any, depth = 0): any => {
+      if (!check || typeof check !== 'object') return check
+      const out: any = {}
+      for (const key of ['kind', 'status', 'complete', 'item_count', 'message', 'reason']) {
+        if (key === 'item_count') out.item_count = Array.isArray(check.items) ? check.items.length : check.item_count
+        else if (key === 'message' || key === 'reason') { const text = str(check[key], 800); if (text !== undefined) out[key] = text }
+        else if (key === 'kind' || key === 'status') out[key] = str(check[key], 100)
+        else if (key === 'complete') out.complete = typeof check.complete === 'boolean' ? check.complete : undefined
+        else if (check[key] !== undefined) out[key] = check[key]
+      }
+      if (check.counts && typeof check.counts === 'object') out.counts = numbers(check.counts)
+      const summary = str(check.summary, 2000); if (summary !== undefined) out.summary = summary
+      if (check.checks && typeof check.checks === 'object' && depth < 4) {
+        const entries = Object.entries(check.checks).slice(0, 100)
+        out.checks = Object.fromEntries(entries.map(([key, child]) => [key, boundedCheck(child, depth + 1)]))
+        if (Object.keys(check.checks).length > entries.length) out.checks_truncated = Object.keys(check.checks).length - entries.length
+      }
+      return out
+    }
+    const boundedResult = (result: any): any => {
+      if (!result || typeof result !== 'object') return result
+      const out: any = {}
+      for (const key of ['complete', 'status', 'error']) if (result[key] !== undefined) out[key] = key === 'error' ? str(result[key], 500) : key === 'status' ? str(result[key], 100) : key === 'complete' ? Boolean(result[key]) : result[key]
+      if (result.counts && typeof result.counts === 'object') out.counts = numbers(result.counts)
+      if (result.summary !== undefined) out.summary = str(result.summary, 4000) ?? (typeof result.summary === 'object' ? Object.fromEntries(Object.entries(result.summary).filter(([, v]) => ['string', 'number', 'boolean'].includes(typeof v)).slice(0, 30)) : undefined)
+      if (result.checks && typeof result.checks === 'object') {
+        const entries = Object.entries(result.checks).slice(0, 100)
+        out.checks = Object.fromEntries(entries.map(([key, check]) => [key, boundedCheck(check)]))
+        if (Object.keys(result.checks).length > entries.length) out.checks_truncated = Object.keys(result.checks).length - entries.length
+      }
+      return out
+    }
+    const nodes = Object.entries(value.nodes ?? {})
+    const detailNodes: Record<string, string[]> = { status: [], baseline: [], reachability: [], vulnerabilities: [], root: ['root'] }
+    for (const [key] of nodes) for (const dimension of ['status', 'baseline', 'reachability', 'vulnerabilities']) if (new RegExp(`(?:^|/)${dimension}(?:/|$)`).test(key) && detailNodes[dimension].length < 10) detailNodes[dimension].push(key)
+    const byStatus: Record<string, number> = {}
+    for (const [, node] of nodes) { const status = String((node as any)?.status ?? 'unknown'); byStatus[status] = (byStatus[status] ?? 0) + 1 }
+    const ids = (status: string) => nodes.filter(([, node]) => (node as any)?.status === status).slice(0, 20).map(([key]) => key)
+    const scope = boundedScope(value.scope)
+    const input = value.input && typeof value.input === 'object' ? { ...(value.input.scope !== undefined ? { scope: boundedScope(value.input.scope) } : {}) } : value.input
+    const progress: any = {}
+    if (value.progress && typeof value.progress === 'object') for (const key of ['completed', 'total', 'status', 'title', 'error']) if (value.progress[key] !== undefined) progress[key] = key === 'error' ? str(value.progress[key], 500) : key === 'title' || key === 'status' ? str(value.progress[key], 300) : value.progress[key]
+    const metrics = numbers(value.metrics)
+    const error = typeof value.error === 'string'
+      ? value.error.replace(/(authorization|bearer|token|password|api[_-]?key|secret)\s*[:=]?\s*\S+/giu, '$1=[已脱敏]').slice(0, 500)
+      : value.error
+    const version = value.version && typeof value.version === 'object' ? {
+      versionId: value.version.versionId, workflow: value.version.workflow, toolName: value.version.toolName,
+      implementationDigest: value.version.implementationDigest, digest: value.version.digest,
+      sourceDigest: value.version.sourceDigest, gitCommit: value.version.gitCommit, gitDirty: value.version.gitDirty,
+      programCommit: value.version.programCommit, programDirty: value.version.programDirty,
+    } : value.version
+    const result: any = {
+      engine: value.engine, run_id: value.run_id, composition_id: value.composition_id, workflow: value.workflow,
+      status: value.status, created_at: value.created_at, started_at: value.started_at, finished_at: value.finished_at,
+      updated_at: value.updated_at, error, scope, input, version, progress, metrics,
+      result: boundedResult(value.result),
+      nodes_summary: { total: nodes.length, by_status: byStatus, failed: ids('failed'), running: ids('running'), completed: byStatus.completed ?? 0 }, detail_nodes: detailNodes,
+      artifacts: value.artifacts.map(({ body: _body, ...artifact }: any) => ({ id: artifact.id, filename: artifact.filename, contentType: artifact.contentType, bytes: artifact.bytes ?? Buffer.byteLength(_body ?? '') })),
+      detail: { tool: 'get_composition_details', run_id: value.run_id, node_id: 'root', offset: 0, limit: 50, note: '完整 result、节点证据与 HTML 仍在原存储/产物中，按 node_id 分页读取。' },
+    }
+    if (Buffer.byteLength(JSON.stringify(result)) > MAX_BYTES) {
+      result.truncated = true
+      result.detail_available = true
+      result.nodes_summary.failed = result.nodes_summary.failed.slice(0, 10)
+      result.nodes_summary.running = result.nodes_summary.running.slice(0, 10)
+      if (result.result?.checks && Object.keys(result.result.checks).length > 50) {
+        result.result.checks = Object.fromEntries(Object.entries(result.result.checks).slice(0, 50))
+        result.result.checks_truncated = true
+      }
+      if (result.input?.scope?.assetIds) result.input.scope.assetIds = result.input.scope.assetIds.slice(0, 100)
+      if (result.scope?.assetIds) result.scope.assetIds = result.scope.assetIds.slice(0, 100)
+      result.detail.note = '摘要超过预算，已保留状态/计数/来源；完整 result、节点证据与 HTML 仍可按 detail 分页读取。'
+      if (Buffer.byteLength(JSON.stringify(result)) > MAX_BYTES) {
+        result.omitted = ['result.checks 明细', '完整节点树', '输入/进度非白名单字段']
+        if (result.result?.checks) result.result.checks = Object.fromEntries(Object.entries(result.result.checks).slice(0, 10))
+        if (Array.isArray(result.scope?.assetIds)) result.scope.assetIds = result.scope.assetIds.slice(0, 20)
+        if (Array.isArray(result.input?.scope?.assetIds)) result.input.scope.assetIds = result.input.scope.assetIds.slice(0, 20)
+        result.nodes_summary.failed = []
+        result.nodes_summary.running = []
+      }
+      if (Buffer.byteLength(JSON.stringify(result)) > MAX_BYTES) {
+        result.result = result.result && typeof result.result === 'object' ? { status: result.result.status, complete: result.result.complete, counts: result.result.counts } : result.result
+        result.input = result.input?.scope ? { scope: { count: result.input.scope.count, frozen_at: result.input.scope.frozen_at } } : undefined
+        result.scope = { count: result.scope?.count, frozen_at: result.scope?.frozen_at, requested: result.scope?.requested }
+      }
+    }
+    return result
+  }  function resultForNode(result: any, nodeId: string): any {
     let current = result, matched = false
     for (const raw of nodeId.split('/').slice(1)) {
       if (current?.checks && Object.hasOwn(current.checks, raw)) { current = current.checks[raw]; matched = true; continue }
@@ -205,5 +311,5 @@ export function workflowRuns(root: string) {
     const { filename, contentType, body } = value
     return { filename, contentType, body }
   }
-  return { start, inspect, details, artifact, read, active: () => [...state.active] }
+  return { start, inspect, summary, details, artifact, read, active: () => [...state.active] }
 }

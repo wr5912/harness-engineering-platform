@@ -5,6 +5,7 @@ import { assertAssetPath, candidateDigest, candidateFiles, dataPath, sha256, sou
 import { assetText } from './asset-text.ts'
 import { isComputeEntry } from './compute-generation-contract.ts'
 import { versionSource } from './version-source.ts'
+import { validateCandidateChanges } from './candidate-assets.ts'
 
 type Edit = { path: string; expected_sha256: string; move_to?: string; content?: string | null }
 type Rpc = (endpoint: string, body: Record<string, any>) => Promise<any>
@@ -104,6 +105,9 @@ export function previewComputeAssets(root: string, experimentId: string, request
   }
   const edits = [...changes.values()].map(edit => ({ path: prefix + edit.path, expected_sha256: edit.expected_sha256,
     ...(edit.move_to ? { move_to: prefix + edit.move_to } : {}), content: edit.content === null ? null : texts.get(edit.path)! }))
+  validateCandidateChanges(root, source.id, edits.flatMap(edit => [
+    ...(edit.move_to ? [{ rel: edit.path, content: null }] : []), { rel: edit.move_to ?? edit.path, content: edit.content },
+  ]))
   require(candidateDigest(source.candidate) === candidateHash && readFileSync(dataPath(root, changePath)).equals(changeBytes), '预览期间来源变化，请重新核对')
   const result = { schema_version: 'compute-assets/v1', experiment_id: source.id, candidate_sha256: candidateHash,
     change_sha256: sha256(changeBytes), edits, required_paths: roots.map(finalPath), references,
@@ -120,7 +124,7 @@ export async function applyComputeAssets(root: string, preview: ReturnType<typeo
   require(sha256(readFileSync(dataPath(root, changePath))) === preview.change_sha256, '整理期间研究计划变化，请重新预览')
   for (const edit of preview.edits) {
     require(edit.path.startsWith(prefix) && (!edit.move_to || edit.move_to.startsWith(prefix)), '整理预览越出目标 Candidate')
-    assertAssetPath(edit.path); if (edit.move_to) assertAssetPath(edit.move_to)
+    assertAssetPath(edit.path.slice(prefix.length)); if (edit.move_to) assertAssetPath(edit.move_to.slice(prefix.length))
   }
   function complete() {
     return preview.edits.every(edit => {

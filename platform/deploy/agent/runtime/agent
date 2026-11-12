@@ -1,5 +1,65 @@
 #!/bin/bash
 set -euo pipefail
+usage() {
+  cat <<'HELP'
+用法：./agent <命令> [参数]
+  start       启动智能体
+  stop        停止智能体，保留 HOME 和会话
+  cleanup     移除本实例的容器、网络和安装介质，保留镜像、Harness、HOME 和会话
+  restart     重新装载 Harness、MCP 配置和端口，保留 HOME 和会话
+  status      查看状态
+  logs [-f]   查看日志；其余日志参数沿用 docker compose logs
+  open        打开局域网直接访问入口，无需登录或访问 Token
+  configure [--config-file <JSON>]  交互配置或导入连接配置
+  prepare-sdk | run --input-file <JSON> | example [输入]  SDK 操作
+  -h, --help  显示帮助；也可在命令后使用
+
+start、restart、configure 支持：
+  --mcp-server <连接ID>  选择 mcp.servers[].id，可重复执行以配置多个服务
+  --mcp-url <HTTP(S)地址>  MCP 服务地址；OpenAPI 连接填写规范文件地址
+  --mcp-token <Token>    更新该连接凭据；省略保留，空字符串清除
+  示例：./agent restart --mcp-server ai-soc-master --mcp-url http://host:8000/openapi.json --mcp-token '<Token>'
+
+配置文件（修改后执行 ./agent restart）：
+  state/deployment.env                 AGENT_PORT、AGENT_HOST 等部署设置
+  state/home/standalone/config.json     mcp.servers 中的地址和凭据
+Harness：编辑 assets/workspace、assets/presets、assets/managed 后重启，无需构建镜像。
+说明：详见 README.md；命令行 Token 可能被本机进程查看或终端历史记录。
+HELP
+}
+argument_error() { echo "$1" >&2; usage >&2; exit 2; }
+action=${1:-status}
+case "$action" in -h|--help) usage; exit 0 ;; esac
+for argument in "${@:2}"; do case "$argument" in -h|--help) usage; exit 0 ;; esac; done
+mcp_server='' mcp_url='' mcp_token='' token_supplied=false
+case "$action" in
+  start|restart|configure)
+    parameters=("${@:2}")
+    if [ "$action" = configure ] && [ "${2:-}" = --config-file ]; then
+      [ "$#" = 3 ] && [ -f "${3:-}" ] || argument_error '--config-file 需要一个存在的 JSON 文件'
+    else
+      while [ "${#parameters[@]}" -gt 0 ]; do
+        [ "${#parameters[@]}" -ge 2 ] || argument_error 'MCP 参数缺少值'
+        value=${parameters[1]}
+        case "${parameters[0]}" in
+          --mcp-server) [ -z "$mcp_server" ] && [[ "$value" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || argument_error 'MCP 连接 ID 无效或重复'; mcp_server=$value ;;
+          --mcp-url) [ -z "$mcp_url" ] && [[ "$value" =~ ^https?://[^[:space:]]+$ ]] || argument_error 'MCP 地址无效或重复'; mcp_url=$value ;;
+          --mcp-token) [ "$token_supplied" = false ] && [[ "$value" != --* ]] || argument_error 'MCP Token 参数无效或重复'; mcp_token=$value; token_supplied=true ;;
+          *) argument_error '未知参数' ;;
+        esac
+        parameters=("${parameters[@]:2}")
+      done
+      if [ -n "$mcp_server$mcp_url" ] || [ "$token_supplied" = true ]; then
+        [ -n "$mcp_server" ] && { [ -n "$mcp_url" ] || [ "$token_supplied" = true ]; } || argument_error 'MCP 参数需要 --mcp-server 及 --mcp-url 或 --mcp-token'
+      fi
+    fi
+    ;;
+  stop|cleanup|status|open|prepare-sdk) [ "$#" -le 1 ] || argument_error '该命令不接受额外参数' ;;
+  run) [ "$#" = 3 ] && [ "${2:-}" = --input-file ] && [ -f "${3:-}" ] || argument_error 'run 需要 --input-file <存在的JSON文件>' ;;
+  example) [ "$#" -le 2 ] && [[ "${2:-}" != --* ]] || argument_error 'example 只接受一个输入文本' ;;
+  logs) ;;
+  *) argument_error '未知命令' ;;
+esac
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 . "$ROOT/runtime/bundle.env"
 if [ -f "$ROOT/state/deployment.env" ]; then . "$ROOT/state/deployment.env"; fi
@@ -12,7 +72,17 @@ export AGENT_HOST=${AGENT_HOST:-127.0.0.1}
 export AGENT_UID=${AGENT_UID:-1000}
 export AGENT_GID=${AGENT_GID:-1000}
 export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-hep-agent-${AGENT_ID}}
+if [ "${AGENT_PROFILE:-web}" != sdk ]; then
+  [[ "$AGENT_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$((10#$AGENT_PORT))" -ge 1 ] && [ "$((10#$AGENT_PORT))" -le 65535 ] || argument_error 'AGENT_PORT 须为 1–65535 的端口'
+  [[ "$AGENT_HOST" =~ ^[a-zA-Z0-9.-]+$ ]] || argument_error 'AGENT_HOST 地址无效'
+fi
 compose() { docker compose --project-directory "$ROOT" -f "$ROOT/runtime/compose.yaml" "$@"; }
+configure_mcp() {
+  [ -n "$mcp_server" ] || return 0
+  compose run --rm -T init >/dev/null
+  { printf '%s\0' "$mcp_server" "$mcp_url"; if [ "$token_supplied" = true ]; then printf '%s\0' "$mcp_token"; fi; } |
+    compose run --rm --no-deps -T dsh configure-mcp || { usage >&2; exit 2; }
+}
 if [ "${AGENT_PROFILE:-web}" = sdk ]; then
   case "${1:-status}" in
     start|run|example|prepare-sdk|configure)
@@ -35,10 +105,15 @@ sdk_run() {
 }
 case "${1:-status}" in
   start)
+    configure_mcp
     if [ "${AGENT_PROFILE:-web}" = sdk ]; then
       [ -f "$ROOT/state/home/standalone/input.json" ] || { echo '请使用 ./agent run --input-file <JSON文件> 提交 SDK 输入' >&2; exit 2; }
       sdk_run
-    else compose up -d --wait dsh; echo "智能体已启动：http://${AGENT_HOST}:${AGENT_PORT}/assistant/"; echo "首次访问请使用受保护入口文件：$ROOT/state/home/standalone/open.html"; fi
+    else
+      if [ -n "$mcp_server" ]; then compose up -d --force-recreate --wait dsh; else compose up -d --wait dsh; fi
+      echo "智能体已启动：http://${AGENT_HOST}:${AGENT_PORT}/assistant/"
+      echo '局域网直接访问，无需登录或访问 Token。'
+    fi
     ;;
   prepare-sdk)
     [ "${AGENT_PROFILE:-web}" = sdk ] || { echo '当前运行包不是 SDK 型智能体' >&2; exit 2; }
@@ -66,25 +141,34 @@ case "${1:-status}" in
     compose stop
     if [ "${AGENT_PROFILE:-web}" = sdk ] && [ "$(docker inspect --format '{{.State.Running}}' "${COMPOSE_PROJECT_NAME}-sdk-example" 2>/dev/null || true)" = true ]; then docker stop --time 20 "${COMPOSE_PROJECT_NAME}-sdk-example" >/dev/null; fi
     ;;
+  cleanup)
+    compose down --remove-orphans
+    rm -rf -- "$ROOT/images" "$ROOT/offline"
+    echo '本实例的容器、网络和安装介质已清理；标准镜像、Harness、HOME 和会话已保留。'
+    ;;
   restart)
     if [ "${AGENT_PROFILE:-web}" = sdk ]; then echo 'SDK 任务不会自动重放；请显式运行 ./agent run --input-file <JSON文件>' >&2; exit 2
-    else compose restart dsh; compose up -d --wait dsh; fi
+    else configure_mcp; compose up -d --force-recreate --wait dsh; fi
     ;;
   status) compose ps ;;
-  logs) shift; compose logs --tail 150 "$@" dsh ;;
+  logs) shift; compose logs --tail 150 "$@" dsh || { usage >&2; exit 2; } ;;
   open)
     [ "${AGENT_PROFILE:-web}" != sdk ] || { echo "SDK 接入说明：$ROOT/SDK使用说明.md"; exit 0; }
-    entry="$ROOT/state/home/standalone/open.html"
-    [ -f "$entry" ] || { echo '访问入口尚未生成，请先启动智能体' >&2; exit 2; }
-    if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null; then xdg-open "$entry" >/dev/null 2>&1 || echo "请使用浏览器打开受保护入口文件：$entry"; else echo "请使用浏览器打开受保护入口文件：$entry"; fi
+    entry="http://${AGENT_HOST}:${AGENT_PORT}/assistant/"
+    echo "$entry"
+    if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null; then xdg-open "$entry" >/dev/null 2>&1 || true; fi
     ;;
   configure)
-    if [ -z "${2:-}" ]; then
+    if [ -n "$mcp_server" ]; then
+      configure_mcp
+    elif [ -z "${2:-}" ]; then
+      compose run --rm -T init >/dev/null
       compose run --rm --no-deps dsh configure
     else
       [ "${2:-}" = --config-file ] && [ -n "${3:-}" ] || { echo '用法：./agent configure [--config-file <JSON>]' >&2; exit 2; }
       config_file=$(realpath -- "$3")
       test -f "$config_file"
+      compose run --rm -T init >/dev/null
       staged_config="$ROOT/state/.configure.llm-api-key"
       cp -- "$config_file" "$staged_config"
       chmod 600 "$staged_config"
@@ -97,5 +181,5 @@ case "${1:-status}" in
     if [ "${AGENT_PROFILE:-web}" = sdk ]; then echo '模型与 MCP 配置已保存，后续 SDK 进程将使用新配置；没有重放任务。'
     else echo '模型与 MCP 配置已保存；请在当前任务结束后运行 ./agent restart 使配置生效。'; fi
     ;;
-  *) echo '用法：./agent start|stop|restart|status|logs|configure|open|prepare-sdk|run --input-file <JSON>|example [输入]' >&2; exit 2 ;;
+  *) argument_error '未知命令' ;;
 esac

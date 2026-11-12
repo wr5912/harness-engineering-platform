@@ -41,7 +41,8 @@ function flag(options: Options, name: string): boolean {
 
 function validateOptions(command: string, options: Options): void {
   const values: Record<string, string[]> = {
-    'agent-preview': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir'],
+    'agent-cleanup': ['prefix'],
+    'agent-preview': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'prefix'],
     'agent-pack': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'out', 'seed-file', 'expected-candidate-sha256'],
     'agent-prepare': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'image-archive', 'docker-assets'],
     pack: ['out', 'program-root', 'data-root', 'assets-dir', 'knowledge-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
@@ -53,6 +54,7 @@ function validateOptions(command: string, options: Options): void {
     'mcp-migrate': ['program-root', 'data-root'],
   }
   const flags: Record<string, string[]> = {
+    'agent-cleanup': [],
     'agent-preview': [], 'agent-pack': [], 'agent-prepare': [],
     pack: ['no-image', 'no-data', 'allow-dirty', 'allow-fixture-data', 'keep-staging'],
     install: ['dry-run', 'skip-image', 'skip-prepare', 'strict-paths', 'allow-fixture-data', 'start'],
@@ -87,6 +89,9 @@ function installPort(value: string | undefined, name: string, fallback: number):
 
 function usage(): string {
   return `用法：
+  dsh-deploy agent-cleanup --prefix <独立智能体安装目录>
+    移除该安装的容器、网络和安装介质，保留标准镜像、Harness、HOME 和会话。
+
   dsh-deploy mcp-migrate [--program-root <目录>] [--data-root <目录>] [--dry-run] [--json]
     将当前 MCP 配置、组合与运行数据归拢到数据根 mcp；核对空闲后激活，失败恢复。
 
@@ -133,6 +138,7 @@ function usage(): string {
     --out <目录>                agent-pack 输出目录
     --seed-file <*.llm-api-key> agent-pack 连接与凭据种子；不传时保留原生资产配置和工作区环境
     --expected-candidate-sha256 <摘要>  agent-pack 核对先前预览的实际资产
+    --prefix <目录>             agent-preview 刷新已有独立预览的运行器；保留资产、配置、会话和镜像，随后用 agent restart 生效
     --image-archive <tar>       agent-prepare 导入该架构标准镜像
     --docker-assets <目录>      agent-prepare 导入官方 docker-*.tgz 与 docker-compose
 
@@ -189,6 +195,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     const { command, options } = parse(argv)
     if (!command || command === '--help' || flag(options, 'help')) { console.log(usage()); return 0 }
     validateOptions(command, options)
+    if (command === 'agent-cleanup') {
+      const prefix = text(options, 'prefix')
+      if (!prefix) throw new Error('agent-cleanup 需要 --prefix')
+      const { cleanupAgentInstallation } = await import('./agent/cleanup.mts')
+      console.log(JSON.stringify(await cleanupAgentInstallation(resolve(prefix)), null, 2))
+      return 0
+    }
     if (command === 'mcp-migrate') {
       const { migrateMcp } = await import('./mcp-migrate.mts')
       const report = await migrateMcp({ programRoot: resolve(text(options, 'program-root', REPO)!), dataRoot: resolve(text(options, 'data-root', defaultAssetRoot())!), dryRun: flag(options, 'dry-run') })
@@ -239,7 +252,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       }
       if (command === 'agent-preview') {
         const { previewAgentPackage } = await import('./agent/pack.mts')
-        console.log(JSON.stringify(previewAgentPackage(input), null, 2))
+        const preview = previewAgentPackage(input)
+        const prefix = text(options, 'prefix')
+        if (prefix) {
+          const { refreshAgentPreview } = await import('./agent/runtime/index.mts')
+          await refreshAgentPreview(resolve(prefix), input.programRoot, preview)
+        }
+        console.log(JSON.stringify({ ...preview, ...(prefix ? { runtimeRefreshed: resolve(prefix), restartRequired: true } : {}) }, null, 2))
         return 0
       }
       const controller = new AbortController()

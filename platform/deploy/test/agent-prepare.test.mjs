@@ -5,6 +5,18 @@ import test from 'node:test'
 import { fixture, write } from './agent-fixture.mjs'
 import { defaultAgentResourcesDir, inspectAgentResources, prepareAgentResources } from '../agent/prepare.mts'
 import { previewAgentPackage } from '../agent/pack.mts'
+import { inspectAgentSnapshot } from '../agent/snapshot.mts'
+
+test('Web 插件复用原生客户端 React，服务端与其他必需依赖仍须准备', t => {
+  const f = fixture(t), manifest = join(f.candidate, 'dsh/managed/web-plugin/package.json')
+  const pkg = { dsh: { client: { platform: 'web' } }, peerDependencies: { react: '^18.2.0' } }
+  write(manifest, JSON.stringify(pkg))
+  assert.deepEqual(inspectAgentSnapshot(f.input).dependencies, [])
+  write(manifest, JSON.stringify({ ...pkg, dependencies: { react: '^18.2.0' }, peerDependencies: { fixture: '1.0.0' } }))
+  assert.deepEqual(inspectAgentSnapshot(f.input).dependencies[0].dependencies, ['react', 'fixture'])
+  write(manifest, JSON.stringify({ peerDependencies: pkg.peerDependencies }))
+  assert.deepEqual(inspectAgentSnapshot(f.input).dependencies[0].dependencies, ['react'])
+})
 
 test('目标架构资源可由另一架构的已准备镜像与Docker归档导入，不依赖目标宿主工具链', async t => {
   const f = fixture(t, 'arm64'), target = join(f.root, 'imported-arm64'), stages = []

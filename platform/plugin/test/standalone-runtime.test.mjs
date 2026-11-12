@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { load, FAILSAFE_SCHEMA, Type } from 'js-yaml'
+import { dump, load, FAILSAFE_SCHEMA, Type } from 'js-yaml'
 process.env.HARNESS_DSH_ENTRY ??= '/opt/dsh/npm/lib/node_modules/@deepseek-ai/dsh/package.json'
-import { initializeStandalone, configureStandalone, projectManagedPatch, prepareStandaloneSdk } from '../src/standalone/bootstrap.ts'
+import { initializeStandalone, configureStandalone, configureMcpConnection, projectManagedPatch, prepareStandaloneSdk } from '../src/standalone/bootstrap.ts'
 import { readStandaloneConfig } from '../src/standalone/config.ts'
 
 function fixture(t) {
@@ -18,7 +18,11 @@ function fixture(t) {
   writeFileSync(join(root, 'runtime/package.json'), JSON.stringify({ type: 'module' }))
   writeFileSync(join(root, 'runtime/standalone-plugin.js'), `export { validateConfiguration } from ${JSON.stringify(new URL('../lib/mcp-manager.js', import.meta.url).href)};`)
   mkdirSync(installation, { recursive: true })
-  writeFileSync(join(installation, 'package.json'), JSON.stringify({ name: '@fixture/cli', dependencies: {} }))
+  writeFileSync(join(installation, 'package.json'), JSON.stringify({ name: '@fixture/cli', dependencies: { '@deepseek-ai/dsh-client-connection': '*' } }))
+  const connection = join(installation, 'node_modules/@deepseek-ai/dsh-client-connection')
+  mkdirSync(connection, { recursive: true })
+  writeFileSync(join(connection, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-client-connection', exports: { './package.json': './package.json', './client': { default: './client.browser.js' } }, dsh: { client: { inject: [], platform: 'web', immediately: true } } }))
+  writeFileSync(join(connection, 'client.browser.js'), '// 同镜像原生浏览器连接\n')
   writeFileSync(join(root, 'assets/managed/agent.patch.yml'), '- id: agent-default-model\n  config: {provider: old, model: old}\n- insert:\n    - id: business-tools\n      name: /opt/dsh-managed/tools.mjs\n    - id: mcp-session-manager\n      name: /opt/dsh-managed/mcp-manager.mjs\n      config:\n        servers:\n          - id: group-one\n')
   const seed = { agentId: 'demo', experimentId: 'EXP-demo-001', presetId: 'demo', profilePatch: 'agent.patch.yml', modelPatch: [{ id: 'agent-default-model', config: { provider: 'api', model: 'model-a' } }], mcp: { servers: [], groups: [{ id: 'group-one', members: [] }], sharedToken: 'a'.repeat(64) } }
   writeFileSync(join(root, 'config-seed/standalone.json'), JSON.stringify(seed))
@@ -35,6 +39,11 @@ test('新 HOME 原生初始化一次，冻结业务配置保留，模型与 MCP 
   assert.match(runtime, /business-tools/)
   assert.doesNotMatch(runtime, /mcp-manager\.mjs|provider: old|business-runtime/)
   assert.match(runtime, /standalone-plugin\.js/)
+  assert.match(runtime, /standalone\/connection\/index\.mjs/)
+  const connection = JSON.parse(readFileSync(join(f.home, 'standalone/connection/package.json')))
+  assert.deepEqual(connection.dsh.client, { inject: [], platform: 'web', immediately: true })
+  assert.equal(connection.name, '@deepseek-ai/dsh-client-connection')
+  assert.equal(realpathSync(join(f.home, 'standalone/connection/client.browser.js')), join(dirname(f.installAnchor), 'node_modules/@deepseek-ai/dsh-client-connection/client.browser.js'))
   const schema = FAILSAFE_SCHEMA.extend([new Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: expression => expression })])
   const web = load(runtime, { schema }).flatMap(row => row.insert ?? []).find(row => row.id === 'web-runtime')
   assert.deepEqual(web.inject, ['webStartup'])
@@ -42,10 +51,45 @@ test('新 HOME 原生初始化一次，冻结业务配置保留，模型与 MCP 
   const changed = { ...first, mcp: { ...first.mcp, sharedToken: 'b'.repeat(64) } }
   writeFileSync(join(f.home, 'standalone/config.json'), JSON.stringify(changed))
   writeFileSync(join(f.home, 'profiles/standalone/cordis.patch.yml'), '# 原生UI保存的新模型\n[]\n')
+  writeFileSync(join(f.root, 'assets/managed/agent.patch.yml'), '- insert:\n    - id: changed-business-ui\n      name: /opt/dsh-managed/changed-ui.mjs\n')
   assert.equal(initializeStandalone(f).initialized, false)
+  const restarted = readFileSync(join(f.home, 'standalone/runtime.patch.yml'), 'utf8')
+  assert.match(restarted, /changed-business-ui/)
+  assert.doesNotMatch(restarted, /business-tools/)
   assert.equal(readStandaloneConfig(f.home).mcp.sharedToken, 'b'.repeat(64))
   assert.match(readFileSync(join(f.home, 'profiles/standalone/cordis.patch.yml'), 'utf8'), /原生UI保存/)
   assert.equal(existsSync(join(f.home, 'profiles/node_modules/@fixture/cli')), true)
+})
+
+test('独立 Web 访问声明随 Harness 读取，不支持的模式明确报错而非静默匿名运行', t => {
+  const f = fixture(t)
+  writeFileSync(join(f.root, 'assets/harness.yaml'), 'standalone:\n  web:\n    access: anonymous-lan\n')
+  initializeStandalone(f)
+  writeFileSync(join(f.root, 'assets/harness.yaml'), 'standalone:\n  web:\n    access: authenticated\n')
+  assert.throws(() => initializeStandalone(f), /standalone.web.access/)
+})
+
+test('初始化保留 Harness 直连 MCP，已有连接优先，本地分组不回连平台，重配后重启不覆盖', async t => {
+  const f = fixture(t)
+  const direct = { id: 'report-write', enabled: true, serverName: 'report-write', url: 'http://external.test/mcp', headers: [{ name: 'X-API-Key', value: 'fixture-key' }], tools: { mode: 'selected', names: ['save', 'get'] } }
+  const existing = { id: 'existing', enabled: true, url: 'http://current.test/mcp', tools: { mode: 'all', names: [] } }
+  f.seed.mcp.servers = [existing]
+  writeFileSync(join(f.root, 'config-seed/standalone.json'), JSON.stringify(f.seed))
+  writeFileSync(join(f.root, 'assets/managed/agent.patch.yml'), dump([{ id: 'mcp-session-manager', config: { servers: [
+    { id: 'group-one', url: 'http://old-platform.test/mcp/groups/group-one/v2' },
+    direct, { ...existing, url: 'http://stale.test/mcp' }, { id: 'minimal', url: 'http://minimal.test/mcp' }, { id: 'disabled', enabled: false, url: 'http://disabled.test/mcp' },
+  ] } }]))
+  initializeStandalone(f)
+  const first = readStandaloneConfig(f.home)
+  assert.deepEqual(first.mcp.servers, [existing, direct, { id: 'minimal', url: 'http://minimal.test/mcp', enabled: true, tools: { mode: 'all', names: [] } }])
+  assert.deepEqual(first.mcp.mountServerIds, ['group-one', 'report-write', 'existing', 'minimal'])
+  assert.deepEqual(first.mcp.mountOverrides['report-write'], { serverName: direct.serverName, tools: direct.tools })
+  await configureMcpConnection({ id: 'report-write', url: 'http://new.test/mcp', token: 'new-token' }, f)
+  const changed = readStandaloneConfig(f.home)
+  assert.equal(initializeStandalone(f).initialized, false)
+  assert.deepEqual(readStandaloneConfig(f.home), changed)
+  assert.equal(changed.mcp.servers[1].url, 'http://new.test/mcp')
+  assert.deepEqual(changed.mcp.servers[1].headers, [...direct.headers, { name: 'Authorization', value: 'Bearer new-token' }])
 })
 
 test('明确重配仅更新模型/MCP，保留业务身份及专用凭据路径', async t => {
@@ -157,4 +201,52 @@ test('SDK 独立环境使用原生SDK组合和固定Preset，初始化及重配�
   await configureStandalone(config, f)
   assert.equal(prepareStandaloneSdk(f).model, 'new-model')
   assert.equal(existsSync(join(f.home, 'standalone/input.json')), false)
+})
+
+test('MCP 重配与实际装载共用本地组合服务，不要求在可编辑连接中保存派生服务', async t => {
+  const f = fixture(t)
+  f.seed.mcp.servers = [{ id: 'soc', enabled: true, specUrl: 'http://old.test/openapi.json' }]
+  f.seed.mcp.groups = [{ id: 'policy-response', members: [{ serverId: 'platform-compositions', names: ['policy_change', 'get_composition_run'] }] }]
+  f.seed.compositions = { schema_version: '1.0', compositions: [{ id: 'policy', published: { toolName: 'policy_change', title: '策略变更', description: '', connectionId: 'soc' } }] }
+  writeFileSync(join(f.root, 'config-seed/standalone.json'), JSON.stringify(f.seed))
+  initializeStandalone(f)
+  await configureMcpConnection({ id: 'soc', url: 'http://new.test/openapi.json', token: 'new-key' }, f)
+  const current = readStandaloneConfig(f.home)
+  assert.equal(current.mcp.servers[0].specUrl, 'http://new.test/openapi.json')
+  assert.equal(current.mcp.servers[0].apiKey, 'new-key')
+  assert.deepEqual(current.mcp.groups, f.seed.mcp.groups)
+  assert.deepEqual(current.compositions, f.seed.compositions)
+  assert.equal(current.mcp.servers.some(server => server.id === 'platform-compositions'), false)
+  await assert.rejects(configureStandalone({ mcp: { ...current.mcp, groups: [{ id: 'bad', members: [{ serverId: 'missing', names: ['query'] }] }] } }, f), /分组成员/)
+  assert.deepEqual(readStandaloneConfig(f.home), current)
+})
+
+test('MCP 参数更新同一当前配置，按 ID 保留其他连接与原生模型，支持 OpenAPI 和 Bearer', async t => {
+  const f = fixture(t)
+  f.seed.mcp.servers = [
+    { id: 'soc', enabled: true, specUrl: 'http://old.test/openapi.json', apiKey: 'old-key', authType: 'credential', authHeader: 'X-API-Key' },
+    { id: 'direct', enabled: true, url: 'http://old.test/mcp', headers: [{ name: 'Authorization', value: 'Bearer old-key' }, { name: 'X-Trace', value: 'preserve' }], tools: { mode: 'all', names: [] } },
+  ]
+  writeFileSync(join(f.root, 'config-seed/standalone.json'), JSON.stringify(f.seed))
+  initializeStandalone(f)
+  const model = readFileSync(join(f.home, 'profiles/standalone/cordis.patch.yml'), 'utf8')
+  await configureMcpConnection({ id: 'soc', url: 'http://new.test/openapi.json', token: 'new-key' }, f)
+  let current = readStandaloneConfig(f.home)
+  assert.equal(current.mcp.servers[0].specUrl, 'http://new.test/openapi.json')
+  assert.equal(current.mcp.servers[0].apiKey, 'new-key')
+  assert.equal(current.mcp.servers[0].authHeader, 'X-API-Key')
+  assert.deepEqual(current.mcp.servers[1], f.seed.mcp.servers[1])
+  await configureMcpConnection({ id: 'direct', url: 'http://new.test/mcp' }, f)
+  assert.equal(readStandaloneConfig(f.home).mcp.servers[1].headers[0].value, 'Bearer old-key')
+  await configureMcpConnection({ id: 'direct', token: 'Bearer replacement' }, f)
+  current = readStandaloneConfig(f.home)
+  assert.deepEqual(current.mcp.servers[1].headers, [{ name: 'X-Trace', value: 'preserve' }, { name: 'Authorization', value: 'Bearer replacement' }])
+  assert.equal(readFileSync(join(f.home, 'profiles/standalone/cordis.patch.yml'), 'utf8'), model)
+  await configureMcpConnection({ id: 'direct', token: '' }, f)
+  assert.deepEqual(readStandaloneConfig(f.home).mcp.servers[1].headers, [{ name: 'X-Trace', value: 'preserve' }])
+  const before = readFileSync(join(f.home, 'standalone/config.json'), 'utf8')
+  for (const input of [{ id: 'missing', token: 'value' }, { id: 'soc' }, { id: 'soc', url: 'invalid' }, { id: 'soc', url: 'file:///tmp/private' }, { id: 'soc', token: 'bad\r\nvalue' }]) {
+    await assert.rejects(configureMcpConnection(input, f))
+    assert.equal(readFileSync(join(f.home, 'standalone/config.json'), 'utf8'), before)
+  }
 })

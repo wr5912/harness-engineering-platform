@@ -253,8 +253,10 @@ def preset_id(preset_relative: str) -> str:
     return parts[0]
 
 
-def _resolve_experiment(source_id: str, *, repo: Path, sources: Path, lock_path: Path, require_assets: bool) -> dict:
+def _resolve_experiment(source_id: str, *, repo: Path, sources: Path, lock_path: Path, require_assets: bool, web_bootstrap: bool = True) -> dict:
     command = ["node", str(ADAPTER / "version-source.mts"), str(repo), source_id]
+    if require_assets:
+        command.append("--check-assets" if web_bootstrap else "--analysis-assets")
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.TimeoutExpired) as error:
@@ -331,7 +333,7 @@ def instance_desired_source(manifest: dict, *, repo: Path = REPO) -> str:
 
 def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path | None = None,
             lock_path: Path = LOCK, require_assets: bool = True, source_ref: str | None = None,
-            evaluation_source: str = "source") -> dict:
+            evaluation_source: str = "source", web_bootstrap: bool = True) -> dict:
     repo = repo.expanduser().resolve()
     if evaluation_source not in {"source", "current"}:
         raise ValueError("evaluation_source 必须是 source 或 current")
@@ -346,7 +348,7 @@ def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path
             raise ValueError(result.stderr.strip() or "固定评测来源物化失败")
         selected = json.loads(result.stdout)
         frozen = Path(selected["root"])
-        contract = resolve(source_id, repo=frozen, lock_path=lock_path, require_assets=require_assets)
+        contract = resolve(source_id, repo=frozen, lock_path=lock_path, require_assets=require_assets, web_bootstrap=web_bootstrap)
         contract.update({"source_ref": source_ref, "source_snapshot_root": str(frozen),
                          "candidate_source_root": str(Path(contract["candidate_root"]).parent),
                          "evaluation_path": str((repo if evaluation_source == "current" else frozen) / "agents" / contract["agent_id"] / "evaluation.md"),
@@ -361,12 +363,12 @@ def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path
         if not isinstance(source_id, str) or not EXPERIMENT.fullmatch(source_id):
             raise ValueError("默认智能体没有有效的 active_experiment；请通过 --source 指定来源")
     if source_id.startswith("experiment:"):
-        return _resolve_experiment(source_id[len("experiment:"):], repo=repo, sources=sources, lock_path=lock_path, require_assets=require_assets)
+        return _resolve_experiment(source_id[len("experiment:"):], repo=repo, sources=sources, lock_path=lock_path, require_assets=require_assets, web_bootstrap=web_bootstrap)
     if source_id.startswith("release:"):
         return _resolve_release(source_id[len("release:"):], repo=repo)
     if ":" in source_id:
         raise ValueError(f"unknown source selector: {source_id}")
-    return _resolve_experiment(source_id, repo=repo, sources=sources, lock_path=lock_path, require_assets=require_assets)
+    return _resolve_experiment(source_id, repo=repo, sources=sources, lock_path=lock_path, require_assets=require_assets, web_bootstrap=web_bootstrap)
 
 
 def mount_plan(contract: dict, role: str, *, task_dir: str = None, output_dir: str = None,

@@ -163,6 +163,7 @@ const standaloneManagerSources = { name: 'standalone-mcp-sources', setup(build) 
 } }
 await build({ entryPoints: {
   'standalone-bootstrap': 'src/standalone/bootstrap.ts', 'standalone-plugin': 'src/standalone/plugin.ts',
+  'standalone-connection': 'src/standalone/connection.ts',
   'standalone-bridge': 'src/standalone/bridge.ts', 'standalone-knowledge': 'src/standalone-knowledge/index.ts',
 }, outdir: 'lib', bundle: true, platform: 'node', target: 'node24', format: 'esm', packages: 'bundle',
   external: ['@deepseek-ai/*'], legalComments: 'none', define: implementationDefine, plugins: [standaloneManagerSources],

@@ -7,6 +7,8 @@ import { McpConfigStore } from '../mcp/store.ts'
 import { COMPOSITION_SERVICE_ID, readCompositions, type CompositionEntry, type CompositionVersion } from '../mcp/compositions.ts'
 import { versionSource, assertStandaloneVersionSupported } from '../agents/version-source.ts'
 import { workspaceConfigPath } from '../workspace.ts'
+import { compositionQueries } from '../mcp/definition.ts'
+import { lfxDependencies } from '../mcp/lfx-assets.ts'
 
 type ModelProjection = (agentId: string, selection?: { provider: string; model: string; reasoningEffort?: string }, candidatePath?: string) => Promise<{ policy: any; environment: Record<string, string> }>
 type Document = { name: string; content: string }
@@ -131,10 +133,11 @@ export function createDeploymentSeed(assetRoot: string, modelProjection: ModelPr
       if (versions.has(versionId)) return
       versions.set(versionId, version); selected.set(id, versions)
       const config = version.config
-      for (const connection of [config.connectionId, config.alertsConnectionId, config.bindings?.socConnectionId, config.bindings?.reportConnectionId]) {
+      for (const connection of [config.connectionId, config.alertsConnectionId, config.bindings?.socConnectionId, config.bindings?.reportConnectionId, ...Object.values(config.connections ?? {})]) {
         if (connection && connection !== COMPOSITION_SERVICE_ID) neededServers.add(connection)
       }
-      for (const step of config.steps ?? []) include(step.compositionId, step.versionId, false, new Set([...visiting, key]))
+      if (config.engine === 'lfx' && !config.flowDigest) throw new Error(`编排 ${id} 的发布版本缺少冻结流程，未替换为当前草稿`)
+      for (const step of lfxDependencies(assetRoot, config)) include(step.compositionId, step.versionId, false, new Set([...visiting, key]))
     }
     const explicit = fixedReferences(documents)
     for (const reference of explicit) include(reference.compositionId, reference.versionId)
@@ -145,7 +148,7 @@ export function createDeploymentSeed(assetRoot: string, modelProjection: ModelPr
       if (names.has(entry.published.toolName) || directTool) include(entry.id, entry.publishedVersionId!, true)
       if (directTool && !mountServerIds.includes(COMPOSITION_SERVICE_ID)) mountServerIds.push(COMPOSITION_SERVICE_ID)
     }
-    for (const name of names) if (!catalog.compositions.some(entry => entry.published?.toolName === name)) throw new Error(`所选 MCP 分组中的编排工具 ${name} 尚未发布，请核对分组后重试`)
+    for (const name of names) if (!compositionQueries.some(query => query.toolName === name) && !catalog.compositions.some(entry => entry.published?.toolName === name)) notices.push(`分组引用的工具 ${name} 尚未发布，安装包保留分组选择，但不包含该工具的可执行实现。`)
     const entries: CompositionEntry[] = [...selected].map(([id, versions]) => {
       const version = versions.get(published.get(id) ?? '') ?? versions.values().next().value!
       return { id, published: { ...version.config, ...(version.publishedAt ? { publishedAt: version.publishedAt } : {}) }, publishedVersionId: version.versionId, versions: [...versions.values()] }

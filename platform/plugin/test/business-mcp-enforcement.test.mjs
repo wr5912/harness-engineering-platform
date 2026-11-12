@@ -16,7 +16,7 @@ async function fixture(t) {
   await symlink(join(process.cwd(), 'node_modules'), join(root, 'node_modules'), 'dir')
   const source = await readFile(new URL('../build.mjs', import.meta.url), 'utf8')
   const adapter = join(root, 'adapter.mjs')
-  const start = source.indexOf('export const managerSource ='), end = source.indexOf('\nconst { name } =', start)
+  const start = source.indexOf('export const managerSource ='), end = source.indexOf('\nasync function main()', start)
   await writeFile(adapter, "import { readFile } from 'node:fs/promises'; import { resolve } from 'node:path';\n" + source.slice(start, end)
     .replace(/fileURLToPath\(new URL\('..\/..\/plugins\/mcp-manager', import.meta.url\)\)/, JSON.stringify(new URL('../../../plugins/mcp-manager', import.meta.url).pathname)))
   const { managerSources } = await import(pathToFileURL(adapter).href)

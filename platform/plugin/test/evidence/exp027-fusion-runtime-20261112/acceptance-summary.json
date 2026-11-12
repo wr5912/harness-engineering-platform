@@ -1,0 +1,151 @@
+{
+  "observed_at": "2026-11-12T05:03:40Z",
+  "scope": "EXP027 three-feature fusion, shared DSH startup path, MCP composition publication and live instance discovery",
+  "data_repository": {
+    "commit": "deded0c15d7a23c25316ef588b1e1ea5f3fa0b81",
+    "remote_main": "deded0c15d7a23c25316ef588b1e1ea5f3fa0b81",
+    "committed_paths": [
+      "mcp/compositions/policy-change/composition.json"
+    ],
+    "worktree_dirty": true
+  },
+  "composition": {
+    "id": "policy-change",
+    "tool_name": "policy_change",
+    "has_draft": false,
+    "published_version_id": "ae580a422cf607df8b24f7c84226983fa3cf80fa8b016e386a323ea2a0552ef8",
+    "implementation_digest": "5c35af4ae29747498b63d3bdc36c325e0db0a6c6371bda34d2a73de0917979e8",
+    "published_at": "2026-11-12T04:51:21.129Z",
+    "catalog_revision": "13a58846a085cb210624e9b8131b6b333679b3a23de6c474eac0a1a39287a0b4",
+    "published_dry": {
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementationDigest": "5c35af4ae29747498b63d3bdc36c325e0db0a6c6371bda34d2a73de0917979e8",
+      "sourceDigest": "bf7d30b122c186718f3e098acefd074b9860bf36e6508df6de62f4cbe174e729"
+    },
+    "publish_dry_upstream_requests": 0,
+    "runtime_data_commit": "deded0c15d7a23c25316ef588b1e1ea5f3fa0b81",
+    "runtime_data_dirty": true,
+    "program_commit": "23b3a08d1df7d1ce62c9000f501346f0c2975aaa"
+  },
+  "bindings": {
+    "security-operations-expert-main": {
+      "before": [
+        "policy-change",
+        "xx-device-policy"
+      ],
+      "after": [
+        "xx-device-policy"
+      ]
+    },
+    "policy-response-acceptance-027-r5efdc136f237": {
+      "before": [
+        "policy-change",
+        "xx-device-policy"
+      ],
+      "after": [
+        "xx-device-policy"
+      ]
+    }
+  },
+  "instances": {
+    "security-operations-expert-main": {
+      "port": 18503,
+      "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+      "restart_ok": true,
+      "running_after": 0,
+      "sessions_after_restart": 38,
+      "sessions_current": 39,
+      "observed_at": "2026-11-12T05:59:10.731231Z",
+      "state": "running",
+      "asset_status": "current",
+      "asset_checked_at": "2026-11-12T05:59:11.426Z",
+      "source_asset_digest": "sha256:18986547a21ddb0e5621d0f9aa4ba747092ea259ae4fe530bdff4ff1106a43fb",
+      "loaded_digest": "sha256:18986547a21ddb0e5621d0f9aa4ba747092ea259ae4fe530bdff4ff1106a43fb",
+      "loaded_at": "2026-11-12T05:00:16.114Z",
+      "loaded_ok": true
+    },
+    "policy-response-acceptance-027-r5efdc136f237": {
+      "port": 18504,
+      "source": "experiment:EXP-security-operations-expert-027-f-r5efdc136f237",
+      "restart_ok": true,
+      "running_after": 0,
+      "sessions_after_restart": 105,
+      "sessions_current": 105,
+      "observed_at": "2026-11-12T05:59:09.375703Z",
+      "state": "running",
+      "asset_status": "current",
+      "asset_checked_at": "2026-11-12T05:59:10.005Z",
+      "source_asset_digest": "sha256:7816c75dfc67346cf4e6f5dd5b6401bacd805602fe92cb286b5078225d66b838",
+      "loaded_digest": "sha256:7816c75dfc67346cf4e6f5dd5b6401bacd805602fe92cb286b5078225d66b838",
+      "loaded_at": "2026-11-12T05:00:43.034Z",
+      "loaded_ok": true
+    }
+  },
+  "discovery": {
+    "instances_checked": [
+      "security-operations-expert-main",
+      "policy-response-acceptance-027-r5efdc136f237"
+    ],
+    "groups_per_instance": 11,
+    "errors": [],
+    "policy-response-acceptance_tools": [
+      "policy_change",
+      "emergency_action"
+    ],
+    "raw_files": [
+      "discovery-main.jsonl",
+      "discovery-policy.jsonl"
+    ],
+    "observed_at": "2026-11-12T05:57:39.839Z"
+  },
+  "startup": {
+    "container_home_submounts": "passed: 5 controlled file mounts, 4 controlled module mounts, 0 writable profile module paths",
+    "docker_bootstrap": "passed: 2/2 (missing .env negative case and canonical .env case; fresh UID1000 managed dependency volume)",
+    "python_dsh_dev": "passed: 162/162",
+    "host_probe_note": "直接在宿主机运行 test_home_submounts 未设置 DSH_HARNESS_MODE，1 项失败；按容器验证合同重新执行后通过。",
+    "runtime_fallback_check": {
+      "nativeFallbackHealer": "undefined",
+      "uid": 1000
+    }
+  },
+  "limitations": [
+    "xx_device_policy 仍是草稿联调绑定，真实 XX 外部 MCP 未配置；未伪造连接，也未把本地 Mock 当真实业务验收。",
+    "未执行真实策略变更、提交、下发或业务 Evaluation Run；发布和 dry 只证明目录、流程和实现装载合同。",
+    "程序根修复仍在本地工作树，未获授权提交或推送；数据仓库存在其他并行未提交修改，本次只提交策略组合发布文件。",
+    "cf 实例此前启动复验成功，但收尾时已不在登记列表中，未擅自重建。"
+  ],
+  "native_tool_header": {
+    "instance": "security-operations-expert-main",
+    "policy_change": "mcp__policy-response-acceptance__policy_change",
+    "emergency_action": "mcp__policy-response-acceptance__emergency_action",
+    "tool_calls": 0,
+    "request_header_record_count": 1,
+    "tool_entry_count": 333,
+    "unique_tool_count": 333,
+    "policy_response_raw_tool_count": 27
+  },
+  "final_instance_observation_at": "2026-11-12T05:59:11.488Z",
+  "fusion": {
+    "asset_commits": [
+      "b220b910fc06c31ae2d1c30bdf5a894cdd4f1bd3",
+      "8a4b22ffcf0268668c8a3dd56c45764d1b292eaa"
+    ],
+    "state": "integrating",
+    "pending_research_checks": [
+      "merged-load",
+      "merged-capability"
+    ]
+  }
+}

@@ -93,6 +93,10 @@ services:
         target: /opt/dsh-managed
         read_only: true
       - type: volume
+        source: dsh-verification-trusted-fallback
+        target: /opt/node_modules
+        read_only: true
+      - type: volume
         source: dsh-verification-home
         target: /var/lib/dsh
       - type: volume

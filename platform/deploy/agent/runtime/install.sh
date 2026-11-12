@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+usage() { echo '用法：./install.sh [--prefix <空目录>] [--port <端口>] [--host <地址>] [-h|--help]'; }
+argument_error() { echo "$1" >&2; usage >&2; exit 2; }
 SOURCE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 . "$SOURCE/runtime/bundle.env"
 prefix="${HOME}/.local/share/standalone-agents/${AGENT_ID}"
@@ -7,13 +9,19 @@ port=''
 public_host=''
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --prefix) prefix=${2:?缺少安装目录}; shift 2 ;;
-    --port) port=${2:?缺少端口}; shift 2 ;;
-    --host) public_host=${2:?缺少主机地址}; shift 2 ;;
-    --help) echo '用法：./install.sh [--prefix <空目录>] [--port <端口>] [--host <地址>]'; exit 0 ;;
-    *) echo "未知安装参数：$1" >&2; exit 2 ;;
+    -h|--help) usage; exit 0 ;;
+    --prefix|--port|--host)
+      [ "$#" -ge 2 ] && [ -n "$2" ] && [[ "$2" != --* ]] || argument_error '安装参数缺少值'
+      case "$1" in --prefix) prefix=$2 ;; --port) port=$2 ;; --host) public_host=$2 ;; esac
+      shift 2 ;;
+    *) argument_error '未知安装参数' ;;
   esac
 done
+if [ -n "$port" ]; then
+  [[ "$port" =~ ^[0-9]{1,5}$ ]] && [ "$((10#$port))" -ge 1 ] && [ "$((10#$port))" -le 65535 ] || argument_error '指定端口无效'
+  port=$((10#$port))
+fi
+[ -z "$public_host" ] || [[ "$public_host" =~ ^[a-zA-Z0-9.-]+$ ]] || argument_error '目标访问地址格式无效'
 case "$(uname -m)" in x86_64|amd64) host_arch=amd64 ;; aarch64|arm64) host_arch=arm64 ;; *) echo '仅支持 Linux AMD64/ARM64' >&2; exit 2 ;; esac
 [ "$(uname -s)" = Linux ] && [ "$host_arch" = "$AGENT_ARCH" ] || { echo '安装包与目标主机架构不一致' >&2; exit 2; }
 if [ ! -f "$SOURCE/SHA256SUMS" ]; then echo '安装包缺少 SHA256SUMS 校验清单' >&2; exit 2; fi
@@ -67,7 +75,7 @@ if [ -z "$public_host" ]; then
   public_host=${public_host:-$(hostname -I 2>/dev/null | awk '{print $1}' || true)}
 fi
 public_host=${public_host:-127.0.0.1}
-[[ "$public_host" =~ ^[a-zA-Z0-9.-]+$ ]] || { echo '目标访问地址格式无效' >&2; exit 2; }
+[[ "$public_host" =~ ^[a-zA-Z0-9.-]+$ ]] || argument_error '目标访问地址格式无效'
 printf 'AGENT_PORT=%s\nCOMPOSE_PROJECT_NAME=%s\nAGENT_HOST=%s\nAGENT_UID=%s\nAGENT_GID=%s\n' "$port" "$deployment" "$public_host" "$runtime_uid" "$runtime_gid" > "$prefix/state/deployment.env"
 chmod 600 "$prefix/state/deployment.env"
 if [ "$(id -u)" = 0 ]; then chown "$runtime_uid:$runtime_gid" "$prefix/state/deployment.env"; fi
@@ -85,3 +93,6 @@ else
   "$prefix/agent" start
   printf '安装目录：%s\n再次启动：%s/agent start\n' "$prefix" "$prefix"
 fi
+# 镜像已经导入 Docker；安装目录只保留运行资产，原始安装包仍可用于恢复。
+rm -rf -- "$prefix/images" "$prefix/offline"
+echo '已清理安装目录中的镜像归档和 Docker 安装介质；标准镜像、Harness、HOME 与原始安装源保留。'

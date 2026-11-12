@@ -49,6 +49,8 @@ APT 索引使用 `Error-Mode=any`、单次重试、30 秒 HTTP 连接超时和 I
 
 ## 候选资产装载
 
+实例预览与启动先按[完整 Candidate 装载预检合同](../../../docs/platform-design/03_存储架构与数据契约.md#candidate-asset-validation)核对所选来源，失败发生在写入实例或停止旧实例之前。Web workspace 的 `.env` 必须保留规范注释占位；错误回执中的阶段、路径和修复动作指向来源资产，修复后重新预览，再继续创建。启动成功只证明技术状态，融合的 load/capability 仍需匹配当前资产的封存 Run。
+
 | 容器路径 | 宿主机来源（所选 Experiment） | 评测实例 |
 |---|---|---|
 | `/work/harness/workspace` | `candidate/dsh/workspace` | 只读 |
@@ -63,7 +65,9 @@ APT 索引使用 `Error-Mode=any`、单次重试、30 秒 HTTP 连接超时和 I
 
 评测实例不挂载 `evaluation.md` 或其他判分材料；`verify-load.mjs` 与 `test_home_submounts.mjs` 对此做负向断言。Harness 修改由宿主开发会话完成，容器只负责装载和评测。
 
-Candidate 的 Managed Patch 如加载带独立 Node 依赖的插件，先在目标主机的该插件目录按 `package-lock.json` 执行 `npm ci --ignore-scripts --legacy-peer-deps --registry=https://registry.npmmirror.com`。当前 `dsh-voice-hub` 的运行时导入链需要锁定的 peer/dev 依赖 `@deepseek-ai/cordis`，不能加 `--omit=dev`。`node_modules/` 已被 Git 忽略，会随 `candidate/dsh/managed` 一起只读挂载，Node 从插件文件所在目录向上解析依赖；不得把 AMD64 主机安装的 `node_modules/` 复制到 ARM64 主机。当前 `security-operations-expert` 的 `dsh-voice-hub` 使用 `sherpa-onnx-node` 原生包，须在每台目标主机的当前 active Experiment Candidate 中安装，并在对应容器内核对完整插件导入、原生模块加载、插件激活和浏览器语音功能；目录存在只表示依赖已放置。只有依赖必须存放在 Candidate 外时，才用 `dsh-dev up --plugin-node-modules PATH` 额外挂载到 `/opt/node_modules`。
+Managed 插件从自身目录向上解析 Node 依赖。主容器在 `/opt/node_modules` 只读复用原生 Profile 已初始化的镜像依赖卷；它与镜像指纹绑定，不安装另一份 DSH。插件自己的 `node_modules/` 仍优先使用。镜像未提供的独立依赖按插件锁文件在目标主机准备，不能为补齐 Runtime 包直接安装旧插件的开发版 DSH。`dsh-dev` 在停止旧实例前核对显式运行依赖，完整导入和插件激活仍由实际装载核验。
+
+`node_modules/` 已被 Git 忽略，不得把 AMD64 主机的依赖复制到 ARM64 主机。当前 `security-operations-expert` 的 `dsh-voice-hub` 使用 `sherpa-onnx-node` 原生包，须在目标主机准备并在容器内核对原生模块和浏览器语音功能；目录存在只表示依赖已放置。显式使用 `dsh-dev up --plugin-node-modules PATH` 时，该只读目录替代默认 `/opt/node_modules` 投影，须同时提供插件所需的共享依赖。
 
 `locked-user.patch.yml` 只读覆盖 HOME 级用户 Patch；Web Profile 的 `cordis.patch.yml` 留在实例 HOME 卷中，由 DSH Web 保存当前实例的设置（新版 DSH 的设置写入要求对该文件原子替换）。真正 **0 字节**的 `locked-global.AGENTS.md` 和只含注释的 `locked-bootstrap.env` 分别只读覆盖全局 Agent instructions 与 Boot 环境文件。模型/MCP Endpoint 和凭据只能由调用环境或 Runtime 受控凭据提供，不能由 Candidate 工作区改变。复用实例时须把 Web Profile 设置视为运行状态，而非 Candidate 资产；评估前核对其摘要或使用新实例。
 

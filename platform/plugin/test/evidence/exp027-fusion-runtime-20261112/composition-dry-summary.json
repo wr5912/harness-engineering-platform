@@ -1,0 +1,220 @@
+{
+  "phase": "before-policy-change-publication",
+  "compositions": [
+    {
+      "id": "inspection-baseline",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "5fc83a7356e398b02f1bf09d2796dfdd2301166e46d005454461a6af564c0ec6",
+      "selection": "published"
+    },
+    {
+      "id": "inspection-vulnerabilities",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "9d69dc19807b8a802e09d077412e1450f15be8e7f4bdc4d50f7f2750d9caa2cb",
+      "selection": "published"
+    },
+    {
+      "id": "inspection-reachability",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "3929f4df42a7bf72604b7cc2cd7d67961280899a7d9320aa430ec4be6b8c1ab6",
+      "selection": "published"
+    },
+    {
+      "id": "inspection-routine",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "36464652e1d023887d0568c1320d9fe7ae558cf1c85559d636a0c5c9b2cee5aa",
+      "selection": "published"
+    },
+    {
+      "id": "inspection-deep",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "150992030897c4a8fb57216562b885a9c70811e30364354234f26ae2d24d7331",
+      "selection": "published"
+    },
+    {
+      "id": "emergency-action",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "2ac4af0dd72c95f047297271387d0b1e2028d9b96998dec56b8e8b9361a031a6",
+      "selection": "published"
+    },
+    {
+      "id": "troubleshooting-business-access",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "c1bc953c927d7cbbb1a651672895713637fea507d8d6d01a1c09a76f6ffcab65",
+      "selection": "published"
+    },
+    {
+      "id": "troubleshooting-device-offline",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "5eba1ae237a67d1afe5f9eaf877825ad145e6c1e0dd8d542b04c07a42abb8d1a",
+      "selection": "published"
+    },
+    {
+      "id": "xx-device-command",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "5ce1287f6813b9375d053248d316166b3a46a1a0c42931808e966e1cd0d9beca",
+      "selection": "published"
+    },
+    {
+      "id": "policy-change",
+      "selection": "draft",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "47e5313bbc4a9ee9fcc68be28f3233ab5fda273ee4931214c79c1f7cd47b05aa"
+    },
+    {
+      "id": "xx-device-policy",
+      "selection": "draft",
+      "ok": true,
+      "mode": "dry",
+      "upstreamRequests": 0,
+      "checks": [
+        "输入有效",
+        "子组合版本与参数映射有效",
+        "依赖连接已登记",
+        "执行结构有效"
+      ],
+      "unverified": [
+        "真实范围与上游数据",
+        "实际检查及报告产物"
+      ],
+      "implementation": "d6cdfb15c60eb63d4cdf61bd2408da87a5a326fbcbc5b65374010befe6173565"
+    }
+  ],
+  "later_policy_change_published_dry": {
+    "ok": true,
+    "mode": "dry",
+    "upstreamRequests": 0,
+    "checks": [
+      "输入有效",
+      "子组合版本与参数映射有效",
+      "依赖连接已登记",
+      "执行结构有效"
+    ],
+    "unverified": [
+      "真实范围与上游数据",
+      "实际检查及报告产物"
+    ],
+    "implementationDigest": "5c35af4ae29747498b63d3bdc36c325e0db0a6c6371bda34d2a73de0917979e8",
+    "sourceDigest": "bf7d30b122c186718f3e098acefd074b9860bf36e6508df6de62f4cbe174e729"
+  }
+}

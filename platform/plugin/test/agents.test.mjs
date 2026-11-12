@@ -65,12 +65,17 @@ function fixture() {
     'runtime/adapters/dsh-container/source_contract.py',
     'runtime/adapters/dsh-container/version-source.mts',
     'platform/plugin/src/agents/version-source.ts',
+    'platform/plugin/src/agents/candidate-assets.ts',
+    'platform/plugin/src/tasks/files.ts',
+    'platform/plugin/src/tasks/asset-error.ts',
+    'platform/plugin/src/workspace.ts',
     'platform/plugin/src/models/harness-runtime.ts',
     'platform/plugin/src/version-id.ts',
     'runtime/adapters/dsh-container/workspace_paths.py',
     'runtime/adapters/dsh-container/scenario_analysis.py',
     'runtime/adapters/dsh-container/run_record.py',
     'runtime/adapters/dsh-container/mutation-receipt.py',
+    'runtime/adapters/dsh-container/verification-home-controls/locked-bootstrap.env',
     'runtime/research/evaluation_contract.py',
     'runtime/research/validate_experiment.py',
     'runtime/research/validate_repository.py',
@@ -115,6 +120,7 @@ function fixture() {
   write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/harness.yaml'), 'name: test\nloadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: test-agent\n  preset_file: test-agent/preset.yml\n  profile_patch: dsh/managed/test-agent.patch.yml\ncredential_environment_keys: []\n')
   write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/roles/analyst/AGENTS.md'), '# Analyst\n')
   write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/workspace/input.txt'), 'workspace\n')
+  copyFileSync(join(root, 'runtime/adapters/dsh-container/verification-home-controls/locked-bootstrap.env'), join(root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/workspace/.env'))
   write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/managed/test-agent.patch.yml'), 'patch: test\n')
   write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/presets/test-agent/preset.yml'), 'preset: test\n')
   write(join(root, 'evolution/experiments/EXP-test-agent-001/candidate/RuntimeHOME/session.txt'), 'must not copy\n')
@@ -1090,7 +1096,7 @@ test('父版缺少装载入口时完整清理本次目录，不触碰其他版�
     await rm(join(fx.root, 'evolution/experiments/EXP-test-agent-001/candidate/dsh/presets/test-agent/preset.yml'))
     run(fx.root, 'git', ['add', '.']); run(fx.root, 'git', ['commit', '-m', 'missing entry'])
     const commit = run(fx.root, 'git', ['rev-parse', 'HEAD'])
-    await assert.rejects(() => rpc(createAgentsHandler(fx.root), 'create', { agent_id: 'test-agent', parent_ref: `git:${commit}`, parent_experiment_id: 'EXP-test-agent-001', research_question: '验证失败恢复' }), /父版缺少装载入口/)
+    await assert.rejects(() => rpc(createAgentsHandler(fx.root), 'create', { agent_id: 'test-agent', parent_ref: `git:${commit}`, parent_experiment_id: 'EXP-test-agent-001', research_question: '验证失败恢复' }), /Candidate 装载资产/)
     assert.deepEqual(readdirSync(join(fx.root, 'evolution/experiments')), ['EXP-test-agent-001'])
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
@@ -1476,7 +1482,7 @@ test('资产树展示真实嵌套目录，二进制只读，排除运行目录�
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 
-test('保存仅检查本次草稿；格式或装载声明失败不写入，!!js 不执行', async () => {
+test('保存检查完整装载结构和本次草稿语法；失败不写入，!!js 不执行', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
@@ -1486,12 +1492,12 @@ test('保存仅检查本次草稿；格式或装载声明失败不写入，!!js 
     const original = await rpc(handler, 'edit/read', { experiment_id, path })
     const apply = content => rpc(handler, 'edit/apply', { experiment_id, edits: [{ path, content, expected_sha256: original.sha256 }] })
     await assert.rejects(() => apply('name: [invalid\n'), /草稿格式无效/)
-    await assert.rejects(() => apply('name: valid\n'), /装载声明无效/)
+    await assert.rejects(() => apply('name: valid\n'), /装载资产不完整或不安全/)
     assert.equal((await rpc(handler, 'edit/read', { experiment_id, path })).content, original.content)
     const content = original.content + 'config: !!js |\n  (() => { throw new Error("must not execute") })()\n'
-    await assert.rejects(() => apply(content), /装载声明无效/)
+    await assert.rejects(() => apply(content), /装载资产不完整或不安全/)
     const saved = await apply(original.content + 'description: valid draft\n')
-    assert.equal(saved.dry_run.preflight_scope, 'changed-files')
+    assert.equal(saved.dry_run.preflight_scope, 'complete-candidate')
     assert.equal((await rpc(handler, 'edit/read', { experiment_id, path })).content, original.content + 'description: valid draft\n')
     assert.equal(readFileSync(join(fx.root, 'evolution/experiments', experiment_id, 'runs/run-11111111-1111-4111-8111-111111111111/run.json'), 'utf8'), '{"status":"failed"}\n')
   } finally { await rm(fx.root, { recursive: true, force: true }) }
@@ -1524,6 +1530,27 @@ test('源码变量式凭据引用原样读写，错误语法与脱敏预览不�
     assert.notEqual(masked.sha256, masked.content_sha256)
     await assert.rejects(() => rpc(handler, 'edit/apply', { experiment_id, edits: [{ path, content: masked.content, expected_sha256: masked.sha256 }] }), /只读预览/)
     assert.equal(readFileSync(file, 'utf8'), "export const token = 'fixture-secret-value-1234';\n")
+  } finally { await rm(fx.root, { recursive: true, force: true }) }
+})
+
+test('声明文件可以预览和保存，语法错误仍拒绝写入', async () => {
+  const { createAgentsHandler } = await loadServer()
+  const fx = fixture()
+  try {
+    const handler = createAgentsHandler(fx.root), experiment_id = 'EXP-test-agent-001'
+    for (const extension of ['d.ts', 'd.mts', 'd.cts']) {
+      const path = `candidate/dsh/managed/types.${extension}`
+      const content = 'export function readWorkbook(id?: string): Promise<Record<string, unknown>>\n'
+      const edits = [{ path, content, expected_sha256: null }]
+      await rpc(handler, 'edit/preview', { experiment_id, edits })
+      await rpc(handler, 'edit/apply', { experiment_id, edits })
+      const saved = await rpc(handler, 'edit/read', { experiment_id, path })
+      assert.equal(saved.content, content)
+      for (const action of ['edit/preview', 'edit/apply']) {
+        await assert.rejects(() => rpc(handler, action, { experiment_id, edits: [{ path, content: 'export function broken(: void\n', expected_sha256: saved.sha256 }] }), /草稿格式无效/)
+      }
+      assert.equal((await rpc(handler, 'edit/read', { experiment_id, path })).content, content)
+    }
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })
 

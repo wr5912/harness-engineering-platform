@@ -8,6 +8,7 @@ import { join, relative, resolve, sep } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import { assetText } from './asset-text.ts'
+import { assertAssetPath, BOOTSTRAP_ENV } from '../tasks/files.ts'
 
 const execute = promisify(execFile)
 const EXPERIMENT = VERSION_ID
@@ -38,7 +39,7 @@ function fail(message: string): never { throw new DiffError('invalid_request', m
 function cancelled(signal?: AbortSignal) { if (signal?.aborted) throw new DiffError('aborted', '资产比较已取消') }
 function hash(data: string | Buffer) { return createHash('sha256').update(data).digest('hex') }
 function excluded(path: string) {
-  return path.split('/').some(name => EXCLUDED.has(name) || name === '.env' || name.startsWith('.env.') || name.endsWith('.llm-api-key'))
+  return path.split('/').some(name => EXCLUDED.has(name) || (name === '.env' && path !== BOOTSTRAP_ENV) || name.startsWith('.env.') || name.endsWith('.llm-api-key'))
 }
 function experimentId(value: unknown): string {
   if (typeof value !== 'string' || !EXPERIMENT.test(value)) fail('experiment_id 格式无效')
@@ -90,6 +91,7 @@ function workingFiles(root: string, id: string, algorithm: string, signal?: Abor
       if (stat.isSymbolicLink()) throw new DiffError('path_rejected', 'Candidate 含符号链接，无法确定完整比较来源')
       if (stat.isDirectory()) visit(file)
       else if (stat.isFile()) {
+        if (path === BOOTSTRAP_ENV) assertAssetPath(path, readFileSync(file))
         bytes += stat.size
         if (files.length >= 10_000 || bytes > 128 * 1024 * 1024) throw new DiffError('limit_exceeded', 'Candidate 超出本次比较的 10000 文件或 128 MiB 范围')
         files.push({ path, object: objectId(readFileSync(file), algorithm), size: stat.size, mode: stat.mode & 0o111 ? '100755' : '100644', file })
@@ -109,6 +111,7 @@ async function fixedFiles(root: string, commit: string, id: string, signal?: Abo
     const path = match[5].slice(prefix.length)
     if (excluded(path)) continue
     if (match[1] === '120000' || match[2] !== 'blob') throw new DiffError('path_rejected', '固定来源含符号链接或子模块，不能作为普通资产比较')
+    if (path === BOOTSTRAP_ENV) assertAssetPath(path, await git(root, ['cat-file', 'blob', match[3]], signal))
     files.push({ path, object: match[3], size: Number(match[4]), mode: match[1] })
   }
   if (!files.length) throw new DiffError('baseline_unavailable', '固定提交中没有指定父研究版本的 Candidate 资产')
@@ -234,7 +237,7 @@ export async function readAssetDiff(rootPath: string, payload: JsonMap, signal?:
       left: { label: leftLabel, source: leftSource, ...(leftId ? { experiment_id: leftId } : {}), digest: digest(leftFiles) },
       right: { label: `${id}（工作树）`, source: `experiment:${id}`, experiment_id: id, digest: digest(rightFiles) },
       files, summary,
-      notes: ['比较仅包含 Candidate；不包含 Run、Session、缓存、依赖目录和 .env/LLM 凭据文件。', '工作树版本可能包含未提交修改；内容摘要对应本次读取，比较不会修改或切换运行实例。'],
+      notes: ['比较包含 Candidate 的启动占位 dsh/workspace/.env；不包含 Run、Session、缓存、依赖目录和其他环境凭据文件。', '工作树版本可能包含未提交修改；内容摘要对应本次读取，比较不会修改或切换运行实例。'],
     }
     if (payload.path !== undefined) {
       if (typeof payload.path !== 'string' || !files.some(item => item.path === payload.path)) fail('path 必须来自本次差异文件列表')

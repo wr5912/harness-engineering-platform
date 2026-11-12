@@ -5,6 +5,7 @@ import test from 'node:test'
 import { fixture, write } from '../../deploy/test/agent-fixture.mjs'
 import { createDeploymentSeed } from '../src/deployment/seed.ts'
 import { compositionConfig, compositionVersionId, readCompositions } from '../src/mcp/compositions.ts'
+import { lfxDigest } from '../src/mcp/lfx-assets.ts'
 
 const signal = () => new AbortController().signal
 const publishedAt = '2026-10-29T00:00:00Z'
@@ -29,6 +30,33 @@ function configure(f, serverIds, compositions, groups = []) {
 function seed(f) {
   return createDeploymentSeed(f.data, async () => ({ policy: { patch: [] }, environment: {} }))({ agent_id: 'alpha', experiment_id: f.id }, signal())
 }
+
+test('内置运行查询不需要发布，未发布工具明确提示而不阻塞其他能力导出', async t => {
+  const f = fixture(t)
+  write(join(f.candidate, 'dsh/workspace/AGENTS.md'), 'mcp__business-group__get_composition_run')
+  configure(f, [], [], [group(['get_composition_run', 'get_composition_artifact', 'get_composition_details', 'unpublished_tool'])])
+  const result = await seed(f)
+  assert.deepEqual(result.seed.compositions.compositions, [])
+  assert.deepEqual(result.seed.mcp.groups[0].members[0].names, ['get_composition_run', 'get_composition_artifact', 'get_composition_details', 'unpublished_tool'])
+  assert.equal(result.notices.length, 1)
+  assert.match(result.notices[0], /unpublished_tool.*尚未发布/)
+})
+
+test('LFX 导出冻结流程及固定子版本的全部连接，不读取可变草稿', async t => {
+  const f = fixture(t)
+  const child = config('child_tool', 'child-server')
+  const bundle = { engine: 'lfx==1.13.1', flow: { data: { nodes: [{ id: 'result', position: { x: 0, y: 0 }, data: { id: 'result', type: 'HepOutput', node: { is_output: true, template: { code: { value: 'unexecuted' } } } } }], edges: [] } }, modules: {}, children: {} }
+  const flowDigest = lfxDigest(bundle)
+  write(join(f.data, 'mcp/compositions/native/versions', flowDigest, 'bundle.json'), JSON.stringify(bundle))
+  const parent = config('native_tool', 'platform-compositions', { kind: 'workflow', workflow: 'native', engine: 'lfx', flowDigest,
+    connections: { master: 'native-master', graph: 'native-graph' }, options: { fixedDependencies: [{ compositionId: 'child', versionId: compositionVersionId(child) }] } })
+  configure(f, ['child-server', 'native-master', 'native-graph'], [entry('native', parent), entry('child', child)], [group(['native_tool'])])
+  write(join(f.candidate, 'dsh/workspace/AGENTS.md'), 'mcp__business-group__native_tool')
+  const result = await seed(f)
+  assert.deepEqual(result.seed.mcp.servers.map(item => item.id).sort(), ['child-server', 'native-graph', 'native-master'])
+  assert.deepEqual(result.seed.compositions.compositions.map(item => item.id).sort(), ['child', 'native'])
+  assert.equal(result.seed.compositions.compositions.find(item => item.id === 'native').published.flowDigest, flowDigest)
+})
 
 test('Web角色运行声明仍拒绝独立部署，不回落全局模型或提前生成投影', async t => {
   const f = fixture(t), harness = join(f.candidate, 'harness.yaml')

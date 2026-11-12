@@ -30,6 +30,7 @@ export type McpRegistry = {
   mcp: Map<string, any>
   status: Map<string, ConnectionStatus>
   stateFile?: string
+  runRoot?: string
   threat?: ThreatRuntime
   extension?: CompositionExtension
   control?: ManagedDispatch
@@ -371,7 +372,7 @@ export async function executeComposition(registry: McpRegistry, assetRoot: strin
       const frozenCatalog = structuredClone({ ...resolvedCatalog, compositions: resolvedCatalog.compositions.filter(entry => required.has(entry.id) || [entry.draft, entry.published, ...(entry.versions ?? []).map(item => item.config)].some(item => item && compositionVersionId(item) === compositionVersionId(config))) }), frozenConfig = structuredClone(config)
       const frozenRegistry = { ...registry, extension: { ...registry.extension, workflows: { ...registry.extension?.workflows } }, openapi: new Map(registry.openapi), mcp: new Map(registry.mcp) }
       const compositionId = resolvedCatalog.compositions.find(entry => [entry.draft, entry.published, ...(entry.versions ?? []).map(item => item.config)].some(item => item && compositionVersionId(item) === compositionVersionId(config)))?.id ?? config.workflow
-      const accepted = await workflowRuns(assetRoot).start({ config: frozenConfig, input: validated, catalog: frozenCatalog, version, executionId: runContext.execution_id, compositionId }, workflow,
+      const accepted = await workflowRuns(registry.runRoot ?? assetRoot).start({ config: frozenConfig, input: validated, catalog: frozenCatalog, version, executionId: runContext.execution_id, compositionId }, workflow,
         context => executeComposition(frozenRegistry, assetRoot, frozenConfig, validated, undefined, frozenCatalog, true, { ...runContext, workflowContext: context }, version),
         async preparation => {
           await dryRunComposition(registry, config, validated, resolvedCatalog)

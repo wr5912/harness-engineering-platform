@@ -88,7 +88,7 @@ interface Receipt {
   model_selection?: ModelSelection
   registration?: { status: 'checking' | 'verified' | 'unknown'; observed?: Pick<InstanceRow, 'source_id' | 'state' | 'business_gateway' | 'access_mode' | 'identity_mode' | 'access_url' | 'asset_status'> | null; checked_at?: string }
   value?: unknown
-  error?: { message: string }
+  error?: { code?: string; message: string; details?: { stage?: string; path?: string; reason?: string; next_action?: string } }
 }
 
 interface SourceOption {
@@ -119,7 +119,7 @@ interface OperationPreview {
   operation: Operation
   ok: boolean
   value?: { name: string; operation: Operation; plan?: Record<string, unknown>; source_id?: string; port?: number; retention?: Record<string, string>; model_selection?: ModelSelection; model_policy_hash?: string; observed_state?: string; observed_at?: string; access_mode?: 'authenticated' | 'anonymous'; identity_mode?: 'development' | 'published' }
-  error?: { message: string }
+  error?: Receipt['error']
 }
 
 const labels: Record<Operation, string> = {
@@ -341,7 +341,11 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
 
   async function call<T>(endpoint: string, payload: unknown): Promise<T> {
     const result = await rpc.call(CHANNEL, `instances/${endpoint}`, payload)
-    if (!result.ok) throw new Error(result.error.message)
+    if (!result.ok) {
+      const details = result.error.details as NonNullable<Receipt['error']>['details']
+      throw new Error(details?.stage === 'candidate-assets'
+        ? `${result.error.message}；失败阶段：来源资产预检；路径：${details.path}；${details.reason}；${details.next_action}` : result.error.message)
+    }
     return result.value as T
   }
 
@@ -606,7 +610,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
       const shown = results.map((result, index) => {
         const item = items[index]
         if (!result.ok || !result.value) {
-          skipped.push({ ...item, ok: false, status: 'not_dispatched', error: { message: result.error?.message || '预览失败' } })
+          skipped.push({ ...item, ok: false, status: 'not_dispatched', error: result.error || { message: '预览失败' } })
           return result
         }
         const source = result.value.plan?.source_id ?? result.value.source_id
@@ -706,7 +710,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
       const checking = all.map(item => item.status === 'success' ? { ...item, registration: { status: 'checking' as const } } : item)
       setReceipts(checking)
       setPending(null)
-      if (pending.operation === 'create') setCreating(false)
+      if (pending.operation === 'create' && all.some(item => item.status === 'success')) setCreating(false)
       setActionPhase('readback')
       const observed = await refresh()
       const checked = checkRegistrations(checking, observed)
@@ -915,7 +919,9 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
       return <div key={`${item.operation}-${item.name}-${index}`} className={status === 'success' ? 'instance-receipt-ok' : 'instance-receipt-bad'}>
         <strong>{item.name}</strong> · {labels[item.operation]} · {status === 'success' ? '成功' : status === 'failed' ? '失败' : status === 'unknown' ? '结果未知，请刷新核对' : '未派发'}
         {item.error?.message && <div>{item.error.message}</div>}
-        {status === 'failed' && item.port && <div>请核对当前端口和实例状态，重新预览后再执行。</div>}
+        {item.error?.details?.stage && <div>失败阶段：{item.error.details.stage === 'candidate-assets' ? '来源资产预检' : item.error.details.stage}；路径：<code>{item.error.details.path}</code></div>}
+        {item.error?.details?.reason && <div>{item.error.details.reason}</div>}
+        {status === 'failed' && <div>{item.error?.details?.next_action || '请查看失败说明并刷新实例状态，处理后重新预览再执行。'}</div>}
         {item.port && <div className="instance-muted">{registration?.observed?.business_gateway ? '内部 Runtime ' : ''}预览端口：{item.port}；执行回执端口：{typeof command?.port === 'number' ? command.port : '尚未确认'}</div>}
         {item.model_selection && <div className="instance-muted">提交默认模型：{modelLabel(models?.catalog, item.model_selection)}；当前实例登记与实际模型调用请分别核对。</div>}
         {item.requested_source_id && <div className="instance-muted">提交来源：<code>{item.requested_source_id}</code>；当前登记来源{registration?.checked_at ? `（核对于 ${new Date(registration.checked_at).toLocaleString('zh-CN')}）` : ''}：{registration?.status === 'checking' ? '正在核对…' : registration?.status === 'unknown' ? '未知，登记读取未完成' : registration?.status === 'verified' ? registration.observed?.source_id ? <code>{registration.observed.source_id}</code> : registration.observed ? '登记未记录来源' : '未找到此实例登记' : '等待操作完成后核对'}{registration?.status === 'verified' && registration.observed && `；登记状态：${stateLabels[registration.observed.state || 'unknown'] || '状态待核对'}`}</div>}
@@ -1242,7 +1248,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
         </section> : null}
         </div>
         <footer className="instance-dialog-actions">
-          <button type="button" disabled={actionDialogLocked} onClick={closeAction} className="instance-button">{pending?.operation === 'create' ? '返回修改' : pending?.operation === 'stop' ? '保持运行' : pending ? '取消' : '关闭'}</button>
+          <button type="button" disabled={actionDialogLocked} onClick={closeAction} className="instance-button">{actionDialog === 'create' && creating ? '返回修改' : pending?.operation === 'stop' ? '保持运行' : pending ? '取消' : '关闭'}</button>
           {previews.length && pending ? <button type="button" onClick={execute} disabled={busy} className={pending.operation === 'stop' ? 'instance-danger-button' : 'harness-primary'}>{pending.items.length === 1 && pending.operation === 'create' ? '确认创建' : pending.items.length === 1 && pending.operation === 'stop' ? '确认停止' : `确认${labels[pending.operation]} ${pending.items.length} 项`}</button> : null}
         </footer>
         </>}

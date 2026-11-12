@@ -21,6 +21,7 @@ function fixture(t) {
   for (const id of [sourceId, targetId]) {
     const candidate = `evolution/experiments/${id}/candidate`
     write(root, `${candidate}/dsh/workspace/AGENTS.md`, '只读巡检测试资产。')
+    write(root, `${candidate}/dsh/workspace/.env`, readFileSync(join(adapter, 'verification-home-controls/locked-bootstrap.env')))
     write(root, `${candidate}/dsh/managed/task.patch.yml`, '- name: cordis:include\n  config:\n    path: /opt/dsh-presets/inspection-task/agent.cordis.yml\n')
     write(root, `${candidate}/dsh/presets/inspection-task/agent.cordis.yml`, '- name: "@deepseek-ai/dsh-agent"\n')
     write(root, `evolution/experiments/${id}/change.yaml`, `experiment_id: ${id}\nagent_id: inspection-task\nbaseline_ref: "none:first-experiment"\n`)
@@ -124,9 +125,19 @@ test('整批装配先检查配置绑定，缺失依赖或越界路径不得部�
   await assert.rejects(applyTaskAssembly(root, input), /不存在的资产/)
   assert.equal(existsSync(join(root, `evolution/experiments/${targetId}/candidate/${input.files[0].path}`)), false)
   delete input.configuration_edits; input.files[0].target_path = '../escape.md'; await assert.rejects(applyTaskAssembly(root, input), /相对路径/)
-  input.files[0].target_path = 'dsh/workspace/.env'; await assert.rejects(applyTaskAssembly(root, input), /不能作为装配资产/)
+  input.files[0].target_path = 'dsh/workspace/.env'; await assert.rejects(applyTaskAssembly(root, input), /注释型占位模板/)
   input.files[0].target_path = 'dsh/workspace/link/report.md'; symlinkSync(tmpdir(), join(root, `evolution/experiments/${targetId}/candidate/dsh/workspace/link`))
   await assert.rejects(applyTaskAssembly(root, input), /符号链接/)
+})
+
+test('原生 !!js 配置可作为资产装配并检查引用，不执行表达式', async t => {
+  const root = fixture(t), input = assemblyInput(root)
+  const path = 'dsh/managed/task.patch.yml', target = join(root, `evolution/experiments/${targetId}/candidate/${path}`)
+  const content = '- id: business\n  config:\n    watch: !!js (() => { throw new Error("must-not-execute") })()\n    path: /opt/dsh-presets/inspection-task/agent.cordis.yml\n'
+  input.configuration_edits = [{ path, content, expected_target_sha256: sha256(readFileSync(target)) }]
+  assert.equal((await previewTaskAssembly(root, input)).bindings.status, 'declared')
+  await applyTaskAssembly(root, input)
+  assert.equal(readFileSync(target, 'utf8'), content)
 })
 
 test('装配错误携带实际阶段、路径和摘要，配置解析失败不泄露正文', async t => {

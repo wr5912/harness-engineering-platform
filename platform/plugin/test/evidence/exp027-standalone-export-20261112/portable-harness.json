@@ -1,0 +1,152 @@
+{
+  "preview": {
+    "experiment_id": "EXP-security-operations-expert-027-m-reab20c48f610",
+    "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+    "candidate_sha256": "887c231b351042e2d6107f9bae0474649d35fb4942cd54e80f1d952e2a4e66a1",
+    "files": [
+      {
+        "path": "dsh/workspace/AGENTS.md",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "dsh/workspace/AGENTS.md",
+        "sha256": "1765fa0ef42fdc101238c23141427e3a413acd0d44e9e066047242d036ae45c7",
+        "operation": "replace"
+      },
+      {
+        "path": "harness.yaml",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "harness.yaml",
+        "sha256": "1894623f53755027634a7ffc408c9bc639ee07a56689c2ec38e05d9174bcec7e",
+        "operation": "replace"
+      },
+      {
+        "path": "dsh/managed/security-operations-ui/package.json",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "dsh/managed/security-operations-ui/package.json",
+        "sha256": "4c0145985fee7a48d9ab1944f60bc764153386298307efc52d2fc665a0c2bdf7",
+        "operation": "replace"
+      },
+      {
+        "path": "dsh/managed/security-operations-ui/client.tsx",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "dsh/managed/security-operations-ui/client.tsx",
+        "sha256": "0af36e257daa322764861591f5d51a1dd1468cf11e110b2507ed8c93d940bdf7",
+        "operation": "replace"
+      },
+      {
+        "path": "dsh/managed/security-operations-ui/client.js",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "dsh/managed/security-operations-ui/client.js",
+        "sha256": "b705e250c19ce49213f9d567593b15b670a29b8173e00fdb6bde9c4498f10e5b",
+        "operation": "replace"
+      },
+      {
+        "path": "dsh/managed/security-operations-ui/test-ui.mjs",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "dsh/managed/security-operations-ui/test-ui.mjs",
+        "sha256": "ada00ee1c80a44df57426773746a7c8be9924c03c7c97766add72e97fec29035",
+        "operation": "replace"
+      }
+    ],
+    "bindings": {
+      "status": "declared",
+      "referenced_assets": [
+        "dsh/workspace/.agents/skills",
+        "dsh/presets/security-operations-expert/agent.cordis.yml",
+        "dsh/presets/security-operations-fault-analysis/agent.cordis.yml",
+        "dsh/presets/security-operations-response-planning/agent.cordis.yml",
+        "dsh/presets/security-operations-threat-analysis/agent.cordis.yml",
+        "dsh/managed/security-operations-ui/index.js",
+        "dsh/managed/security-report-download/index.mjs",
+        "dsh/managed/inspection-report-card/index.mjs",
+        "dsh/managed/dsh-voice-hub/lib/index.js",
+        "dsh/managed/threat-analysis.mjs",
+        "dsh/managed/threat-report-download.mjs",
+        "dsh/managed/dsh-ui-html/lib/index.js",
+        "dsh/managed/security-operations-guard.mjs",
+        "dsh/managed/asset-onboarding-runtime.mjs",
+        "dsh/managed/inspection-preparation-runtime.mjs",
+        "dsh/managed/diagnosis-runtime.mjs",
+        "dsh/managed/security-report-runtime.mjs"
+      ],
+      "runtime_verified": false
+    },
+    "note": "选定资产和配置引用已核对；实际 Plugin 依赖、MCP 可达性和装载仍须通过新 Session 验证。"
+  },
+  "applied": {
+    "experiment_id": "EXP-security-operations-expert-027-m-reab20c48f610",
+    "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+    "candidate_sha256": "12017d4587d12005c289d777dae060289070d8bfec8544dd4e397e7ad106814f",
+    "files": [
+      {
+        "path": "dsh/workspace/AGENTS.md",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "dsh/workspace/AGENTS.md",
+        "sha256": "1765fa0ef42fdc101238c23141427e3a413acd0d44e9e066047242d036ae45c7"
+      },
+      {
+        "path": "harness.yaml",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "harness.yaml",
+        "sha256": "1894623f53755027634a7ffc408c9bc639ee07a56689c2ec38e05d9174bcec7e"
+      },
+      {
+        "path": "dsh/managed/security-operations-ui/package.json",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "dsh/managed/security-operations-ui/package.json",
+        "sha256": "4c0145985fee7a48d9ab1944f60bc764153386298307efc52d2fc665a0c2bdf7"
+      },
+      {
+        "path": "dsh/managed/security-operations-ui/client.tsx",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "dsh/managed/security-operations-ui/client.tsx",
+        "sha256": "0af36e257daa322764861591f5d51a1dd1468cf11e110b2507ed8c93d940bdf7"
+      },
+      {
+        "path": "dsh/managed/security-operations-ui/client.js",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "dsh/managed/security-operations-ui/client.js",
+        "sha256": "b705e250c19ce49213f9d567593b15b670a29b8173e00fdb6bde9c4498f10e5b"
+      },
+      {
+        "path": "dsh/managed/security-operations-ui/test-ui.mjs",
+        "source": "experiment:EXP-security-operations-expert-027-m-reab20c48f610",
+        "source_path": "dsh/managed/security-operations-ui/test-ui.mjs",
+        "sha256": "ada00ee1c80a44df57426773746a7c8be9924c03c7c97766add72e97fec29035"
+      }
+    ],
+    "bindings": {
+      "status": "declared",
+      "referenced_assets": [
+        "dsh/workspace/.agents/skills",
+        "dsh/presets/security-operations-expert/agent.cordis.yml",
+        "dsh/presets/security-operations-fault-analysis/agent.cordis.yml",
+        "dsh/presets/security-operations-response-planning/agent.cordis.yml",
+        "dsh/presets/security-operations-threat-analysis/agent.cordis.yml",
+        "dsh/managed/security-operations-ui/index.js",
+        "dsh/managed/security-report-download/index.mjs",
+        "dsh/managed/inspection-report-card/index.mjs",
+        "dsh/managed/dsh-voice-hub/lib/index.js",
+        "dsh/managed/threat-analysis.mjs",
+        "dsh/managed/threat-report-download.mjs",
+        "dsh/managed/dsh-ui-html/lib/index.js",
+        "dsh/managed/security-operations-guard.mjs",
+        "dsh/managed/asset-onboarding-runtime.mjs",
+        "dsh/managed/inspection-preparation-runtime.mjs",
+        "dsh/managed/diagnosis-runtime.mjs",
+        "dsh/managed/security-report-runtime.mjs"
+      ],
+      "runtime_verified": false,
+      "preset": "security-operations-expert/agent.cordis.yml",
+      "patch": "security-operations-expert.patch.yml",
+      "required_env_names": []
+    },
+    "next_step": "在目标 Preset/Plugin 配置中绑定所选资产；工具通过 MCP 配置管理接入，再用新 Session 和业务评测核验。"
+  },
+  "readback": "12017d4587d12005c289d777dae060289070d8bfec8544dd4e397e7ad106814f",
+  "live_platform_preview": {
+    "passed": false,
+    "stage": "configuration-references",
+    "cause": "running bundle lacks native YAML tag support"
+  },
+  "real_inspection_executed": false
+}

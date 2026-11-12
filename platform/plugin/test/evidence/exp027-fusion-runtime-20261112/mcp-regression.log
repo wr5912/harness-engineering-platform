@@ -1,0 +1,50 @@
+✔ 真实原生OpenAPI执行只收紧A写入，A资源查询与B写入继续，目标账本可核对 (1151.123002ms)
+✔ 同一specUrl和operationId改变真实目标或方法时，未授权请求没有到达目标 (144.179272ms)
+✔ 服务条件默认拒绝保留MCP目录发现与会话可用，只有真实工具执行被阻止 (100.082364ms)
+✔ 独立handler调用也走相同控制，外部关联session_id不能赋予业务主体 (102.110724ms)
+✔ 规格或检测异步等待期间停用连接，最终派发重新读取当前配置且上游零请求 (124.489541ms)
+✔ 已发布组合保留真实业务上下文，在真实叶子授权；撤销A查询不影响B且拒绝请求零到达 (626.981947ms)
+(node:2842987) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/cmp/work/harness-engineering-platform/plugins/mcp-manager/resource-address.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/cmp/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 受控业务仅投影 Candidate 重叠连接，平台保存收缩新目录并拒绝旧分组目标 (1016.614265ms)
+✔ 平台保存后的新业务 Session 装载当前连接，旧 Session 在目标变化和停用时拒绝调用 (226.533813ms)
+✔ 显式组引用仅投影所选成员，缺组/成员/取消/未知Session不分发且不新增主子客户端 (264.544808ms)
+✔ 草稿固定在指定实例及来源，普通发现不受影响，并发上下文互不串用 (55.714643ms)
+(node:2843010) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/cmp/work/harness-engineering-platform/plugins/mcp-manager/resource-address.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/cmp/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ v2 调用按来源路由，健康工具与资源工具不等待无关挂起成员 (2329.253172ms)
+✔ 分组 HTTP 路由在实例上下文内生成快照，草稿发现和调用同源且不泄露给其他实例 (333.730177ms)
+✔ v2 分组名称与显示名解耦，资源代理隔离同 URI 来源并拒绝失效选择 (518.95413ms)
+✔ v2 分组保留可达来源，标出不可达来源；平台可关闭管理 Agent 自动装载 (112.822707ms)
+✔ v2 拒绝跨来源、上游重复和旧名冲突，离线来源不让出名称且不影响其他工具 (408.974822ms)
+✔ 业务 Session 跳过连接、鉴权和规范发现失败的 MCP 来源，仍校验本地配置 (561.914624ms)
+✔ 原始 OpenAPI 发现尊重调用方取消信号，包括登录授权过程 (260.881332ms)
+✔ 原生 MCP 桥沿用 DSH 的非致命启动与无工具注册状态 (130.742132ms)
+✔ 原生 MCP 的同名工具与资源不合并，冲突项不发布也不能通过旧名调用 (246.654733ms)
+✔ OpenAPI 地址模板与实际请求共用服务器基址及路径解析，重新发现跟随基址变化 (24.840781ms)
+✔ 服务基址迁移后分组工具、资源和模板实际访问新地址，不依赖旧服务在线 (103.161986ms)
+✔ OpenAPI 同一操作只发布一个工具，保留资源读取与已选包装工具调用 (170.668776ms)
+✔ v2 分组可列出并读取包含多个普通变量的来源资源模板 (97.388675ms)
+✔ 旧分组可继续读取同一服务重复成员，v2 拒绝歧义来源 (69.702774ms)
+✔ 分组允许只有 Resource 能力的服务，工具发现不要求上游 tools 能力 (129.206671ms)
+✔ v2 工具代理将 SDK 取消传到实际来源 (129.352096ms)
+✔ 资源工具复用真实读取、参数约束和同进程分派，正文可供 DSH 模型读取 (286.216236ms)
+✔ OpenAPI 资源工具保留参数类型、必填查询参数与说明，并隔离未选操作 (96.49486ms)
+✔ 三类发现遍历全部分页，模板不支持与坏来源不阻塞其他资源工具，二进制保留原文 (356.935246ms)
+✔ 分组调试通过实际已发布 v2 端点发现、调用、读 URI 与模板，拒绝混淆目标 (448.271575ms)
+✔ MCP 从当前 Runtime 原生客户端闭包加载作用域，保留父作用域隔离和释放 (546.324043ms)
+✔ 真实 Cordis 插件依赖允许冻结业务扩展读取原生模型与设置服务 (46.36927ms)
+✔ 纯资源分组通过实际 SDK 挂载原生资源和模板，读取保持公开分组 URI (374.611354ms)
+✔ 失效来源仍在等待时，健康 MCP 工具已在原生 Agent 作用域可用 (65.581848ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7362.538561

@@ -14,7 +14,7 @@ async function sourceManager(t) {
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   symlinkSync(join(process.cwd(), 'node_modules'), join(directory, 'node_modules'), 'dir')
   const source = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8')
-  const start = source.indexOf('export const managerSource ='), end = source.indexOf('\nconst { name } =', start)
+  const start = source.indexOf('export const managerSource ='), end = source.indexOf('\nasync function main()', start)
   assert.ok(start >= 0 && end > start)
   const adapter = join(directory, 'adapter.mjs')
   writeFileSync(adapter, "import { readFile } from 'node:fs/promises'; import { resolve } from 'node:path';\n" + source.slice(start, end)
