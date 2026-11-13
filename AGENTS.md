@@ -103,15 +103,15 @@
 
 ## 程序与数据工作区
 
-本仓库保存平台程序、Runtime 适配器、通用 MCP 管理源码、研究工具、平台开发技能和平台验收资料。管理助手的业务原则、表达规范与 Skill，以及业务 `agents/`、`evolution/`、实际 `config/`、业务 `extensions/` 和运行状态位于独立数据工作区。两仓各自使用根级 `AGENTS.md` 和 `.agents/skills/`，分别按研发职责和业务职责维护。详细路径、历史恢复、原生 HOME 和备份边界只在[独立数据工作区合同](docs/platform-design/02_系统架构与部署设计.md#独立数据工作区)维护。下文业务资产的相对路径均相对数据根，程序脚本与开发规范相对程序根。
+本仓库保存平台程序、Runtime 适配器、MCP 框架与功能代码、研究工具、平台开发技能和验收资料。`platform-manager-dsh-home` 以原生 DSH HOME 文件维护管理助手的原则、技能、研究方法和 Profile；`business-agents` 以文件维护业务 Harness 及其原生 MCP 声明；数据仓库保存研究登记、Experiment、Run、用户配置的 MCP 服务与组合编排及运行数据。两类 Harness 均不写入数据库。详细路径、历史恢复、原生 HOME 和备份边界只在[独立数据工作区合同](docs/platform-design/02_系统架构与部署设计.md#独立数据工作区)维护。下文研究资产的相对路径均相对数据根，程序脚本与开发规范相对程序根。
 
-**业务文档归属是硬性限制**：特定业务智能体的说明性文档及其导出件只能保存在数据根的 `agents/<agent-id>/docs/`；数据根级 `docs/` 只保存共用管理与研究方法，不作业务文档或临时文件的落点。数据侧管理助手遵循其 `AGENTS.md` 的同名规则；平台写入入口、导入导出与核验工具共用[业务文档归属与校验合同](docs/platform-design/03_存储架构与数据契约.md#业务文档归属与校验)。既有 `evaluation.md`、Candidate、Run 等专用事实源保持各自合同，不搬迁或重复维护。
+**业务文档归属是硬性限制**：特定业务智能体的说明性文档及其导出件只能保存在数据根的 `agents/<agent-id>/docs/`；共用管理与研究方法由管理助手 HOME 的 `docs/` 维护。管理助手遵循其 `AGENTS.md` 的同名规则；平台写入入口、导入导出与核验工具共用[业务文档归属与校验合同](docs/platform-design/03_存储架构与数据契约.md#业务文档归属与校验)。既有 `evaluation.md`、Candidate、Run 等专用事实源保持各自合同，不搬迁或重复维护。
 
-平台管理助手保持管理身份，通过受信任工作区上下文和平台工具定位资产。它的业务 Harness 由数据仓库维护；程序负责加载、接口合同和执行约束。不把程序仓库的开发协作规则或业务 Agent 的角色指令作为管理身份。当前工作目录不能替代程序根、数据根和工作区 ID；Session 的迁移归属不改写历史事件。
+平台管理助手保持管理身份，通过受信任工作区上下文和平台工具定位资产。它的业务 Harness 由 `platform-manager-dsh-home` 维护；程序负责加载、接口合同和执行约束。不把程序仓库的开发协作规则或业务 Agent 的角色指令作为管理身份。当前工作目录不能替代程序根、数据根、管理助手 HOME 和工作区 ID；Session 的迁移归属不改写历史事件。
 
 ## 研究演进
 
-业务研究方法与管理助手的操作约束由数据工作区的 `AGENTS.md`、`.agents/skills/` 和[研究方法入口](https://github.com/wr5912/harness-engineering-platform-data/blob/main/docs/harness-research/README.md)维护。本仓库开发研究工具时保持 Agent、Experiment、Candidate、Run 与 Decision 的既有身份和文件合同，不能为接口迁移改写业务评判口径或历史结果。
+业务研究方法与管理助手的操作约束由管理助手 HOME 的 `AGENTS.md`、`.agents/skills/` 和[研究方法入口](https://github.com/wr5912/platform-manager-dsh-home/blob/main/docs/harness-research/README.md)维护。本仓库开发研究工具时保持 Agent、Experiment、Candidate、Run 与 Decision 的既有身份和文件合同，不能为接口迁移改写业务评判口径或历史结果。
 
 业务 Harness 的语义性变化按数据侧研究流程执行；平台页面、启动器与通用工具按本仓库验收路径验证。维护工具时区分来源解析、静态校验、实际装载和任务效果，不把机器合同通过写成业务采纳。研究脚本集中在 `runtime/research/`，由程序版本管理，不与业务 Skill 形成两份实现。
 
@@ -139,9 +139,9 @@ Memory 位于仓库外的 `$CODEX_HOME/memories`，不得复制进仓库、Resea
 
 ## 文档与数据质量
 
-- **失效文档及时清除**：AI 开发工具与平台管理助手均须始终遵守数据工作区的[失效文档及时清除硬性原则](https://github.com/wr5912/harness-engineering-platform-data/blob/main/AGENTS.md#失效文档及时清除硬性原则)，在文档维护与任务收尾时清除已完成用途或被替代的文档及其导出件，同步有效内容与直接引用，无需归档。该原则也适用于本程序仓库的说明性文档。
-- **Skill 自包含**：研发与业务 Skill 均严格遵循数据仓库 [Skill 资产自包含](https://github.com/wr5912/harness-engineering-platform-data/blob/main/AGENTS.md#skill-资产自包含硬性原则)；审查整个包及公开依赖，不在 DSH 原生对话增加检查。
-- **数据仓库层级索引**：AI 开发工具必须遵守数据仓库的[层级索引与按需阅读](https://github.com/wr5912/harness-engineering-platform-data/blob/main/AGENTS.md#层级索引与按需阅读)，包括其中的组合编排资产自包含规则。该原则适用于整个数据仓库，包括 MCP；维护其资产、文档、生成器和模板时，按对象归属组织整个资产包，入口只保留简短用途与重要索引，不复制详情或代码事实，变更同步所属上级入口与直接引用。完整规则只在数据仓库维护。
+- **失效文档及时清除**：AI 开发工具与平台管理助手均须始终遵守管理助手的[失效文档及时清除硬性原则](https://github.com/wr5912/platform-manager-dsh-home/blob/main/AGENTS.md#失效文档及时清除硬性原则)，在文档维护与任务收尾时清除已完成用途或被替代的文档及其导出件，同步有效内容与直接引用，无需归档。该原则也适用于本程序仓库的说明性文档。
+- **Skill 自包含**：研发与业务 Skill 均严格遵循管理助手的 [Skill 资产自包含](https://github.com/wr5912/platform-manager-dsh-home/blob/main/AGENTS.md#skill-资产自包含硬性原则)；审查整个包及公开依赖，不在 DSH 原生对话增加检查。
+- **数据仓库层级索引**：AI 开发工具必须遵守管理助手维护的[层级索引与按需阅读](https://github.com/wr5912/platform-manager-dsh-home/blob/main/AGENTS.md#层级索引与按需阅读)，包括其中的组合编排资产自包含规则。该原则适用于整个数据仓库，包括 MCP；维护其资产、文档、生成器和模板时，按对象归属组织整个资产包，入口只保留简短用途与重要索引，不复制详情或代码事实，变更同步所属上级入口与直接引用。完整规则只在管理助手 HOME 维护。
 - README 先说明用途、当前能力和使用入口，再介绍目录与约束；不把计划写成现有能力。
 - 使用完整、直接的中文句子。用词以[项目术语表](docs/项目术语表.md)为准，首次出现时解释；代码、命令、协议字段和稳定 ID 保持准确。长期文档直接说明当前用途、规则、边界和证据；反思归纳进入[AI 纠错经验总结](docs/AI纠错经验总结.md)，不在设计、使用说明和技能中堆积整改叙述或旧问题辩解。
 - 表格用于比较和索引，长解释使用段落；不为短文档机械套模板。
@@ -164,7 +164,7 @@ Memory 位于仓库外的 `$CODEX_HOME/memories`，不得复制进仓库、Resea
 2. 按本次任务检索[AI 纠错经验总结](docs/AI纠错经验总结.md)的相关条目，涉及歧义时查[项目术语表](docs/项目术语表.md)；不要求每次通读全部历史记录。
 3. 阅读 `docs/standards/SOURCES.md` 与 `docs/standards/PROJECT-INTERPRETATION.md`，确认来源对平台开发及 Harness 研究的适用范围。
 4. 阅读项目验收矩阵，确定涉及的 `PA-xx`、已有证据和缺口。
-5. 按[分支与开发工作流](#分支与开发工作流)判断任务对象并选择技能；平台及通用工具开发使用本仓库 `dsh-platform-development`。编写项目说明使用 [writing-project-docs](.agents/skills/writing-project-docs/SKILL.md)，审查项目文档使用 [reviewing-project-docs](.agents/skills/reviewing-project-docs/SKILL.md)；业务用例和 Skill 审查使用各自技能。新建、迁移、修改或优化业务 Harness 时，读取已选数据工作区的 `AGENTS.md` 和 `.agents/skills/workspace-management/SKILL.md`，按数据侧原则开展任务。
+5. 按[分支与开发工作流](#分支与开发工作流)判断任务对象并选择技能；平台及通用工具开发使用本仓库 `dsh-platform-development`。编写项目说明使用 [writing-project-docs](.agents/skills/writing-project-docs/SKILL.md)，审查项目文档使用 [reviewing-project-docs](.agents/skills/reviewing-project-docs/SKILL.md)；业务用例和 Skill 审查使用各自技能。新建、迁移、修改或优化业务 Harness 时，读取所用管理助手 HOME 的 `AGENTS.md` 和 `.agents/skills/workspace-management/SKILL.md`，按其原则定位目标数据工作区和业务 Harness 仓库。
 6. 检查 Git 工作树和现有资产；不得覆盖、回退或混入他人的改动。涉及运行或环境操作时，先核对工作树、目标主机、实例、进程／端口及实际来源，按本次目标区分本地、部署测试与其他环境。
 
 ## 分支与开发工作流
