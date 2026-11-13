@@ -1,4 +1,20 @@
 #!/bin/sh
 set -eu
-. "$(dirname -- "$0")/tool-env.sh"
-exec node "$HEP_ROOT/platform/lab/cli.mts" "$@"
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+
+if [ "${1-}" = bootstrap ]; then
+  shift
+  exec "$SCRIPT_DIR/hep-lab-bootstrap.sh" "$@"
+fi
+
+if [ -f "$SCRIPT_DIR/tool-env.sh" ] && [ -f "$SCRIPT_DIR/lab/cli.mts" ]; then
+  . "$SCRIPT_DIR/tool-env.sh"
+  exec node "$HEP_ROOT/platform/lab/cli.mts" "$@"
+fi
+
+if [ -x "$SCRIPT_DIR/hep-lab-bootstrap.sh" ]; then
+  exec "$SCRIPT_DIR/hep-lab-bootstrap.sh" "$@"
+fi
+
+echo "hep-lab: 未找到源码 CLI 或 hep-lab-bootstrap.sh；请下载完整 platform 目录" >&2
+exit 2

@@ -36,16 +36,17 @@ hep-lab update    只生成远端更新计划，不直接修改仓库
 
 ## 独立安装与一键初始化
 
-源码入口 `platform/hep-lab` 依赖同仓库的 `tool-env.sh`、`platform/lab` 和插件依赖，不能作为单个 raw 文件直接执行。正式的一键流程应提供固定版本的 bootstrap 安装器：
+`platform/hep-lab` 在源码工作区内直接执行核心 CLI；`platform/hep-lab bootstrap` 或 `platform/hep-lab-bootstrap.sh` 是独立 Bootstrap 入口。Bootstrap 自身只依赖 Node.js 24、Git 和 pnpm（已有缓存时不重复安装依赖），不要求先进入平台源码目录。
 
-1. 下载或安装固定版本的 `hep-lab` CLI；
-2. 校验发布包的 SHA-256 或签名；
-3. 检查 Node.js 24、pnpm、Git 和认证；
-4. 从数据仓库锁定文件解析四个仓库的来源和提交；
-5. 调用 `hep-lab init --destination "$HOME/hep-lab"`；
-6. 输出清单路径、四个仓库 SHA 和下一步的 `status`/`doctor` 命令。
+Bootstrap 流程固定程序仓库和数据仓库提交，下载并校验程序 CLI，从数据仓库 `locks/repositories.yaml` 解析四个仓库的 URL 与完整 SHA，然后调用核心 `init`：
 
-bootstrap 不应直接执行可变的 `main` 分支脚本，也不应把凭据放在命令行参数或日志中。README 同时保留源码仓库内运行方式和独立安装方式，并明确两者的依赖与版本边界。
+1. 检查 Node.js 24、Git、pnpm/corepack 和目标路径；
+2. 按完整 SHA 缓存程序仓库与数据仓库；
+3. 读取数据锁定文件中的平台、DSH Home、业务智能体仓库来源；
+4. 调用 `hep-lab init` 检出四个仓库并写入 `hep-lab.yaml`；
+5. 输出 `doctor` 和平台启动命令；指定 `--start` 时先执行 `prepare` 再启动平台。
+
+Bootstrap 不执行可变 `main` 分支脚本，也不把凭据放在命令行参数或日志中。受控升级可通过环境变量替换固定程序/数据 SHA，并由数据仓库锁定文件继续校验四仓库来源。
 
 ## 验收要求
 

@@ -12,11 +12,11 @@ const REVISION = process.env.HEP_LAB_REVISION ?? (() => {
 })()
 
 const usage = `用法：
+  platform/hep-lab bootstrap --destination <目录> [--reuse] [--start]
+    独立下载固定版本 CLI，按数据仓库锁定文件检出四个仓库。
   platform/hep-lab init --destination <目录> --data-repository <URL> --data-commit <SHA>
-    --platform-repository <URL> --platform-commit <SHA>
-    --platform-manager-dsh-home-repository <URL> --platform-manager-dsh-home-commit <SHA>
-    --business-agents-repository <URL> --business-agents-commit <SHA>
-    各仓库支持同名前缀的 --<仓库>-ref；business-agents 是保存全部业务智能体的单个仓库。
+    其余三仓库默认从数据仓库 locks/repositories.yaml 推导；也可显式传入同名前缀的 URL/ref/commit。
+    business-agents 是保存全部业务智能体的单个仓库。
     --check-only          只验证输入与已有目录，不 clone/fetch/写入
     --reuse               复用 origin、版本均一致且干净的仓库
     --allow-floating-ref  开发环境显式允许解析分支，清单仍记录实际 SHA
@@ -58,11 +58,15 @@ try {
     let result: any
     if (command === 'init') {
       if (typeof values.destination !== 'string') throw new Error('init 需要 --destination')
-      const repositories = Object.fromEntries((Object.keys(repositoryNames) as RepositoryKey[]).map(key => {
+      const repositories = Object.fromEntries((Object.keys(repositoryNames) as RepositoryKey[]).flatMap(key => {
         const prefix = prefixes[key], url = values[`${prefix}-repository`], ref = values[`${prefix}-ref`], commit = values[`${prefix}-commit`]
-        if (typeof url !== 'string') throw new Error(`需要 --${prefix}-repository`)
-        return [key, { url, ...(ref ? { ref: String(ref) } : {}), ...(commit ? { commit: String(commit) } : {}) } as RepositoryInput]
-      })) as Record<RepositoryKey, RepositoryInput>
+        if (typeof url !== 'string') {
+          if (ref !== undefined || commit !== undefined) throw new Error(`--${prefix}-ref/commit 需要同时提供 --${prefix}-repository`)
+          return []
+        }
+        return [[key, { url, ...(ref ? { ref: String(ref) } : {}), ...(commit ? { commit: String(commit) } : {}) } as RepositoryInput]]
+      })) as Partial<Record<RepositoryKey, RepositoryInput>>
+      if (!repositories.data) throw new Error('init 需要 --data-repository；其余仓库可从数据仓库锁定文件推导')
       result = initializeLab({ destination: values.destination, repositories, checkOnly: values['check-only'] === true, reuse: values.reuse === true,
         allowFloatingRef: values['allow-floating-ref'] === true })
       if (result.validation && !result.validation.valid) process.exitCode = 1

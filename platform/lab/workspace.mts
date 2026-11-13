@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { tmpdir } from 'node:os'
 
 const require = createRequire(new URL('../plugin/package.json', import.meta.url))
 const yaml = () => require('js-yaml') as { load(text: string, options?: object): any; dump(value: unknown, options?: object): string; DEFAULT_SCHEMA: { extend(types: unknown[]): unknown }; Type: new (name: string, options: object) => unknown }
@@ -19,7 +20,7 @@ export interface LabManifest {
 }
 export interface InitOptions {
   destination: string
-  repositories: Record<RepositoryKey, RepositoryInput>
+  repositories: Partial<Record<RepositoryKey, RepositoryInput>>
   allowFloatingRef?: boolean
   checkOnly?: boolean
   reuse?: boolean
@@ -119,6 +120,37 @@ function resolveRemote(input: RepositoryInput): string {
   if (!found || !commitPattern.test(found)) fail('仓库 ref 不存在或仓库尚无提交')
   if (input.commit && found !== input.commit) fail('仓库 ref 与指定 commit 不一致')
   return found
+}
+function remoteRepositoryLocks(input: RepositoryInput): Partial<Record<RepositoryKey, Partial<RepositoryInput>>> {
+  const temporary = mkdtempSync(join(tmpdir(), 'hep-lab-lock-'))
+  try {
+    const commit = resolveRemote(input)
+    git(undefined, ['clone', '--no-checkout', '--', input.url, temporary])
+    try { git(temporary, ['cat-file', '-e', `${commit}^{commit}`]) }
+    catch { git(temporary, ['fetch', '--no-tags', 'origin', commit]) }
+    git(temporary, ['checkout', '--detach', commit])
+    return repositoryLocks(temporary)
+  } finally { rmSync(temporary, { recursive: true, force: true }) }
+}
+function completeInputs(root: string, provided: Partial<Record<RepositoryKey, RepositoryInput>>, allowFloatingRef: boolean, checkOnly: boolean) {
+  const dataInput = provided.data
+  if (!dataInput) fail('至少需要 --data-repository；其余仓库可从数据仓库 locks/repositories.yaml 推导')
+  const normalized: Partial<Record<RepositoryKey, RepositoryInput>> = {}
+  for (const key of keys) if (provided[key]) normalized[key] = inputOf(provided[key]!)
+  let locks = existsSync(join(root, repositoryNames.data, '.git')) ? repositoryLocks(join(root, repositoryNames.data)) : {}
+  const missing = keys.some(key => !normalized[key])
+  if (missing && !Object.keys(locks).length) {
+    if (checkOnly) fail('check-only 缺少本地数据仓库锁定文件，不能 clone/fetch；请补齐四仓库参数或先准备数据仓库')
+    locks = remoteRepositoryLocks(normalized.data!)
+  }
+  for (const key of keys) {
+    const current = normalized[key]
+    const lock = locks[key]
+    if (!current && !lock) fail(`${key} 未提供且数据仓库锁定文件中没有对应来源`)
+    normalized[key] = withLock(current ?? inputOf(lock!), lock)
+  }
+  if (!allowFloatingRef) for (const key of keys) if (!normalized[key]!.commit) fail(`${key} 缺少 commit 锁定；开发环境可显式使用 --allow-floating-ref`)
+  return normalized as Record<RepositoryKey, RepositoryInput>
 }
 function manifestPath(lab: string) { return join(resolve(lab), 'hep-lab.yaml') }
 function legacyMetadataPath(lab: string) { return join(resolve(lab), '.hep-lab') }
@@ -255,9 +287,11 @@ export function doctorLab(lab: string) { return inspectLab(readLab(lab)) }
 export function initializeLab(options: InitOptions) {
   const root = resolve(options.destination)
   safeDirectory(root)
-  const inputs = Object.fromEntries(keys.map(key => [key, inputOf(options.repositories[key])])) as Record<RepositoryKey, RepositoryInput>
   if (existsSync(legacyMetadataPath(root))) fail('目标目录包含已移除的 .hep-lab 元数据目录，请清理后重新初始化')
   const existingManifest = existsSync(manifestPath(root)) ? readLab(root) : undefined
+  const allowed = new Set([...Object.values(repositoryNames), 'hep-lab.yaml'])
+  if (existsSync(root) && readdirSync(root).some(name => !allowed.has(name))) fail('目标目录含非 hep-lab 内容，请使用空目录')
+  const inputs = completeInputs(root, options.repositories, Boolean(options.allowFloatingRef), Boolean(options.checkOnly))
   let locks = existsSync(join(root, repositoryNames.data, '.git')) ? repositoryLocks(join(root, repositoryNames.data)) : {}
   const states = {} as Record<RepositoryKey, RepositoryState>
   // 在任何写入前检查全部已存在工作树，避免后续失败覆盖用户改动。
@@ -266,8 +300,6 @@ export function initializeLab(options: InitOptions) {
     const state = inspectRepository(join(root, repositoryNames[key]), inputs[key], Boolean(options.reuse))
     if (state) states[key] = state
   }
-  const allowed = new Set([...Object.values(repositoryNames), 'hep-lab.yaml'])
-  if (existsSync(root) && readdirSync(root).some(name => !allowed.has(name))) fail('目标目录含非 hep-lab 内容，请使用空目录')
   for (const key of keys) {
     if (!inputs[key].commit && !options.allowFloatingRef) fail(`${key} 缺少 commit 锁定；开发环境可显式使用 --allow-floating-ref`)
     const commit = resolveRemote(inputs[key])

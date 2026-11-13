@@ -48,6 +48,54 @@ test('四仓固定SHA并列检出、重复执行幂等，check-only完全不落�
   assert.equal(statusLab(f.destination).repositories.business_agents.matches_lock, true)
   assert.equal(planUpdate(f.destination).repositories.every(item => !item.changed), true)
 })
+test('只提供数据仓库时从 locks/repositories.yaml 推导其余三库', t => {
+  const f = fixture(t), data = f.repositories.data.url
+  mkdirSync(join(data, 'locks'), { recursive: true })
+  writeFileSync(join(data, 'locks/repositories.yaml'), `repositories:
+  platform:
+    url: ${f.repositories.platform.url}
+    commit: ${f.repositories.platform.commit}
+  platform_manager_dsh_home:
+    url: ${f.repositories.platform_manager_dsh_home.url}
+    commit: ${f.repositories.platform_manager_dsh_home.commit}
+  business_agents:
+    url: ${f.repositories.business_agents.url}
+    commit: ${f.repositories.business_agents.commit}
+`)
+  git(data, 'add', '.'); git(data, 'commit', '-qm', 'repository locks')
+  const repositories = { data: { url: data, commit: git(data, 'rev-parse', 'HEAD') } }
+  const result = initializeLab({ ...f, repositories })
+  assert.equal(result.validation.valid, true, JSON.stringify(result.validation))
+  for (const key of ['platform', 'platform_manager_dsh_home', 'business_agents']) assert.equal(result.manifest.repositories[key].commit, f.repositories[key].commit)
+  assert.equal(result.manifest.repositories.data.commit, repositories.data.commit)
+})
+test('check-only 不为推导锁定临时下载数据仓库', t => {
+  const f = fixture(t), repositories = { data: f.repositories.data }
+  assert.throws(() => initializeLab({ ...f, repositories, checkOnly: true }), /check-only.*不能 clone\/fetch/)
+  assert.equal(existsSync(f.destination), false)
+})
+test('CLI 只传数据仓库参数即可初始化四库工作区', t => {
+  const f = fixture(t), data = f.repositories.data.url
+  mkdirSync(join(data, 'locks'), { recursive: true })
+  writeFileSync(join(data, 'locks/repositories.yaml'), `repositories:
+  platform:
+    url: ${f.repositories.platform.url}
+    commit: ${f.repositories.platform.commit}
+  platform_manager_dsh_home:
+    url: ${f.repositories.platform_manager_dsh_home.url}
+    commit: ${f.repositories.platform_manager_dsh_home.commit}
+  business_agents:
+    url: ${f.repositories.business_agents.url}
+    commit: ${f.repositories.business_agents.commit}
+`)
+  git(data, 'add', '.'); git(data, 'commit', '-qm', 'repository locks')
+  const cli = new URL('../cli.mts', import.meta.url).pathname
+  const result = spawnSync(process.execPath, [cli, 'init', '--destination', f.destination, '--data-repository', data, '--data-commit', git(data, 'rev-parse', 'HEAD'), '--json'], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr || result.stdout)
+  const output = JSON.parse(result.stdout)
+  assert.equal(output.status, 'succeeded')
+  assert.equal(output.manifest.repositories.business_agents.commit, f.repositories.business_agents.commit)
+})
 test('dirty工作树、非空目录、origin和版本冲突均保留用户内容', t => {
   const f = fixture(t); initializeLab(f)
   const path = join(f.destination, 'business-agents/README.md')

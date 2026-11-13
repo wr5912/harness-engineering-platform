@@ -37,6 +37,14 @@ cd harness-engineering-platform
 ./platform/dsh-platform start
 ```
 
+需要从零建立可复现的四仓库工作区时，使用 Bootstrap 入口；它会按数据仓库锁定文件下载平台、数据、DSH Home 和业务智能体仓库：
+
+```bash
+./platform/hep-lab bootstrap --destination "$HOME/hep-lab"
+# 或直接使用独立入口
+./platform/hep-lab-bootstrap.sh --destination "$HOME/hep-lab"
+```
+
 打开终端给出的 `/hep/` 地址，按首次引导连接、克隆配套数据仓库或创建空白工作区。默认端口 `18120`；已有部署保留账号和配置。私有仓库使用主机已有 Git 认证；日志只记录初始化入口文件位置，不输出访问凭据。PyYAML 缺失时可先进入初始化页，平台准备阶段会提示补齐。
 
 登录账号保存在数据根 `.local/credentials/admin.json`；修改后重启生效，旧登录会话失效。查询和编辑不需要模型密钥；使用管理对话前，在“设置 → 模型”配置模型。平台 HOME 和 Session 位于数据根 `.local/platform-home/`，启动和准备会保留；`.local/` 不入 Git，新主机须恢复必要状态或重新配置。完整条件见[平台接入合同](docs/platform-design/02_系统架构与部署设计.md#当前最小平台接入合同)。
