@@ -73,7 +73,7 @@ else:
         sys.exit(2)
     with open(os.environ["FAKE_DSH_TRACE"], "a") as handle:
         handle.write(json.dumps({"args": sys.argv[1:], "home": os.environ["DSH_HOME"],
-                                 "repository": os.environ["HARNESS_ASSET_ROOT"],
+                                 "repository": os.environ["HARNESS_ASSET_ROOT"], "cwd": os.getcwd(),
                                  "runtime_entry": os.environ["HARNESS_DSH_ENTRY"]}) + "\n")
     if os.environ.get("FAKE_DSH_WELCOME"):
         patch = pathlib.Path(os.environ["DSH_HOME"]) / "profiles/harness-platform/cordis.patch.yml"
@@ -105,7 +105,7 @@ if sys.argv[1:] == ["run", "build"]:
     web.mkdir(parents=True, exist_ok=True)
     (web / "platform-webserver.mjs").write_text("export default class WebServer {}\n")
 ''')
-        self.env = {**os.environ, "PATH": str(self.bin), "HOME": str(self.root / "user"),
+        self.env = {**os.environ, "PATH": str(self.bin), "HOME": str(self.root / "user"), "XDG_CONFIG_HOME": str(self.root / "user/.config"),
                     "HARNESS_PYTHON": sys.executable,
                     "XDG_STATE_HOME": str(self.root / "state"), "HARNESS_ASSET_ROOT": str(self.assets),
                     "DSH_HOME": str(self.root / "unrelated-dsh-home"),
@@ -289,6 +289,37 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertNotIn("UNRELATED_VALUE", environment)
         self.assertEqual(environment["HARNESS_ASSET_ROOT"], str(self.assets))
         self.assertEqual(credentials.read_text(), content)
+
+    def test_physical_manager_workspace_is_native_cwd_and_data_remains_asset_root(self):
+        manager = self.root / "manager-workspace"
+        manager.mkdir()
+        moved = manager / "harness-engineering-platform-data"
+        self.assets.rename(moved)
+        self.assets = moved
+        self.env["HARNESS_ASSET_ROOT"] = str(moved)
+        self.env.pop("HARNESS_MANAGER_WORKSPACE_ROOT", None)
+        self.home = moved / ".local/platform-home"
+        self.profile = self.home / "profiles/harness-platform"
+        (moved / "config/assistant-workspace.json").write_text(json.dumps({"workspaceRoot": ".."}))
+        self.prepare()
+        result = self.run_cli("start")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        trace = json.loads(self.trace.read_text().splitlines()[-1])
+        self.assertEqual(trace["cwd"], str(manager))
+        self.assertEqual(trace["repository"], str(moved))
+
+    def test_manager_home_is_discovered_outside_physical_business_workspace(self):
+        manager = self.root / "manager-workspace"
+        moved = manager / "harness-engineering-platform-data"
+        moved.mkdir(parents=True)
+        home = self.root / "platform-manager-dsh-home"
+        profile = home / "profiles/harness-platform"
+        profile.mkdir(parents=True)
+        (profile / "package.json").write_text('{}')
+        namespace = runpy.run_path(str(self.launcher))
+        with mock.patch.dict(os.environ, {"HARNESS_ASSET_ROOT": str(moved), "HOME": str(self.root)}, clear=True):
+            self.assertEqual(namespace["platform_home"](), home)
+            self.assertEqual(namespace["manager_workspace_root"](), manager)
 
     def test_native_mcp_identity_moves_with_home_without_changing_configuration(self):
         self.prepare()
@@ -718,6 +749,7 @@ if sys.argv[1:] == ["run", "build"]:
         self.assertEqual(environment, {
             "LOCAL_LLM_API_KEY": "fixture-explicit",
             "DSH_HOME": str(self.home), "HARNESS_ASSET_ROOT": str(self.assets),
+            "HARNESS_BUSINESS_AGENTS_ROOT": str(self.assets), "HARNESS_MANAGER_WORKSPACE_ROOT": str(self.assets),
             "HARNESS_PROGRAM_ROOT": str(self.repo), "HARNESS_PYTHON": sys.executable, "HARNESS_SITES_CONFIG": str(self.assets / "config/sites.json"),
         })
 

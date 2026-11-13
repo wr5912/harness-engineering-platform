@@ -28,7 +28,7 @@ function localClock(initial = Date.parse('2026-10-29T08:00:00Z')) {
     advance(duration) { now += duration; for (const [id, timer] of timers) if (timer.at <= now) { timers.delete(id); timer.callback() } },
   }
 }
-function home({ example = false, exampleCase = true, exampleExtra = false, exampleActive = 'EXP-daily-inspection-assistant-002-r222222222222', noRuns = false, runVerdict = 'passed', runStatus = 'completed', runsFixture, agentsFixture = [{ id: 'alpha', name: '行业简报助手' }], experimentsFixture = [{ id: experiment, agent_id: 'alpha', change: {} }], historicalExperimentsFixture = [], failStart = false, sessionFixture, controlsFixture = [], active = true, intercept, storage = memoryStorage(), username = 'admin', workspaceRoot = '/test-assets', workspaceId = 'workspace-test', accountError = false, clock, beforeStart } = {}) {
+function home({ example = false, exampleCase = true, exampleExtra = false, exampleActive = 'EXP-daily-inspection-assistant-002-r222222222222', noRuns = false, runVerdict = 'passed', runStatus = 'completed', runsFixture, agentsFixture = [{ id: 'alpha', name: '行业简报助手' }], experimentsFixture = [{ id: experiment, agent_id: 'alpha', change: {} }], historicalExperimentsFixture = [], failStart = false, sessionFixture, controlsFixture = [], active = true, intercept, storage = memoryStorage(), username = 'admin', workspaceRoot = '/test-assets', workspaceId = 'workspace-test', managementRoots, accountError = false, clock, beforeStart } = {}) {
   const states = [], dependencies = [], cleanups = [], calls = [], tasks = [], navigations = [], assistantSelections = [], projectionRefreshes = []
   let cursor = 0, effects = [], changed = false, tree
   const react = { ...require('react'),
@@ -44,7 +44,7 @@ function home({ example = false, exampleCase = true, exampleExtra = false, examp
     addEventListener(type, fn) { if (!navigationListeners.has(type)) navigationListeners.set(type, new Set()); navigationListeners.get(type).add(fn) }, removeEventListener(type, fn) { navigationListeners.get(type)?.delete(fn) } }
   const module = { exports: {} }
   vm.runInNewContext(homeSource, { module, exports: module.exports, Error, Date: clock?.Date ?? Date, sessionStorage: storage, window: browserWindow, require: name => name === 'react' ? react : name === '@deepseek-ai/dsh-client-ui-primitives' ? primitives : require(name) })
-  let inventory = { root: workspaceRoot, workspace: { id: workspaceId, legacyRoots: [] }, observed_at: '2026-10-16T00:00:00Z', agents: [{ id: 'alpha' }, ...(example ? [{ id: 'daily-inspection-assistant' }] : [])], experiments: [], runs: [] }
+  let inventory = { root: workspaceRoot, workspace: { id: workspaceId, legacyRoots: [], ...(managementRoots ? { managementRoots } : {}) }, observed_at: '2026-10-16T00:00:00Z', agents: [{ id: 'alpha' }, ...(example ? [{ id: 'daily-inspection-assistant' }] : [])], experiments: [], runs: [] }
   const updates = createPlatformUpdates()
   const sessionSnapshot = sessionFixture ?? { ids: [], byId: {}, projectionsBySession: {}, phase: 'ready' }
   const props = { active, catalog: { subscribe() { return () => {} }, getSnapshot() { return { status: 'ready', inventory } }, refresh: async () => {} },
@@ -114,6 +114,24 @@ test('继续处理使用原生会话运行状态与操作投影，完成且无�
     assert.match(ui.text(rows[1]), /native-running.*运行中/s)
     assert.doesNotMatch(ui.text(), /native-idle/)
     assert.equal(ui.tasks.length, 0)
+  } finally { ui.cleanup() }
+})
+
+test('父工作区和业务仓会话均出现在继续处理，程序仓会话不混入', async () => {
+  const manager = '/lab/manager-workspace', data = manager + '/harness-engineering-platform-data', business = manager + '/business-agents'
+  const ids = ['manager-session', 'business-session', 'data-session', 'program-session']
+  const ui = home({ noRuns: true, workspaceRoot: data, managementRoots: [manager, data, business], sessionFixture: {
+    ids, phase: 'ready', projectionsBySession: {}, byId: Object.fromEntries(ids.map((id, at) => [id, {
+      cwd: [manager, business, data, '/lab/harness-engineering-platform'][at], running: true,
+      updatedAt: Date.now() - at, displayTitle: id,
+      projectionValues: { harnessPlatformAssistant: { session_id: id, workspace_id: 'workspace-test' } },
+    }])),
+  } })
+  try {
+    await ui.settle()
+    assert.match(ui.text(), /manager-session/); assert.match(ui.text(), /business-session/); assert.match(ui.text(), /data-session/)
+    assert.doesNotMatch(ui.text(), /program-session/)
+    assert.deepEqual(ui.projectionRefreshes.sort(), ids.slice(0, 3).sort())
   } finally { ui.cleanup() }
 })
 

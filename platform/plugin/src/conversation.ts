@@ -7,7 +7,8 @@ export function bindNewConversation(ctx: Pick<Context, 'uiWorkspace' | 'workspac
   const navigation = ctx.uiWorkspace
   const startSession = navigation.startSession
   navigation.startSession = (_workspaceId, options) => {
-    const workspace = ctx.workspaces.list.getSnapshot().items[0]
+    const workspaces = ctx.workspaces.list.getSnapshot().items
+    const workspace = workspaces.find(item => item.path?.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) === 'manager-workspace') ?? workspaces[0]
     startSession.call(navigation, workspace?.workspaceId, options)
   }
   return () => { navigation.startSession = startSession }

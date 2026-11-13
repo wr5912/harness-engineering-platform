@@ -1,5 +1,5 @@
 import { setImmediate as yieldToLoop } from 'node:timers/promises'
-import { workspaceOwnsCwd } from '../workspace.ts'
+import { workspaceOwnsManagementCwd } from '../workspace.ts'
 
 /** 只重建派生缓存；逐个读取稳定的原生日志，不发布 Session 或激活 Agent。 */
 export async function compactAssistantHistory(root: string, services: any, restore: Function, signal: AbortSignal) {
@@ -7,7 +7,7 @@ export async function compactAssistantHistory(root: string, services: any, resto
   for (const before of await services.sessionPersistence.list({ signal })) {
     signal.throwIfAborted()
     const header = before.header, id = header.id
-    if (typeof header.cwd !== 'string' || !workspaceOwnsCwd(root, header.cwd) || before.formatStatus === 'migration-required'
+    if (typeof header.cwd !== 'string' || !workspaceOwnsManagementCwd(root, header.cwd) || before.formatStatus === 'migration-required'
       || services.sessions.get(id) || services.agents.get(id)
       || services.sessionProjectionCache.cachedSnapshot(header, ['harnessPlatformAssistant'])) { summary.skipped++; continue }
     let handle

@@ -17,7 +17,7 @@ const usage = `用法：
     独立下载固定版本 CLI，按数据仓库锁定文件检出四个仓库。
   platform/hep-lab init --destination <目录> --data-repository <URL> --data-commit <SHA>
     其余三仓库默认从数据仓库 locks/repositories.yaml 推导；也可显式传入同名前缀的 URL/ref/commit。
-    business-agents 是保存全部业务智能体的单个仓库。
+    data 与 business-agents 真实检出到 manager-workspace/，程序与管理 HOME 保持根级独立仓库。
     --check-only          只验证输入与已有目录，不 clone/fetch/写入
     --reuse               复用来源、版本均一致且干净的仓库，远端名称不限
     --allow-floating-ref  开发环境显式允许解析分支，清单仍记录实际 SHA

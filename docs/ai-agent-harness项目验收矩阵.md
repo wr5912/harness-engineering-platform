@@ -1,5 +1,7 @@
 # Harness 工程平台项目验收矩阵
 
+2026-11-14，本机 `manager-workspace/` 改为包含 data 与 business-agents 的真实独立 Git 工作树，默认原生会话从父目录启动。工作区工具 19 项、初始化 23 项、助手与首页 148 项、启动器 48 项通过，类型检查及构建通过。真实管理助手完成 context、Skill 与原生 bash 的目录读取；旧会话通过原生有效目录变更恢复，历史 header 保留。DSH 指令发现仅加载管理 HOME；证据位于 `.local/acceptance/physical-manager-workspace/`。该验证覆盖目录迁移及受影响路径，不提升业务 Evaluation 或 Research Release 状态。
+
 更新日期：2026-11-13
 
 本文是 **Harness 工程平台项目与工具链**验证路径、当前证据和缺口的唯一维护位置。它直接回答三个问题：总共有多少条路径、每条做到什么程度、哪些检查应该进入自动化测试。

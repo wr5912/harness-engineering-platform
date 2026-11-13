@@ -8,7 +8,7 @@ import { Session, SESSION_FORMAT_VERSION, appendPluginRecord } from '@deepseek-a
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { bindNewConversation, prepareConversation } from '../src/conversation.ts'
-import { bindConversationWorkspace } from '../src/conversation-workspace.ts'
+import { bindConversationWorkspace, relocateManagementSession } from '../src/conversation-workspace.ts'
 import { createAssistant } from '../src/assistant/index.ts'
 
 test('新建会话忽略当前历史工作区，保留原生选项并可卸载恢复', () => {
@@ -21,6 +21,42 @@ test('新建会话忽略当前历史工作区，保留原生选项并可卸载�
   assert.deepEqual(calls, [['current-data', options], ['current-data', undefined]])
   dispose()
   assert.equal(uiWorkspace.startSession, original)
+})
+
+test('工作区排序改变时新建管理会话仍选择 manager-workspace', () => {
+  const calls = [], options = { agentPreset: 'standard' }
+  const uiWorkspace = { startSession(...args) { calls.push(args) } }
+  const dispose = bindNewConversation({ uiWorkspace, workspaces: { list: { getSnapshot: () => ({ items: [
+    { workspaceId: 'data', path: '/lab/manager-workspace/harness-engineering-platform-data' },
+    { workspaceId: 'business', path: '/lab/manager-workspace/business-agents' },
+    { workspaceId: 'manager', path: '/lab/manager-workspace' },
+  ] }) } } })
+  uiWorkspace.startSession('business', options)
+  assert.deepEqual(calls, [['manager', options]])
+  dispose()
+})
+
+test('目录迁移恢复旧会话有效 cwd，保留历史 header 且不接管无关目录', async t => {
+  const base = mkdtempSync(join(tmpdir(), 'conversation-relocation-'))
+  t.after(() => rmSync(base, { recursive: true, force: true }))
+  const manager = join(base, 'manager-workspace'), root = join(manager, 'harness-engineering-platform-data')
+  const old = join(base, 'harness-engineering-platform-data')
+  mkdirSync(join(root, 'knowledge'), { recursive: true }); mkdirSync(join(manager, 'business-agents'))
+  writeFileSync(join(root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-moved', legacyRoots: [old] }))
+  const header = { cwd: old }, events = [], agent = { session: { header }, cwd: join(old, 'knowledge') }
+  const workingDirectory = { get: target => agent.cwd, async set(target, path) {
+    assert.equal(target, agent); assert.equal(existsSync(path), true)
+    agent.cwd = path; events.push({ type: 'working-directory/change', data: { cwd: path } }); return path
+  } }
+  await relocateManagementSession(root, workingDirectory, agent)
+  assert.equal(agent.cwd, join(root, 'knowledge'))
+  assert.equal(agent.session.header.cwd, old)
+  assert.equal(events.length, 1)
+  await relocateManagementSession(root, workingDirectory, agent)
+  assert.equal(events.length, 1, '已迁移的有效目录不重复写事件')
+  agent.cwd = join(base, 'unrelated-missing')
+  await relocateManagementSession(root, workingDirectory, agent)
+  assert.equal(events.length, 1, '未登记的旧目录保持原错误，不猜测映射')
 })
 
 test('默认管理对话保留数据根，未登记路径拒绝且旧会话不被改写', async t => {

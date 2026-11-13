@@ -73,7 +73,8 @@ def manager_workspace_root():
             return (asset_root() / relative).resolve()
     except (OSError, ValueError, TypeError):
         pass
-    return (asset_root().parent / "manager-workspace").resolve()
+    # 数据仓在真实业务工作区内；独立安装及旧 fixture 继续以数据根工作。
+    return asset_root().parent if asset_root().parent.name == "manager-workspace" else asset_root()
 
 
 def platform_home():
@@ -88,9 +89,11 @@ def platform_home():
             except (OSError, ValueError):
                 raise PlatformError("无法读取平台管理助手 HOME 定位。") from None
     if not selected:
-        sibling = asset_root().parent / "platform-manager-dsh-home"
-        if (sibling / "profiles" / PROFILE_NAME / "package.json").is_file():
-            selected = str(sibling)
+        parent = asset_root().parent
+        candidates = [parent / "platform-manager-dsh-home"]
+        if parent.name == "manager-workspace":
+            candidates.append(parent.parent / "platform-manager-dsh-home")
+        selected = next((str(path) for path in candidates if (path / "profiles" / PROFILE_NAME / "package.json").is_file()), None)
     if selected:
         path = Path(selected).expanduser()
         if not path.is_absolute() or not path.is_dir():
@@ -1067,7 +1070,7 @@ def start(home, host, port, dry_run, public_url=None, applied=False):
         return
     print(f"平台地址：{public_url or f'http://{host}:{port}{base_path()}'}（打开页面登录）", flush=True)
     print("平台运行中；使用 dsh-platform stop 停止，重启复用同一平台 HOME。", flush=True)
-    os.chdir(asset_root())
+    os.chdir(manager_workspace_root())
     os.execvpe(executable, command, {**native_home_environment(home),
                                   "HARNESS_DSH_ENTRY": str(Path(executable).resolve())})
 

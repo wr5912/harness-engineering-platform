@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync, realpathSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 import { managerHome } from '../manager-home.ts'
+import { managerWorkspaceRoot } from '../workspace.ts'
 
 export interface NativeSkill {
   name: string
@@ -45,7 +46,7 @@ export async function managementSkill(root: string, skills: NativeSkills, name: 
   const skillRoot = join(realpathSync(home), '.agents/skills')
   const withinSkills = relative(skillRoot, expected)
   if (withinSkills === '..' || withinSkills.startsWith(`..${sep}`) || resolve(skillRoot, withinSkills) !== expected) throw new Error('技能不在管理助手 HOME .agents/skills 中')
-  const skill = await skills.get(name, { cwd: root, scope, signal })
+  const skill = await skills.get(name, { cwd: managerWorkspaceRoot(root), scope, signal })
   if (!skill?.path || realWorkspaceFile(home, skill.path) !== expected || !skill.content?.trim() || skill.name !== name || skill.invocation?.modelInvocable === false) throw new Error(`技能 ${name} 未从管理助手 HOME 装载`)
   return { ...skill, path: expected, sha256: digest(readFileSync(expected)) }
 }

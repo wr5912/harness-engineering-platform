@@ -12,7 +12,7 @@ import { CHANNEL } from './protocol.ts'
 import type { Inventory, RunAsset } from './protocol.ts'
 import { DOMAIN_PREFIXES } from './protocol.ts'
 import { recentRuns } from './dashboard.ts'
-import { workspaceIdentity } from './workspace.ts'
+import { managementSessionRoots, workspaceIdentity } from './workspace.ts'
 import { createAgentsHandler } from './agents/index.ts'
 import { createRunDownloadHandler } from './agents/run-files.ts'
 import { createInstancesHandler } from './instances/index.ts'
@@ -36,14 +36,14 @@ import { applyBusinessGateway } from './business-control/index.ts'
 import { platformEntryUrl } from './business-control/group-link.ts'
 import { managementDispatch } from './mcp/control.ts'
 import { currentBusinessContext, getBusinessControl } from './business-control/core.ts'
-import { bindConversationWorkspace } from './conversation-workspace.ts'
+import { bindConversationWorkspace, relocateManagementSession } from './conversation-workspace.ts'
 import type {} from './branding-config.ts'
 
 // 使用启动器核对过的全局 Runtime；开发依赖只提供类型和隔离测试环境。
 const WebApp: typeof NativeWebApp = await runtimeModule('@deepseek-ai/dsh-web-app')
 
 export const name = 'harness-platform'
-export const inject = ['connection', 'webServer', 'platformBranding', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'sessionQuery', 'sessionPersistence', 'sessionProjectionCache', 'sessions', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'skills', 'attachments', 'fs']
+export const inject = ['connection', 'webServer', 'platformBranding', 'credentials', 'platformMcp', 'workspaceRegistry', 'workspaceController', 'sessionController', 'sessionQuery', 'sessionPersistence', 'sessionProjectionCache', 'sessions', 'settingsController', 'agentDefaultModel', 'llm', 'tools', 'agents', 'sessionProjections', 'systemPrompt', 'skills', 'attachments', 'fs', 'workingDirectory']
 export const Config = WebApp.Config
 export type Config = NativeWebApp.Config
 
@@ -70,7 +70,7 @@ export function inventory(assetRoot: string): Inventory {
   return {
     schema_version: '1.0',
     root,
-    workspace: workspaceIdentity(root),
+    workspace: { ...workspaceIdentity(root), managementRoots: managementSessionRoots(root) },
     observed_at: new Date().toISOString(),
     agents: assets.agents.map(id => ({ id, path: `agents/${id}` })),
     experiments: assets.experiments.map(id => ({ id, path: `evolution/experiments/${id}` })),
@@ -277,6 +277,9 @@ export async function apply(ctx: Context, config: Config) {
   const assetRoot = process.env.HARNESS_ASSET_ROOT
   if (!assetRoot) throw new Error('未设置 HARNESS_ASSET_ROOT')
   await bindConversationWorkspace(ctx, assetRoot)
+  ctx.on('agent/created', async ({ agent, signal }) => {
+    await relocateManagementSession(assetRoot, (ctx as any).workingDirectory, agent, signal)
+  })
   const branding = ctx.platformBranding
   await applyAuthentication(ctx, assetRoot, branding)
   // 替换原生明暗主题图标，避免浏览器从多条候选中继续选择 DSH 图标。

@@ -1,8 +1,8 @@
 import { VERSION_ID } from './version-id.ts'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /** 程序位置由启动器固定；业务路径只从显式工作区根解析。 */
@@ -29,6 +29,18 @@ export function workspaceOwnsCwd(assetRoot: string, cwd?: string | null): boolea
   if (!cwd || !isAbsolute(cwd)) return false
   const workspace = workspaceIdentity(assetRoot)
   return [workspace.root, ...workspace.legacyRoots].includes(resolve(cwd))
+}
+
+/** 管理会话可位于父工作区或两个业务仓，评测/实例的数据归属仍使用 workspaceOwnsCwd。 */
+export function managementSessionRoots(assetRoot: string): string[] {
+  const workspace = workspaceIdentity(assetRoot)
+  const scope = assistantWorkspaceScope(assetRoot)
+  const previousBusinessRoots = workspace.legacyRoots.map(previous => join(dirname(previous), 'business-agents'))
+  return [...new Set([workspace.root, ...workspace.legacyRoots, ...previousBusinessRoots, scope.manager_workspace_root, scope.roots.business_agents])]
+}
+
+export function workspaceOwnsManagementCwd(assetRoot: string, cwd?: string | null): boolean {
+  return Boolean(cwd && isAbsolute(cwd) && managementSessionRoots(assetRoot).includes(resolve(cwd)))
 }
 
 /** 与 CLI 共用登记归属规则；同名来源不是跨工作区接管实例的依据。 */
@@ -92,7 +104,7 @@ export function businessAgentPath(assetRoot: string, agentId: string, relative =
 export interface AssistantWorkspaceScope {
   schema_version: 1
   kind: 'platform-assistant-business-workspace'
-  default_repository_id: 'data'
+  default_repository_id: 'manager-workspace' | 'data'
   allowed_repository_ids: string[]
   business_repository_id: 'business-agents'
   excluded_repository_ids: string[]
@@ -101,28 +113,28 @@ export interface AssistantWorkspaceScope {
   roots: { data: string; business_agents: string }
 }
 
+/** 管理会话的真实父目录；后台资产寻址仍以 data Git 根为准。 */
 export function managerWorkspaceRoot(assetRoot: string): string {
+  const root = resolve(assetRoot)
   const explicit = process.env.HARNESS_MANAGER_WORKSPACE_ROOT
   if (explicit) return resolve(explicit)
-  const config = join(resolve(assetRoot), 'config/assistant-workspace.json')
-  try {
+  const config = join(root, 'config/assistant-workspace.json')
+  if (existsSync(config)) {
     const value = JSON.parse(readFileSync(config, 'utf8'))
-    if (typeof value?.workspaceRoot === 'string' && value.workspaceRoot && !isAbsolute(value.workspaceRoot)) return resolve(assetRoot, value.workspaceRoot)
-  } catch { /* 契约校验在 assistantWorkspaceScope 中报告；旧 fixture 使用默认入口。 */ }
-  return resolve(assetRoot, '..', 'manager-workspace')
+    if (typeof value?.workspaceRoot === 'string' && value.workspaceRoot && !isAbsolute(value.workspaceRoot)) return resolve(root, value.workspaceRoot)
+  }
+  // 单数据根的既有安装继续沿用；新布局由真实 manager-workspace 父目录识别。
+  return basename(dirname(root)) === 'manager-workspace' ? dirname(root) : root
 }
 
-/**
- * 管理助手的业务范围是逻辑双仓，不把 Git 工作树物理嵌套到另一个仓库。
- * 契约放在数据仓库 config 中，缺少契约的旧/隔离 fixture 使用同一默认边界。
- */
+/** 管理工作区包含两个独立 Git 工作树，程序和 HOME 不作为业务目标。 */
 export function assistantWorkspaceScope(assetRoot: string): AssistantWorkspaceScope {
   const root = resolve(assetRoot)
   const path = join(root, 'config/assistant-workspace.json')
   const fallback = {
     schemaVersion: 1,
     kind: 'platform-assistant-business-workspace',
-    defaultRepositoryId: 'data',
+    defaultRepositoryId: basename(dirname(root)) === 'manager-workspace' ? 'manager-workspace' : 'data',
     allowedRepositoryIds: ['data', 'business-agents'],
     businessRepositoryId: 'business-agents',
     excludedRepositoryIds: ['harness-engineering-platform', 'platform-manager-dsh-home'],
@@ -132,7 +144,7 @@ export function assistantWorkspaceScope(assetRoot: string): AssistantWorkspaceSc
       'harness-engineering-platform': 'tool-source-only',
       'platform-manager-dsh-home': 'runtime-identity-only',
     },
-    workspaceRoot: '../manager-workspace',
+    workspaceRoot: basename(dirname(root)) === 'manager-workspace' ? '..' : '.',
   }
   let value: any = fallback
   if (existsSync(path)) {
@@ -144,27 +156,36 @@ export function assistantWorkspaceScope(assetRoot: string): AssistantWorkspaceSc
   const allowed = new Set(isIds(value?.allowedRepositoryIds) ? value.allowedRepositoryIds : [])
   const excluded = new Set(isIds(value?.excludedRepositoryIds) ? value.excludedRepositoryIds : [])
   const requiredRoles = ['data', 'business-agents', 'harness-engineering-platform', 'platform-manager-dsh-home']
-  const configuredWorkspaceRoot = value?.workspaceRoot ?? '../manager-workspace'
-  if (value?.schemaVersion !== 1 || value.kind !== fallback.kind || value.defaultRepositoryId !== 'data'
+  const configuredWorkspaceRoot = value?.workspaceRoot ?? (value?.defaultRepositoryId === 'manager-workspace' ? '..' : '.')
+  const managerRoot = managerWorkspaceRoot(root)
+  if (value?.schemaVersion !== 1 || value.kind !== fallback.kind || !['manager-workspace', 'data'].includes(value.defaultRepositoryId)
     || value.businessRepositoryId !== 'business-agents' || !isIds(value.allowedRepositoryIds)
     || value.allowedRepositoryIds.length !== 2 || !allowed.has('data') || !allowed.has('business-agents')
     || !isIds(value.excludedRepositoryIds) || !excluded.has('harness-engineering-platform') || !excluded.has('platform-manager-dsh-home')
     || value.excludedRepositoryIds.some((item: string) => allowed.has(item))
     || typeof configuredWorkspaceRoot !== 'string' || isAbsolute(configuredWorkspaceRoot)
-    || resolve(root, configuredWorkspaceRoot) !== resolve(root, '..', 'manager-workspace')
+    || value.defaultRepositoryId === 'manager-workspace' && (configuredWorkspaceRoot !== '..' || basename(managerRoot) !== 'manager-workspace' || dirname(root) !== managerRoot)
     || !value.roles || typeof value.roles !== 'object' || Array.isArray(value.roles)
     || requiredRoles.some(item => typeof value.roles[item] !== 'string' || !value.roles[item].trim())) {
     throw new Error(`管理助手业务工作区契约无效：${path}`)
   }
+  if (value.defaultRepositoryId === 'manager-workspace') {
+    for (const directory of [managerRoot, root, businessAgentsRoot(root)]) {
+      if (!existsSync(directory) || !lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink() || realpathSync(directory) !== directory) {
+        throw new Error(`管理助手工作区必须使用真实目录：${directory}`)
+      }
+    }
+    if (dirname(businessAgentsRoot(root)) !== managerRoot) throw new Error('业务仓库必须直接位于管理助手工作区中')
+  }
   return {
     schema_version: 1,
     kind: value.kind,
-    default_repository_id: 'data',
+    default_repository_id: value.defaultRepositoryId,
     allowed_repository_ids: [...value.allowedRepositoryIds],
     business_repository_id: 'business-agents',
     excluded_repository_ids: [...value.excludedRepositoryIds],
     roles: { ...value.roles },
-    manager_workspace_root: managerWorkspaceRoot(root),
+    manager_workspace_root: managerRoot,
     roots: { data: root, business_agents: businessAgentsRoot(root) },
   }
 }

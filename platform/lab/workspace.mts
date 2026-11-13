@@ -8,6 +8,10 @@ import { tmpdir } from 'node:os'
 const require = createRequire(new URL('../plugin/package.json', import.meta.url))
 const yaml = () => require('js-yaml') as { load(text: string, options?: object): any; dump(value: unknown, options?: object): string; DEFAULT_SCHEMA: { extend(types: unknown[]): unknown }; Type: new (name: string, options: object) => unknown }
 export const repositoryNames = { platform: 'harness-engineering-platform', data: 'harness-engineering-platform-data', platform_manager_dsh_home: 'platform-manager-dsh-home', business_agents: 'business-agents' } as const
+export const repositoryPaths = { ...repositoryNames,
+  data: `manager-workspace/${repositoryNames.data}`,
+  business_agents: `manager-workspace/${repositoryNames.business_agents}`,
+} as const
 export type RepositoryKey = keyof typeof repositoryNames
 export interface RepositoryInput { url: string; ref?: string; commit?: string }
 export interface RepositoryState extends RepositoryInput { commit: string; path: string }
@@ -16,7 +20,7 @@ export interface LabManifest {
   initializer_version: 2
   created_at: string
   repositories: Record<RepositoryKey, RepositoryState>
-  paths: { dsh_home: string; business_agents_root: string }
+  paths: { dsh_home: string; business_agents_root: string; manager_workspace_root?: string }
 }
 export interface InitOptions {
   destination: string
@@ -67,9 +71,21 @@ function writeYaml(path: string, value: unknown) {
 }
 function safeDirectory(path: string) {
   for (let current = resolve(path); ; current = dirname(current)) {
-    if (existsSync(current) && (lstatSync(current).isSymbolicLink() || !lstatSync(current).isDirectory())) fail(`目录不能经过符号链接或普通文件：${current}`)
+    const info = lstatSync(current, { throwIfNoEntry: false })
+    if (info && (info.isSymbolicLink() || !info.isDirectory())) fail(`目录不能经过符号链接或普通文件：${current}`)
     if (dirname(current) === current) break
   }
+}
+function checkManagerWorkspace(root: string, requireMarker: boolean) {
+  safeDirectory(root)
+  if (existsSync(join(root, '.git'))) fail('manager-workspace 是业务工作区容器，不能另建 Git 仓库')
+  const marker = join(root, '.manager-workspace')
+  const info = lstatSync(marker, { throwIfNoEntry: false })
+  if (!info) {
+    if (requireMarker) fail('manager-workspace 缺少普通项目边界标记 .manager-workspace')
+    return
+  }
+  if (!info.isFile() || info.isSymbolicLink() || !readFileSync(marker, 'utf8').trim()) fail('manager-workspace 项目边界标记必须是非空普通文件')
 }
 function normalizeLock(value: any): Partial<RepositoryInput> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('仓库锁定格式无效')
@@ -142,7 +158,7 @@ function completeInputs(root: string, provided: Partial<Record<RepositoryKey, Re
   if (!dataInput) fail('至少需要 --data-repository；其余仓库可从数据仓库 locks/repositories.yaml 推导')
   const normalized: Partial<Record<RepositoryKey, RepositoryInput>> = {}
   for (const key of keys) if (provided[key]) normalized[key] = inputOf(provided[key]!)
-  let locks = existsSync(join(root, repositoryNames.data, '.git')) ? repositoryLocks(join(root, repositoryNames.data)) : {}
+  let locks = existsSync(join(root, repositoryPaths.data, '.git')) ? repositoryLocks(join(root, repositoryPaths.data)) : {}
   const missing = keys.some(key => !normalized[key])
   if (missing && !Object.keys(locks).length) {
     if (checkOnly) fail('check-only 缺少本地数据仓库锁定文件，不能 clone/fetch；请补齐四仓库参数或先准备数据仓库')
@@ -172,13 +188,18 @@ export function readLab(lab: string): LabManifest {
   checkWorkspaceMetadata(root)
   const manifest = readYaml(manifestPath(root)) as LabManifest
   if (manifest?.schema_version !== 1 || manifest.initializer_version !== 2 || !manifest.repositories) fail('hep-lab 清单版本不受支持，请重新初始化')
+  const current = keys.every(key => manifest.repositories[key]?.path === join(root, repositoryPaths[key]))
+  const legacy = keys.every(key => manifest.repositories[key]?.path === join(root, repositoryNames[key]))
+  if (!current && !legacy) fail('hep-lab 仓库清单路径布局无效')
   for (const key of keys) {
     const item = manifest.repositories[key]
     inputOf(item)
-    if (!commitPattern.test(item?.commit) || item.path !== join(root, repositoryNames[key])) fail(`hep-lab 仓库清单路径或提交无效：${key}`)
+    if (!commitPattern.test(item?.commit)) fail(`hep-lab 仓库清单路径或提交无效：${key}`)
+    safeDirectory(item.path)
   }
   if (manifest.paths?.dsh_home !== join(root, repositoryNames.platform_manager_dsh_home)
-    || manifest.paths.business_agents_root !== join(root, repositoryNames.business_agents)) fail('hep-lab 运行路径无效')
+    || manifest.paths.business_agents_root !== manifest.repositories.business_agents.path
+    || current && manifest.paths.manager_workspace_root !== join(root, 'manager-workspace')) fail('hep-lab 运行路径无效')
   return manifest
 }
 export function statusLab(lab: string) {
@@ -211,6 +232,11 @@ function sensitivePath(path: string) {
 }
 export function inspectLab(manifest: LabManifest) {
   const issues: Finding[] = [], warnings: Finding[] = []
+  if (manifest.paths.manager_workspace_root) {
+    try {
+      checkManagerWorkspace(manifest.paths.manager_workspace_root, true)
+    } catch (error) { issues.push({ code: 'manager_workspace', path: manifest.paths.manager_workspace_root, message: (error as Error).message }) }
+  }
   for (const key of keys) {
     const item = manifest.repositories[key]
     try {
@@ -235,7 +261,7 @@ export function inspectLab(manifest: LabManifest) {
     const excluded = Array.isArray(value?.excludedRepositoryIds) ? new Set(value.excludedRepositoryIds) : new Set()
     const roles = value?.roles
     if (value?.schemaVersion !== 1 || value.kind !== 'platform-assistant-business-workspace'
-      || value.defaultRepositoryId !== 'data' || value.businessRepositoryId !== 'business-agents'
+      || !['data', 'manager-workspace'].includes(value.defaultRepositoryId) || value.businessRepositoryId !== 'business-agents'
       || allowed.size !== 2 || !allowed.has('data') || !allowed.has('business-agents')
       || !excluded.has('harness-engineering-platform') || !excluded.has('platform-manager-dsh-home')
       || [...allowed].some(item => excluded.has(item))
@@ -336,15 +362,16 @@ export function initializeLab(options: InitOptions) {
   safeDirectory(root)
   checkWorkspaceMetadata(root)
   const existingManifest = existsSync(manifestPath(root)) ? readLab(root) : undefined
-  const allowed = new Set([...Object.values(repositoryNames), 'hep-lab.yaml', '.hep-lab', '.git', '.gitignore', '.agents', 'AGENTS.md', 'README.md', 'tools', 'skills'])
+  checkManagerWorkspace(join(root, 'manager-workspace'), false)
+  const allowed = new Set([repositoryNames.platform, repositoryNames.platform_manager_dsh_home, 'manager-workspace', 'hep-lab.yaml', '.hep-lab', '.git', '.gitignore', '.agents', 'AGENTS.md', 'README.md', 'tools', 'skills'])
   if (existsSync(root) && readdirSync(root).some(name => !allowed.has(name))) fail('目标目录含非 hep-lab 内容，请使用空目录')
   const inputs = completeInputs(root, options.repositories, Boolean(options.allowFloatingRef), Boolean(options.checkOnly))
-  let locks = existsSync(join(root, repositoryNames.data, '.git')) ? repositoryLocks(join(root, repositoryNames.data)) : {}
+  let locks = existsSync(join(root, repositoryPaths.data, '.git')) ? repositoryLocks(join(root, repositoryPaths.data)) : {}
   const states = {} as Record<RepositoryKey, RepositoryState>
   // 在任何写入前检查全部已存在工作树，避免后续失败覆盖用户改动。
   for (const key of keys) {
     inputs[key] = withLock(inputs[key], locks[key])
-    const state = inspectRepository(join(root, repositoryNames[key]), inputs[key], Boolean(options.reuse))
+    const state = inspectRepository(join(root, repositoryPaths[key]), inputs[key], Boolean(options.reuse))
     if (state) states[key] = state
   }
   for (const key of keys) {
@@ -358,7 +385,8 @@ export function initializeLab(options: InitOptions) {
   // 先检出数据，再校验其锁定；锁冲突仅保留新检出的数据，不继续其他仓库。
   for (const key of ['data', ...keys.filter(key => key !== 'data')] as RepositoryKey[]) {
     if (!states[key]) {
-      const path = join(root, repositoryNames[key])
+      const path = join(root, repositoryPaths[key])
+      mkdirSync(dirname(path), { recursive: true })
       git(undefined, ['clone', '--no-checkout', '--', inputs[key].url, path])
       try { git(path, ['cat-file', '-e', `${inputs[key].commit}^{commit}`]) }
       catch { git(path, ['fetch', '--no-tags', 'origin', inputs[key].commit!]) }
@@ -370,11 +398,13 @@ export function initializeLab(options: InitOptions) {
       for (const candidate of keys) inputs[candidate] = withLock(inputs[candidate], locks[candidate])
     }
   }
+  const marker = join(root, 'manager-workspace/.manager-workspace')
+  if (!existsSync(marker)) writeFileSync(marker, '平台管理助手业务工作区；包含数据与业务智能体两个独立 Git 仓库。\n')
   const manifest: LabManifest = { schema_version: 1, initializer_version: 2, created_at: existingManifest?.created_at ?? new Date().toISOString(), repositories: Object.fromEntries(keys.map(key => [key, states[key]])) as Record<RepositoryKey, RepositoryState>,
-    paths: { dsh_home: join(root, repositoryNames.platform_manager_dsh_home), business_agents_root: join(root, repositoryNames.business_agents) } }
+    paths: { dsh_home: join(root, repositoryNames.platform_manager_dsh_home), business_agents_root: join(root, repositoryPaths.business_agents), manager_workspace_root: join(root, 'manager-workspace') } }
   const validation = inspectLab(manifest)
   writeYaml(manifestPath(root), { ...manifest, validation })
-  return { manifest, validation, start: { command: join(states.platform.path, 'platform/dsh-platform'), args: ['start'], environment: { HARNESS_PROGRAM_ROOT: states.platform.path, HARNESS_ASSET_ROOT: states.data.path, HARNESS_MANAGER_DSH_HOME: manifest.paths.dsh_home } } }
+  return { manifest, validation, start: { command: join(states.platform.path, 'platform/dsh-platform'), args: ['start'], environment: { HARNESS_PROGRAM_ROOT: states.platform.path, HARNESS_ASSET_ROOT: states.data.path, HARNESS_BUSINESS_AGENTS_ROOT: states.business_agents.path, HARNESS_MANAGER_WORKSPACE_ROOT: manifest.paths.manager_workspace_root, HARNESS_MANAGER_DSH_HOME: manifest.paths.dsh_home } } }
 }
 export function planUpdate(lab: string) {
   const manifest = readLab(lab)

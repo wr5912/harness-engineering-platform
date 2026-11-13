@@ -11,6 +11,7 @@ export interface RepositorySnapshot {
   workspace: string
   agent_path?: string
   dirty: boolean
+  kind?: 'workspace' | 'repository'
 }
 export type RepositoryChoice = Partial<RepositorySnapshot> & { id: string; available: boolean; error?: string }
 interface Declaration { id: string; url: string; ref: string; commit: string; path: string; agent_path?: string }
@@ -50,10 +51,15 @@ function declarations(root: string): Declaration[] {
   }
   return config.repositories
 }
-export function resolveRepository(root: string, id = 'data'): RepositorySnapshot {
+export function resolveRepository(root: string, requestedId?: string): RepositorySnapshot {
   const data = realpathSync(root)
+  const scope = assistantWorkspaceScope(data)
+  const id = requestedId ?? scope.default_repository_id
+  if (id === 'manager-workspace' && scope.default_repository_id === 'manager-workspace') {
+    return { id, kind: 'workspace', workspace: scope.manager_workspace_root, url: null, ref: null, commit: null, dirty: false }
+  }
   if (id !== 'data' && !/^[a-z][a-z0-9-]*$/.test(id)) throw new Error('目标仓库未登记')
-  if (!assistantWorkspaceScope(data).allowed_repository_ids.includes(id)) throw new Error('目标仓库不在管理助手业务工作区')
+  if (!scope.allowed_repository_ids.includes(id)) throw new Error('目标仓库不在管理助手业务工作区')
   if (id === 'data') {
     const repository = optionalGit(data, ['rev-parse', '--show-toplevel']) === data
     return { id, workspace: data,
@@ -76,10 +82,12 @@ export function resolveRepository(root: string, id = 'data'): RepositorySnapshot
   return { id, url: entry.url, ref: entry.ref, commit, workspace, ...(entry.agent_path ? { agent_path: entry.agent_path } : {}), dirty: Boolean(git(workspace, ['status', '--porcelain'])) }
 }
 export function listRepositories(root: string): { repositories: RepositoryChoice[]; default_repository_id: string } {
-  const repositories: RepositoryChoice[] = [{ ...resolveRepository(root), available: true }]
+  const defaultRepository = resolveRepository(root)
+  const repositories: RepositoryChoice[] = [{ ...defaultRepository, available: true }]
+  if (defaultRepository.id !== 'data') repositories.push({ ...resolveRepository(root, 'data'), available: true })
   for (const entry of declarations(root)) {
     try { repositories.push({ ...resolveRepository(root, entry.id), available: true }) }
     catch (error) { repositories.push({ id: entry.id, workspace: resolve(root, entry.path), available: false, error: error instanceof Error ? error.message : '目标仓库不可用' }) }
   }
-  return { repositories, default_repository_id: 'data' }
+  return { repositories, default_repository_id: defaultRepository.id }
 }

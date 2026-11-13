@@ -1,13 +1,35 @@
-import { realpathSync } from 'node:fs'
-import { isAbsolute } from 'node:path'
+import { existsSync, realpathSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/types'
 import type { SessionCreateRequest, SessionCreateValue } from '@deepseek-ai/dsh-api-session-controller/types'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { listRepositories } from './assistant/repositories.ts'
+import { listRepositories, resolveRepository } from './assistant/repositories.ts'
+import { businessAgentsRoot, workspaceIdentity } from './workspace.ts'
+
+/** 通过原生有效目录变更恢复移动前的会话，保留不可变的历史 header。 */
+export async function relocateManagementSession(assetRoot: string, workingDirectory: {
+  get(session: any): string
+  set(agent: any, path: string, signal?: AbortSignal): Promise<string>
+}, agent: any, signal?: AbortSignal): Promise<void> {
+  const workspace = workspaceIdentity(assetRoot)
+  const current = workingDirectory.get(agent.session)
+  if (existsSync(current)) return
+  const migrations = workspace.legacyRoots.flatMap(previous => [
+    { previous, target: workspace.root },
+    { previous: join(dirname(previous), 'business-agents'), target: businessAgentsRoot(assetRoot) },
+  ])
+  for (const { previous, target } of migrations) {
+    const suffix = relative(previous, current)
+    if (suffix === '..' || suffix.startsWith('../') || isAbsolute(suffix)) continue
+    await workingDirectory.set(agent, resolve(target, suffix), signal)
+    return
+  }
+}
 
 export async function bindConversationWorkspace(ctx: Context, assetRoot: string) {
   const root = realpathSync(assetRoot)
+  const defaultRoot = resolveRepository(root).workspace
   const registry = ctx.get('workspaceRegistry') as {
     create(path: string, title?: string): Promise<{ id: WorkspaceId; sessionIds: readonly string[] }>
     list(): readonly { id: WorkspaceId }[]
@@ -22,13 +44,13 @@ export async function bindConversationWorkspace(ctx: Context, assetRoot: string)
   const register = async (path: string, title?: string) => {
     let resolved: string | undefined
     try { if (isAbsolute(path)) resolved = realpathSync(path) } catch { /* 显式拒绝失效路径。 */ }
-    if (!resolved || !allowed().has(resolved)) throw new RemoteError('gateway/bad-request', '管理对话只能使用数据根或已登记目标仓库，不能添加其他工作区。', {})
+    if (!resolved || !allowed().has(resolved)) throw new RemoteError('gateway/bad-request', '管理对话只能使用 manager-workspace、数据根或已登记业务仓库，不能添加其他工作区。', {})
     const workspace = await createWorkspace(resolved, title)
     workspaces.set(resolved, workspace)
     return workspace
   }
-  await register(root)
-  for (const path of allowed()) if (path !== root) await register(path)
+  await register(defaultRoot)
+  for (const path of allowed()) if (path !== defaultRoot) await register(path)
   const retained = new Set([...workspaces.values()].map(item => item.id))
   // 仅撤销未登记目录，保留会话及其历史 cwd。
   for (const item of registry.list()) if (!retained.has(item.id)) await registry.delete(item.id)
@@ -45,7 +67,7 @@ export async function bindConversationWorkspace(ctx: Context, assetRoot: string)
     Object.defineProperty(sessions, 'create', { configurable: true, value: (request: SessionCreateRequest) => {
       if (request.cwd !== undefined && request.workspaceId !== undefined) throw new RemoteError('gateway/bad-request', 'session.create accepts workspaceId or cwd, not both', {})
       return (async () => {
-        let path = root
+        let path = defaultRoot
         if (request.cwd !== undefined) path = request.cwd
         else if (request.workspaceId !== undefined) {
           const found = [...workspaces].find(([, item]) => item.id === request.workspaceId)

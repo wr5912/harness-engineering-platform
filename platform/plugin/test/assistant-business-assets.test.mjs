@@ -97,3 +97,20 @@ test('Candidate技能软链接不能替代管理技能，即使仍位于同一�
   await assert.rejects(() => managementSkill(f.root, f.ctx.skills, 'user-facing-output'), /超出管理助手 HOME/)
   assert.equal((await assistantConfiguration(f.root, f.ctx.skills)).core_ready, false)
 })
+
+test('真实管理工作区中的技能按管理目录查询，身份仍从独立 HOME 装载', async t => {
+  const base = mkdtempSync(join(tmpdir(), 'manager-workspace-skills-'))
+  t.after(() => rmSync(base, { recursive: true, force: true }))
+  const manager = join(base, 'manager-workspace'), root = join(manager, 'harness-engineering-platform-data')
+  const home = join(root, '.local/platform-home'), skill = join(home, '.agents/skills/workspace-management/SKILL.md')
+  mkdirSync(dirname(skill), { recursive: true }); mkdirSync(join(root, 'config'), { recursive: true })
+  writeFileSync(join(root, 'config/assistant-workspace.json'), JSON.stringify({ workspaceRoot: '..' }))
+  writeFileSync(join(home, 'AGENTS.md'), '保持平台管理身份')
+  writeFileSync(skill, '管理双仓业务资产')
+  const loaded = await managementSkill(root, { async get(name, options) {
+    assert.equal(options.cwd, manager)
+    return { name, path: skill, content: readFileSync(skill, 'utf8') }
+  } }, 'workspace-management')
+  assert.equal(loaded.path, skill)
+  assert.equal(managementPrinciples(root).content, '保持平台管理身份')
+})

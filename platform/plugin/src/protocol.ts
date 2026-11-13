@@ -43,7 +43,7 @@ export interface RunAsset extends Asset {
 export interface Inventory {
   schema_version: '1.0'
   root: string
-  workspace?: { id: string; root: string; legacyRoots: string[] }
+  workspace?: { id: string; root: string; legacyRoots: string[]; managementRoots?: string[] }
   observed_at: string
   agents: Asset[]
   experiments: Asset[]

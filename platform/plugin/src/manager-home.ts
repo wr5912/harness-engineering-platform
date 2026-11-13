@@ -10,8 +10,9 @@ export function managerHome(dataRoot: string, environment = process.env): string
     if (workspace.assetRoot && resolve(workspace.assetRoot) === resolve(dataRoot)) selected = workspace.managerDshHome
   }
   if (!selected) {
-    const sibling = resolve(dataRoot, '..', 'platform-manager-dsh-home')
-    if (existsSync(join(sibling, 'profiles/harness-platform/package.json'))) selected = sibling
+    const base = resolve(dataRoot, '..')
+    const candidates = [join(base, 'platform-manager-dsh-home'), ...(base.endsWith('/manager-workspace') ? [resolve(base, '..', 'platform-manager-dsh-home')] : [])]
+    selected = candidates.find(path => existsSync(join(path, 'profiles/harness-platform/package.json')))
   }
   if (selected) {
     if (!isAbsolute(selected) || !existsSync(selected) || !statSync(selected).isDirectory()) throw new Error('平台管理助手 HOME 必须是已存在的绝对目录')

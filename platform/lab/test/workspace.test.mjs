@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import test from 'node:test'
-import { doctorLab, initializeLab, planUpdate, readLab, repositoryNames, statusLab } from '../workspace.mts'
+import { doctorLab, initializeLab, planUpdate, readLab, repositoryNames, repositoryPaths, statusLab } from '../workspace.mts'
 
 const git = (root, ...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 function fixture(t) {
@@ -17,7 +17,7 @@ function fixture(t) {
     writeFileSync(join(path, 'README.md'), 'fixture\n')
     writeFileSync(join(path, '.gitignore'), '.env\nsessions/\nnode_modules/\n')
     if (key === 'platform_manager_dsh_home') { mkdirSync(join(path, 'profiles/web'), { recursive: true }); writeFileSync(join(path, 'profiles/web/package.json'), '{"dsh":{"profile":{"bundles":[]}}}\n') }
-    if (key === 'business_agents') { mkdirSync(join(path, 'agents/demo'), { recursive: true }); writeFileSync(join(path, 'agents/demo/harness.yaml'), 'schema_version: 1\n') }
+    if (key === 'business_agents') { mkdirSync(join(path, 'agents/demo'), { recursive: true }); writeFileSync(join(path, 'agents/demo/harness.yaml'), 'schema_version: 1\n'); writeFileSync(join(path, 'manifest.yaml'), 'schema_version: 1\nagents:\n  - agent_id: demo\n    path: agents/demo\n    status: archived\n') }
     git(path, 'add', '.'); git(path, 'commit', '-qm', 'fixture')
     repositories[key] = { url: path, ref: 'main', commit: git(path, 'rev-parse', 'HEAD') }
   }
@@ -28,7 +28,7 @@ function fixture(t) {
   repositories.data.commit = git(data, 'rev-parse', 'HEAD')
   return { root, destination, repositories }
 }
-test('四仓固定SHA并列检出、重复执行幂等，check-only完全不落盘', t => {
+test('四仓固定SHA按业务目录检出、重复执行幂等，check-only完全不落盘', t => {
   const f = fixture(t)
   const plan = initializeLab({ ...f, checkOnly: true })
   assert.equal(plan.check_only, true); assert.equal(existsSync(f.destination), false)
@@ -37,7 +37,19 @@ test('四仓固定SHA并列检出、重复执行幂等，check-only完全不落�
   assert.equal(first.validation.agent_count, 1)
   assert.equal(first.manifest.initializer_version, 2)
   assert.equal(first.manifest.paths.dsh_home, join(f.destination, 'platform-manager-dsh-home'))
-  assert.equal(first.manifest.paths.business_agents_root, join(f.destination, 'business-agents'))
+  assert.equal(first.manifest.paths.business_agents_root, join(f.destination, repositoryPaths.business_agents))
+  assert.equal(first.manifest.paths.manager_workspace_root, join(f.destination, 'manager-workspace'))
+  assert.equal(first.start.environment.HARNESS_MANAGER_WORKSPACE_ROOT, join(f.destination, 'manager-workspace'))
+  const marker = join(f.destination, 'manager-workspace/.manager-workspace')
+  assert.equal(lstatSync(marker).isFile(), true)
+  assert.ok(readFileSync(marker, 'utf8').trim())
+  for (const key of ['data', 'business_agents']) {
+    const path = join(f.destination, repositoryPaths[key])
+    assert.equal(lstatSync(path).isDirectory(), true)
+    assert.equal(lstatSync(path).isSymbolicLink(), false)
+    assert.equal(git(path, 'rev-parse', '--show-toplevel'), path)
+    assert.equal(existsSync(join(f.destination, repositoryNames[key])), false)
+  }
   assert.equal('runtime' in first.manifest, false)
   assert.equal(existsSync(join(f.destination, 'hep-lab.yaml')), true)
   assert.equal(existsSync(join(f.destination, '.hep-lab')), false)
@@ -47,6 +59,52 @@ test('四仓固定SHA并列检出、重复执行幂等，check-only完全不落�
   assert.equal(doctorLab(f.destination).valid, true)
   assert.equal(statusLab(f.destination).repositories.business_agents.matches_lock, true)
   assert.equal(planUpdate(f.destination).repositories.every(item => !item.changed), true)
+})
+test('doctor拒绝缺失或链接形式的管理工作区项目边界标记', t => {
+  const f = fixture(t); initializeLab(f)
+  const marker = join(f.destination, 'manager-workspace/.manager-workspace')
+  rmSync(marker)
+  assert.ok(doctorLab(f.destination).issues.some(item => item.code === 'manager_workspace'))
+  symlinkSync(join(f.destination, 'platform-manager-dsh-home/README.md'), marker)
+  assert.ok(doctorLab(f.destination).issues.some(item => item.code === 'manager_workspace'))
+})
+test('历史并列清单仍可读取，新清单拒绝混合布局和仓库链接', t => {
+  const f = fixture(t); initializeLab(f)
+  const manifest = readLab(f.destination)
+  for (const key of ['data', 'business_agents']) {
+    const target = join(f.destination, repositoryNames[key])
+    renameSync(manifest.repositories[key].path, target)
+    manifest.repositories[key].path = target
+  }
+  manifest.paths.business_agents_root = manifest.repositories.business_agents.path
+  delete manifest.paths.manager_workspace_root
+  writeFileSync(join(f.destination, 'hep-lab.yaml'), JSON.stringify(manifest))
+  assert.equal(readLab(f.destination).repositories.data.path, join(f.destination, repositoryNames.data))
+  symlinkSync(manifest.repositories.data.path, join(f.destination, repositoryPaths.data), 'dir')
+  manifest.repositories.data.path = join(f.destination, repositoryPaths.data)
+  writeFileSync(join(f.destination, 'hep-lab.yaml'), JSON.stringify(manifest))
+  assert.throws(() => readLab(f.destination), /路径布局无效/)
+  symlinkSync(manifest.repositories.business_agents.path, join(f.destination, repositoryPaths.business_agents), 'dir')
+  manifest.repositories.business_agents.path = join(f.destination, repositoryPaths.business_agents)
+  manifest.paths.business_agents_root = manifest.repositories.business_agents.path
+  manifest.paths.manager_workspace_root = join(f.destination, 'manager-workspace')
+  writeFileSync(join(f.destination, 'hep-lab.yaml'), JSON.stringify(manifest))
+  assert.throws(() => readLab(f.destination), /符号链接/)
+})
+test('doctor校验业务仓当前验收定义且拒绝数据仓中的旧评测引用', t => {
+  const f = fixture(t), business = f.repositories.business_agents.url, data = f.repositories.data.url
+  writeFileSync(join(business, 'manifest.yaml'), 'schema_version: 1\nagents:\n  - agent_id: demo\n    path: agents/demo\n    status: active\n    evaluation_path: agents/demo/evaluation.md\n')
+  writeFileSync(join(business, 'agents/demo/evaluation.md'), '# 当前验收定义\n')
+  git(business, 'add', '.'); git(business, 'commit', '-qm', 'active evaluation')
+  f.repositories.business_agents.commit = git(business, 'rev-parse', 'HEAD')
+  const registry = `agent_id: demo\nsource_repository: ${business}\nsource_commit: ${f.repositories.business_agents.commit}\nagent_path: agents/demo\nevaluation_source:\n  repository: ${business}\n  commit: ${f.repositories.business_agents.commit}\n  path: agents/demo/evaluation.md\n`
+  writeFileSync(join(data, 'registry/agents/demo.yaml'), registry)
+  git(data, 'add', '.'); git(data, 'commit', '-qm', 'active evaluation reference')
+  f.repositories.data.commit = git(data, 'rev-parse', 'HEAD')
+  const result = initializeLab(f)
+  assert.equal(result.validation.valid, true, JSON.stringify(result.validation))
+  writeFileSync(join(f.destination, repositoryPaths.data, 'registry/agents/demo.yaml'), registry.replace(`  repository: ${business}\n`, `  repository: ${data}\n`))
+  assert.ok(doctorLab(f.destination).issues.some(item => item.code === 'agent_reference'))
 })
 test('只提供数据仓库时从 locks/repositories.yaml 推导其余三库', t => {
   const f = fixture(t), data = f.repositories.data.url
@@ -98,7 +156,7 @@ test('CLI 只传数据仓库参数即可初始化四库工作区', t => {
 })
 test('dirty工作树、非空目录、来源和版本冲突均保留用户内容', t => {
   const f = fixture(t); initializeLab(f)
-  const path = join(f.destination, 'business-agents/README.md')
+  const path = join(f.destination, repositoryPaths.business_agents, 'README.md')
   writeFileSync(path, '用户修改\n')
   assert.throws(() => initializeLab({ ...f, reuse: true }), /未提交/)
   assert.equal(readFileSync(path, 'utf8'), '用户修改\n')
@@ -107,12 +165,12 @@ test('dirty工作树、非空目录、来源和版本冲突均保留用户内容
   const other = join(f.root, 'not-empty'); mkdirSync(other); writeFileSync(join(other, 'user.txt'), 'keep')
   assert.throws(() => initializeLab({ ...f, destination: other }), /非 hep-lab/)
   assert.equal(readFileSync(join(other, 'user.txt'), 'utf8'), 'keep')
-  git(join(f.destination, 'business-agents'), 'remote', 'set-url', 'origin', f.repositories.data.url)
+  git(join(f.destination, repositoryPaths.business_agents), 'remote', 'set-url', 'origin', f.repositories.data.url)
   assert.throws(() => initializeLab({ ...f, reuse: true }), /未提交|来源/)
 })
 test('复用 gitlab 远端并接受 HTTP 来源，检查过程不修改已有仓库', t => {
   const f = fixture(t); initializeLab(f)
-  const business = join(f.destination, 'business-agents')
+  const business = join(f.destination, repositoryPaths.business_agents)
   git(business, 'remote', 'rename', 'origin', 'gitlab')
   assert.equal(initializeLab({ ...f, reuse: true }).validation.valid, true)
   assert.equal(doctorLab(f.destination).valid, true)
@@ -163,7 +221,7 @@ test('lock不一致先拒绝，不写入目标仓库或用户文件', t => {
   writeFileSync(join(data, 'locks/repositories.yaml'), `repositories:\n  business_agents:\n    url: ${f.repositories.business_agents.url}\n    commit: ${'a'.repeat(40)}\n`)
   git(data, 'add', '.'); git(data, 'commit', '-qm', 'bad lock'); f.repositories.data.commit = git(data, 'rev-parse', 'HEAD')
   assert.throws(() => initializeLab(f), /输入与仓库锁定/)
-  assert.equal(existsSync(join(f.destination, 'business-agents')), false)
+  assert.equal(existsSync(join(f.destination, repositoryPaths.business_agents)), false)
   assert.equal(existsSync(join(f.destination, 'hep-lab.yaml')), false)
 })
 test('拒绝已移除的元数据目录', t => {
@@ -185,7 +243,7 @@ test('控制仓上下文与运行清单共存，旧入口不删除工作区文�
 })
 test('doctor拒绝tracked凭据、嵌套repo和Registry错绑', t => {
   const f = fixture(t); initializeLab(f)
-  const business = join(f.destination, 'business-agents')
+  const business = join(f.destination, repositoryPaths.business_agents)
   git(business, 'config', 'user.name', 'Lab Test'); git(business, 'config', 'user.email', 'lab@example.invalid')
   writeFileSync(join(business, '.env'), 'KEY=fixture\n'); git(business, 'add', '-f', '.env'); git(business, 'commit', '-qm', 'unsafe')
   mkdirSync(join(business, 'nested')); git(join(business, 'nested'), 'init', '-b', 'main')

@@ -181,7 +181,7 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   }, [sessions, refresh, active])
   useEffect(() => {
     if (!active) return
-    const roots = state.inventory ? [state.inventory.root, ...(state.inventory.workspace?.legacyRoots ?? [])] : []
+    const roots = state.inventory ? (state.inventory.workspace?.managementRoots ?? [state.inventory.root, ...(state.inventory.workspace?.legacyRoots ?? [])]) : []
     const pending = sessionList.ids.filter(id => roots.includes(sessionList.byId[id]?.cwd ?? '') && !observedSessions.current.has(id))
     pending.forEach(id => observedSessions.current.add(id))
     void Promise.all(Array.from({ length: Math.min(4, pending.length) }, async () => {
@@ -255,7 +255,7 @@ export function HomePage({ catalog, rpc, updates, sessions, assistant, navigate,
   }, [active, riskState.enabled, riskState.phase, riskState.facts, riskExpiryRevision])
   const sessionTasks = assets ? sessionList.ids.flatMap(id => {
     const row = sessionList.byId[id]
-    if (!row || ![assets.root, ...(assets.workspace?.legacyRoots ?? [])].includes(row.cwd ?? '')) return []
+    if (!row || !(assets.workspace?.managementRoots ?? [assets.root, ...(assets.workspace?.legacyRoots ?? [])]).includes(row.cwd ?? '')) return []
     const projection = row.projectionValues?.harnessPlatformAssistant as AssistantView | undefined
     if (!projection || projection.session_id !== id || projection.workspace_id !== assets.workspace?.id) return []
     if (!row.running && !projection.pending_proposals && !projection.unknown_proposals) return []

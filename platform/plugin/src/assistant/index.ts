@@ -1,6 +1,6 @@
 import { assetText } from '../agents/asset-text.ts'
 import { createHash, randomUUID } from 'node:crypto'
-import { assistantWorkspaceScope, workspaceIdentity } from '../workspace.ts'
+import { assistantWorkspaceScope, workspaceIdentity, workspaceOwnsCwd } from '../workspace.ts'
 import { listRepositories, resolveRepository } from './repositories.ts'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
@@ -661,12 +661,13 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
             if (state.repository && state.repository.id !== body.repository_id) throw new Error('已有会话不能切换目标仓库，请新建任务')
             if (!state.repository) {
               const repository = resolveRepository(root, body.repository_id)
-              if (repository.workspace !== session.header.cwd) throw new Error('已有会话工作目录与目标仓库不一致')
+              if (repository.workspace !== session.header.cwd && !(repository.id === 'data' && workspaceOwnsCwd(root, session.header.cwd))) throw new Error('已有会话工作目录与目标仓库不一致')
               await record(id, { kind: 'repository', repository })
             }
           }
-          if (!state.repository && body.repository_id === undefined && session.header.cwd === workspaceIdentity(root).root) {
-            await record(id, { kind: 'repository', repository: resolveRepository(root) })
+          if (!state.repository && body.repository_id === undefined) {
+            if (workspaceOwnsCwd(root, session.header.cwd)) await record(id, { kind: 'repository', repository: resolveRepository(root, 'data') })
+            else if (session.header.cwd === resolveRepository(root).workspace) await record(id, { kind: 'repository', repository: resolveRepository(root) })
           }
           taskContext = state.task_context
         }
