@@ -48,7 +48,7 @@ import { createAssetBuildHandler } from './asset-build.ts'
 import { createAssetDependenciesHandler } from './asset-dependencies.ts'
 import { createMigrationsHandler } from './migrations.ts'
 import { createComputeFreezeHandler } from './compute-freeze.ts'
-import { programRoot, workspaceConfigPath, workspaceLocalPath } from '../workspace.ts'
+import { businessAgentPath, businessAgentsRoot, programRoot, workspaceConfigPath, workspaceLocalPath } from '../workspace.ts'
 import { discoverTaskCapabilities, type CapabilityOptions } from '../tasks/capabilities.ts'
 import { atomicWrite, candidateFiles, dataPath, gitCandidateDigest, sourceInfo } from '../tasks/files.ts'
 import { previewTaskAssembly, applyTaskAssembly, type TaskAssemblyInput } from '../tasks/assembly.ts'
@@ -373,8 +373,8 @@ function casesFromEvaluation(parsed: unknown) {
 }
 
 async function loadEvaluation(root: string, agentId: string, signal?: AbortSignal) {
-  const path = repoPath(root, `agents/${agentId}/evaluation.md`)
-  assertNoSymlinkPath(root, path)
+  const path = businessAgentPath(root, agentId, 'evaluation.md')
+  assertNoSymlinkPath(businessAgentsRoot(root), path)
   const content = readText(path)
   // 原文、摘要及解析共享同一个快照，避免读取期间保存造成口径错配。
   const parsed = await parseJsonCommandAsync(root, ['-c', evaluationPreviewCode(root)], 'evaluation.md 合同解析失败', signal, content)
@@ -568,7 +568,7 @@ function featureSnapshot(root: string, id: string) { return sha256(`${readText(c
 
 function evaluationDigest(root: string, agentId: string, caseIds: string[]): string {
   const python = ['import json,sys', 'from pathlib import Path', `sys.path.insert(0, ${JSON.stringify(join(programRoot(), dirname(EVALUATION_CONTRACT)))})`, 'from evaluation_contract import evaluation_digest', 'print(json.dumps({"digest":evaluation_digest(Path(sys.argv[1]),json.loads(sys.argv[2]))}))'].join('\n')
-  return String(parseJsonCommand(root, ['-c', python, `agents/${agentId}/evaluation.md`, JSON.stringify(caseIds)], '无法锁定约定评测口径').digest)
+  return String(parseJsonCommand(root, ['-c', python, businessAgentPath(root, agentId, 'evaluation.md'), JSON.stringify(caseIds)], '无法锁定约定评测口径').digest)
 }
 
 function creationView(root: string, id: string, change: JsonMap) {
@@ -1207,9 +1207,13 @@ function assetTree(root: string, experimentId: string): AssetNode[] {
     }
     return lstatSync(file).isFile() ? { name, path: rel, kind: 'file' } : null
   }
-  return [`evolution/experiments/${experimentId}/candidate`, `agents/${exp.agent_id}/evaluation.md`,
+  const evaluation = businessAgentPath(root, exp.agent_id, 'evaluation.md')
+  const evaluationNode = existsSync(evaluation) && !lstatSync(evaluation).isSymbolicLink()
+    ? { name: 'evaluation.md', path: `agents/${exp.agent_id}/evaluation.md`, kind: 'file' as const } : null
+  return [`evolution/experiments/${experimentId}/candidate`,
     ...['hypothesis.md', 'evaluation/observations.md', 'decision.md'].map(path => `evolution/experiments/${experimentId}/${path}`)]
     .map(node).filter((item): item is AssetNode => item !== null)
+    .concat(evaluationNode ? [evaluationNode] : [])
 }
 
 function assertNoSymlinkPath(root: string, target: string) {
@@ -1239,9 +1243,11 @@ function editablePath(root: string, payload: JsonMap, relPath: string) {
     ['decision.md', 'hypothesis.md', 'evaluation/observations.md'].some(path => rel === `evolution/experiments/${experimentId}/${path}`) ||
     rel === `agents/${agentId}/evaluation.md`
   if (!allowed) throw new RpcError('path_rejected', '路径不在可编辑范围内', { path: rel })
-  const file = repoPath(root, rel)
-  assertNoSymlinkPath(root, dirname(file))
-  if (existsSync(file)) assertNoSymlinkPath(root, file)
+  const businessEvaluation = rel === `agents/${agentId}/evaluation.md`
+  const file = businessEvaluation ? businessAgentPath(root, agentId, 'evaluation.md') : repoPath(root, rel)
+  const ownerRoot = businessEvaluation ? businessAgentsRoot(root) : root
+  assertNoSymlinkPath(ownerRoot, dirname(file))
+  if (existsSync(file)) assertNoSymlinkPath(ownerRoot, file)
   return { file, rel, agentId }
 }
 

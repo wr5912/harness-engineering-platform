@@ -45,6 +45,22 @@ def asset_root():
         raise PlatformError("无法读取部署定位文件 ~/.config/harness-engineering-platform/workspace.json。") from None
 
 
+def business_agents_root():
+    explicit = os.environ.get("HARNESS_BUSINESS_AGENTS_ROOT")
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    config = asset_root() / "config" / "repositories.json"
+    try:
+        value = json.loads(config.read_text(encoding="utf-8"))
+        entry = next((item for item in value.get("repositories", []) if item.get("id") == "business-agents"), None)
+        if isinstance(entry, dict) and isinstance(entry.get("path"), str) and entry["path"].strip():
+            return (asset_root() / entry["path"]).resolve()
+    except (OSError, ValueError, TypeError):
+        pass
+    sibling = (asset_root().parent / "business-agents").resolve()
+    return sibling if sibling.is_dir() else asset_root().resolve()
+
+
 def platform_home():
     selected = os.environ.get("HARNESS_MANAGER_DSH_HOME")
     if not selected:
@@ -102,6 +118,7 @@ def runtime_environment(home):
             environment[name] = values[name]
     return {**environment, "DSH_HOME": str(home), "HARNESS_ASSET_ROOT": str(asset_root()),
             "HARNESS_PROGRAM_ROOT": str(REPO),
+            "HARNESS_BUSINESS_AGENTS_ROOT": str(business_agents_root()),
             "HARNESS_PYTHON": sys.executable,
             "HARNESS_SITES_CONFIG": str(asset_root() / "config" / "sites.json")}
 

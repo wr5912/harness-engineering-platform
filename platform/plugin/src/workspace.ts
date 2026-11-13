@@ -66,6 +66,29 @@ export function workspaceConfigPath(assetRoot: string, name: string): string {
   return legacy[name] ? join(resolve(assetRoot), legacy[name]) : current
 }
 
+/** 业务 Agent 的设计、评测和 Harness 来源根；运行状态仍归数据工作区。 */
+export function businessAgentsRoot(assetRoot: string): string {
+  const explicit = process.env.HARNESS_BUSINESS_AGENTS_ROOT
+  if (explicit) return resolve(explicit)
+  const repositories = join(resolve(assetRoot), 'config/repositories.json')
+  try {
+    const value = JSON.parse(readFileSync(repositories, 'utf8'))
+    const entry = Array.isArray(value?.repositories)
+      ? value.repositories.find((item: any) => item?.id === 'business-agents')
+      : undefined
+    if (typeof entry?.path === 'string' && entry.path) return resolve(resolve(assetRoot), entry.path)
+  } catch { /* 旧工作区没有来源清单时继续使用相邻仓库。 */ }
+  const sibling = resolve(assetRoot, '..', 'business-agents')
+  return existsSync(sibling) ? sibling : resolve(assetRoot)
+}
+
+export function businessAgentPath(assetRoot: string, agentId: string, relative = ''): string {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(agentId) || relative.split(/[\\/]/).some(part => !part || part === '.' || part === '..')) {
+    throw new Error('业务 Agent 来源路径无效')
+  }
+  return join(businessAgentsRoot(assetRoot), 'agents', agentId, relative)
+}
+
 export function workspaceLocalPath(assetRoot: string, ...parts: string[]): string {
   return join(resolve(assetRoot), '.local', ...parts)
 }

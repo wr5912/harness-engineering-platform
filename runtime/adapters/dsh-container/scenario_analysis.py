@@ -157,7 +157,7 @@ def _effect_inputs(run_dir: Path, inputs: dict) -> dict:
             "candidate_sha256", "harness_trees", "reference_tree", "evaluation_sha256", "evaluation_cases",
             "case_catalog", "selection_mode", "review_mode", "review_contract", "configured_capabilities",
             "declared_guard", "evaluation_implementation", "dependency_env", "git_version", "program_origin",
-            "asset_origin", "model", "executor", "mcp_fixture", "external_inputs")
+            "asset_origin", "business_origin", "model", "executor", "mcp_fixture", "external_inputs")
     projection = {key: inputs[key] for key in keys if key in inputs}
     if isinstance(inputs.get("harness_review"), dict):
         projection["harness_review"] = {key: value for key, value in inputs["harness_review"].items() if key != "sources"}

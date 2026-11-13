@@ -43,7 +43,7 @@
 |---|---|---|
 | 开发智能体的运行配置 | 开发模式实际采用的 `session_preset=cordis`、`/work/AGENTS.md` 与 `/work/AGENTS.local.md` 指令链，以及 `authoring.compose.yaml` 渲染出的有效启动与挂载配置 | 开发者；改变这些有效值属于开发环境变更 |
 | 被开发或优化的 Harness 资产 | 所选 Experiment 的 `candidate/dsh/{workspace,presets,managed}` | 开发者在任务范围内编辑，经 Git 管理 |
-| 需求、测试数据与评估标准 | `agents/<agent-id>/evaluation.md` 集中维护业务 Case 的名称、用户输入和预期 | 每个 Agent 只有一个可编辑来源；单次评测期间保持不变 |
+| 需求、测试数据与评估标准 | business-agents 的 `agents/<agent-id>/evaluation.md` 集中维护业务 Case 的名称、用户输入和预期 | 每个 Agent 只有一个可编辑来源；单次评测期间保持不变 |
 | 运行状态与运行记录 | 运行状态是实例 `DSH_HOME` 数据卷；持久记录是 `evolution/experiments/<id>/runs/` 与 `evaluation/evidence/` | 状态按实例生命周期管理；受管执行的 Run 事实和必要证据独立保留，不当作缓存丢弃 |
 
 开发会话里读到的业务角色指令（例如目标是网络安全运营专家）是第二类资产的正文，读它是为了修改它，不代表开发工具要切换成业务智能体。这一点不能只靠文字提醒：开发会话注册的工作区是 `/work`，会话身份来自受控只读的 `/work/AGENTS.md`（见 5.2 节），目标自己的 `AGENTS.md` 仍留在 `/work/harness/workspace` 供阅读和编辑，但不会被注入为会话身份。
@@ -223,7 +223,7 @@ HOME 卷名按 Compose 自身的卷标签解析，不按 `<project>-home` 猜测
 
 ### 5.3 判分材料不进入被测容器
 
-Agent 的当前判分材料只有 `agents/<agent-id>/evaluation.md`，其中每个业务 Case 聚合名称、用户输入和预期。该文件保留在宿主侧，由开发流程和评测执行器读取；被测容器不挂载 `/work/reference`。
+Agent 的当前判分材料只有 business-agents 的 `agents/<agent-id>/evaluation.md`，其中每个业务 Case 聚合名称、用户输入和预期。该文件保留在宿主侧，由开发流程和评测执行器读取；被测容器不挂载 `/work/reference`。
 
 因此：
 
@@ -325,7 +325,7 @@ Agent 的当前判分材料只有 `agents/<agent-id>/evaluation.md`，其中每�
 | 启动器 | `runtime/adapters/dsh-container/dsh-dev` |
 | 受管评测 | `runtime/adapters/dsh-container/dsh-eval`、`dsh-eval-{api,browser,common}.mjs`、`run_record.py` |
 | 来源解析 | `runtime/adapters/dsh-container/source_contract.py`、`sources.json` |
-| 评测合同 | `agents/<agent-id>/evaluation.md`、`runtime/research/evaluation_contract.py` |
+| 评测合同 | `business-agents/agents/<agent-id>/evaluation.md`、`runtime/research/evaluation_contract.py` |
 | 核验 | `verify-load.sh`、`verify-load.mjs`、`preflight-access.py`、`tree-digest.mjs` |
 | 仓库校验器 | `runtime/research/validate_repository.py` |
 | 测试 | `runtime/adapters/dsh-container/test_*.py`、`test_*.mjs`、`tests/test_validators.py` |

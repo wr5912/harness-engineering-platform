@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import re
 import stat
@@ -137,10 +138,27 @@ def real_file_below(root: Path, relative: Path) -> bool:
 
 def _agent_asset_roots(repo: Path, agent_id: str) -> dict:
     """Agent 当前评测事实源根；缺失时不伪造空目录。"""
+    candidates = []
+    explicit = os.environ.get("HARNESS_BUSINESS_AGENTS_ROOT")
+    if explicit:
+        candidates.append(Path(explicit).expanduser().resolve())
+    config = repo / "config" / "repositories.json"
+    try:
+        value = json.loads(config.read_text(encoding="utf-8"))
+        entry = next((item for item in value.get("repositories", []) if item.get("id") == "business-agents"), None)
+        if isinstance(entry, dict) and isinstance(entry.get("path"), str):
+            candidates.append((repo / entry["path"]).resolve())
+    except (OSError, ValueError, TypeError):
+        pass
+    candidates.extend([repo.parent / "business-agents", repo])
+    for base in candidates:
+        agent_dir = base / "agents" / agent_id
+        if agent_dir.is_dir() and not agent_dir.is_symlink() and real_file_below(agent_dir, Path("evaluation.md")):
+            return {"reference_root": str(agent_dir), "business_root": str(base)}
     agent_dir = repo / "agents" / agent_id
     valid = agent_dir.is_dir() and not agent_dir.is_symlink() \
         and real_file_below(agent_dir, Path("evaluation.md"))
-    return {"reference_root": str(agent_dir) if valid else None}
+    return {"reference_root": str(agent_dir) if valid else None, "business_root": str(repo) if valid else None}
 
 
 def _experiment_contract(
@@ -273,8 +291,11 @@ def _resolve_experiment(source_id: str, *, repo: Path, sources: Path, lock_path:
             raise ValueError("invalid experiment profile manifest")
         profile_manifest = repo / relative
     lock = _read_source_lock(lock_path)
-    return _experiment_contract(source_id, item, repo=repo, lock=lock, lock_path=lock_path,
-                                profile_manifest=profile_manifest, require_assets=require_assets)
+    contract = _experiment_contract(source_id, item, repo=repo, lock=lock, lock_path=lock_path,
+                                    profile_manifest=profile_manifest, require_assets=require_assets)
+    if contract.get("reference_root"):
+        contract["evaluation_path"] = str(Path(contract["reference_root"]) / "evaluation.md")
+    return contract
 
 
 def _read_source_lock(lock_path: Path) -> dict:

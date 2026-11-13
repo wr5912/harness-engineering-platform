@@ -16,6 +16,30 @@ const git = (root: string, args: string[]) => {
   return result.stdout
 }
 
+function businessRoot(root: string): string {
+  const explicit = process.env.HARNESS_BUSINESS_AGENTS_ROOT
+  if (explicit) return resolve(explicit)
+  try {
+    const value = JSON.parse(readFileSync(join(root, 'config/repositories.json'), 'utf8'))
+    const entry = Array.isArray(value?.repositories) ? value.repositories.find((item: any) => item?.id === 'business-agents') : undefined
+    if (typeof entry?.path === 'string') return resolve(root, entry.path)
+  } catch { /* 旧数据工作区没有业务仓登记时继续使用相邻仓库。 */ }
+  const sibling = resolve(root, '..', 'business-agents')
+  return existsSync(sibling) ? sibling : resolve(root)
+}
+
+function businessCommit(root: string, agentId: string): { root: string; commit: string } {
+  const base = businessRoot(root)
+  try {
+    const registry = readFileSync(join(root, 'registry/agents', `${agentId}.yaml`), 'utf8')
+    const commit = /^source_commit:\s*([0-9a-f]{40})\s*$/m.exec(registry)?.[1]
+    if (commit) return { root: base, commit }
+  } catch { /* 使用当前 business 仓库 HEAD。 */ }
+  const commit = git(base, ['rev-parse', 'HEAD']).toString().trim()
+  if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error('无法读取 business-agents 固定提交')
+  return { root: base, commit }
+}
+
 /** 只物化同一提交内的选定 Agent/版本；原 Candidate、索引和分支均不写入。 */
 export function materializeEvaluationSource(root: string, id: string, ref: string) {
   if (!/^git:[a-f0-9]{40}$/.test(ref)) throw new Error('source_ref 必须是 git:<40位提交>')
@@ -31,8 +55,15 @@ export function materializeEvaluationSource(root: string, id: string, ref: strin
     const path = match[3]
     if (path.split('/').some(part => ['runs', '.git', '.local', 'node_modules', 'RuntimeHOME', 'sessions', 'cache', '__pycache__'].includes(part)) || path.endsWith('.llm-api-key')) return []
     if (!['100644', '100755'].includes(match[1])) throw new Error('固定评测来源不能包含链接或特殊文件')
-    return [{ path, mode: match[1] === '100755' ? 0o755 : 0o644, object: match[2] }]
+    return [{ path, mode: match[1] === '100755' ? 0o755 : 0o644, object: match[2], sourceRoot: root }]
   })
+  const business = businessCommit(root, identity.agent_id)
+  if (!entries.some(entry => entry.path === `agents/${identity.agent_id}/evaluation.md`)) {
+    const businessRows = git(business.root, ['ls-tree', '-rz', business.commit, `agents/${identity.agent_id}/evaluation.md`]).toString().split('\0').filter(Boolean)
+    const match = businessRows.map(row => /^(\d+) blob ([a-f0-9]+)\t([\s\S]+)$/.exec(row)).find(value => value?.[3] === `agents/${identity.agent_id}/evaluation.md`)
+    if (!match) throw new Error('business-agents 固定提交缺少同版本评测定义')
+    entries.push({ path: match[3], mode: match[1] === '100755' ? 0o755 : 0o644, object: match[2], sourceRoot: business.root })
+  }
   if (!entries.some(entry => entry.path === `agents/${identity.agent_id}/evaluation.md`)) throw new Error('固定提交缺少同版本评测定义')
   const cache = dataPath(root, `.local/evaluation-sources/${commit}/${id}`), marker = join(cache, 'snapshot.json')
   const validate = () => {
@@ -52,14 +83,14 @@ export function materializeEvaluationSource(root: string, id: string, ref: strin
   mkdirSync(temporary, { recursive: true })
   try {
     const files = entries.map(entry => {
-      const bytes = git(root, ['cat-file', 'blob', entry.object]), target = dataPath(temporary, entry.path)
+      const bytes = git(entry.sourceRoot, ['cat-file', 'blob', entry.object]), target = dataPath(temporary, entry.path)
       mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, bytes, { mode: entry.mode })
       return { ...entry, sha256: sha(bytes) }
     })
     const candidate = join(temporary, `evolution/experiments/${id}/candidate`)
     const dependencies = reuseParentDependencies(root, id, candidate)
     const candidateSha = candidateDigest(candidate)
-    writeFileSync(join(temporary, 'snapshot.json'), JSON.stringify({ commit, experiment_id: id, files, candidate_sha256: candidateSha, dependency_reuse: dependencies }))
+    writeFileSync(join(temporary, 'snapshot.json'), JSON.stringify({ commit, business_commit: business.commit, experiment_id: id, files, candidate_sha256: candidateSha, dependency_reuse: dependencies }))
     try { renameSync(temporary, cache) } catch (error) { if (!existsSync(cache)) throw error }
   } finally { rmSync(temporary, { recursive: true, force: true }) }
   return validate()

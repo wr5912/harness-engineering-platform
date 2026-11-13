@@ -12,7 +12,7 @@ import { VERSION_ID, assertInheritableVersion } from '../version-id.ts'
 import { allocateVersion, governanceSnapshot, withVersionLock } from './version-governance.ts'
 import { assertAssetPath, BOOTSTRAP_ENV, candidateDigest, candidateFiles, dataPath, sha256 } from '../tasks/files.ts'
 import { assertCandidateAssets } from './candidate-assets.ts'
-import { instanceStateRoot, workspaceOwnsInstance } from '../workspace.ts'
+import { businessAgentPath, instanceStateRoot, workspaceOwnsInstance } from '../workspace.ts'
 import { inspectAssetBuild } from './asset-build.ts'
 import { migrationRunEvidence } from './migrations-evidence.ts'
 import { parseEvaluationDocument } from '../evaluation/cases.ts'
@@ -40,11 +40,12 @@ function jsonSafe(value: unknown, name: string, maximum = 128 * 1024): void {
   if (!content || Buffer.byteLength(content) > maximum) fail(`${name} 内容超过允许范围`)
   if (assetText(`${name}.json`, content).redacted) fail(`${name} 包含凭据常量`, 'secret_rejected')
 }
-function treeDigest(root: string): string {
+function treeDigest(root: string, excludeEvaluation = false): string {
   if (!existsSync(root) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) fail('迁移目录不存在或不是实体目录', 'conflict')
   const entries: unknown[] = []
   function walk(relative: string) {
     for (const name of readdirSync(join(root, relative)).sort()) {
+      if (excludeEvaluation && !relative && name === 'evaluation.md') continue
       const path = relative ? `${relative}/${name}` : name, file = dataPath(root, path), stat = lstatSync(file)
       if (stat.isDirectory()) { entries.push([path, 'directory']); walk(path) }
       else if (stat.isFile()) entries.push([path, stat.mode & 0o111 ? 0o755 : 0o644, sha256(readFileSync(file))])
@@ -228,7 +229,7 @@ export function createMigrationsHandler(rootPath: string) {
         change.parent_experiment_id = parent.id; change.parent_ref = change.baseline_ref = parent.ref; change.research_question = parent.question
         operation.manifest_sha256 = parent.manifest_sha256
         writeFileSync(join(experiment, 'hypothesis.md'), `# ${operation.experiment_id}\n\n研究问题：${parent.question}\n\n固定继承来源见 [change.yaml](change.yaml)，外部来源与转换范围见 [迁移回执](${EVIDENCE})。\n`)
-        const evaluation = dataPath(root, `agents/${agent}/evaluation.md`), before = existsSync(evaluation) ? readFileSync(evaluation, 'utf8') : ''
+        const evaluation = businessAgentPath(root, agent, 'evaluation.md'), before = existsSync(evaluation) ? readFileSync(evaluation, 'utf8') : ''
         finalEvaluation = before
         if (caseIds.length) operation.evaluation_before_sha256 = existsSync(evaluation) ? sha256(before) : null
         if (cases.length) {
@@ -237,6 +238,7 @@ export function createMigrationsHandler(rootPath: string) {
           writeFileSync(join(directory, 'evaluation.after.md'), finalEvaluation)
         }
       }
+      if (!parent) operation.evaluation_after_sha256 = sha256(finalEvaluation)
       if (caseIds.length) {
         const actualCases = (await parseEvaluationDocument(root, finalEvaluation, signal)).cases
         for (const caseId of caseIds) if (!Object.hasOwn(actualCases, caseId)) fail(`迁移关键用例 ${caseId} 不存在于目标 Agent 的最终评测定义中`)
@@ -255,7 +257,7 @@ export function createMigrationsHandler(rootPath: string) {
       const receipt = { schema_version: 1, generated: true, operation_id: operation.operation_id, agent_id: agent, experiment_id: operation.experiment_id, created_at: operation.created_at, source: { source_id: source.source_id, fingerprint: source.fingerprint, provenance: source.provenance, frameworks: source.frameworks, versions: source.versions }, parent: parent ? { experiment_id: parent.id, ref: parent.ref } : null, selected, candidate_sha256: operation.candidate_sha256, asset_list_sha256: operation.asset_list_sha256, mapping: body.mapping, uncovered, scope_limitations: scopeLimitations, evaluation_case_ids: caseIds, validation, note: '来源和映射为此次生成的固定回执；业务等效性须由实际 DSH 行为与评测证据证明。' }
       migrationWrite(join(experiment, EVIDENCE), receipt)
       operation.experiment_tree_sha256 = treeDigest(experiment)
-      if (!parent) operation.agent_tree_sha256 = treeDigest(join(stage, 'agents', agent))
+      if (!parent) operation.agent_tree_sha256 = treeDigest(join(stage, 'agents', agent), true)
       if (governanceSnapshot(root, agent) !== governanceBefore) fail('准备期间版本或来源已变化，请重新预览', 'conflict')
       operation.summary = { agent_id: agent, experiment_id: operation.experiment_id, governance_sha256: governanceBefore, target_kind: target.kind, source_id: source.source_id, fingerprint: source.fingerprint, selected, mapping: body.mapping, uncovered, scope_limitations: scopeLimitations, evaluation_case_ids: caseIds, candidate_sha256: operation.candidate_sha256, asset_list_sha256: operation.asset_list_sha256, active_version_changed: !parent }
       operation.validation = validation
@@ -281,10 +283,10 @@ export function createMigrationsHandler(rootPath: string) {
       loadMigrationSource(root, operation.source_id, operation.source_fingerprint)
       const stage = join(directory, 'stage'), stagedExperiment = join(stage, EXP_PATH(operation.experiment_id)), targetExperiment = dataPath(root, EXP_PATH(operation.experiment_id))
       const targetAgent = dataPath(root, `agents/${operation.agent_id}`), stagedAgent = join(stage, 'agents', operation.agent_id)
-      const evaluation = dataPath(root, `agents/${operation.agent_id}/evaluation.md`)
+      const evaluation = businessAgentPath(root, operation.agent_id, 'evaluation.md')
       if (operation.target_kind === 'new-agent') {
-        if (existsSync(targetAgent)) { if (treeDigest(targetAgent) !== operation.agent_tree_sha256) fail('目标 Agent 已存在或已变化，未覆盖', 'conflict') }
-        else if (!existsSync(stagedAgent) || treeDigest(stagedAgent) !== operation.agent_tree_sha256) fail('暂存 Agent 发生变化', 'conflict')
+        if (existsSync(targetAgent)) { if (treeDigest(targetAgent, true) !== operation.agent_tree_sha256) fail('目标 Agent 已存在或已变化，未覆盖', 'conflict') }
+        else if (!existsSync(stagedAgent) || treeDigest(stagedAgent, true) !== operation.agent_tree_sha256) fail('暂存 Agent 发生变化', 'conflict')
       } else {
         if (sha256(readFileSync(dataPath(root, `agents/${operation.agent_id}/manifest.yaml`))) !== operation.manifest_sha256) fail('目标 Agent 当前版本或登记已变化，请重新预览', 'conflict')
         if (operation.evaluation_before_sha256 !== undefined) {
@@ -299,7 +301,13 @@ export function createMigrationsHandler(rootPath: string) {
       operation.state = 'publishing'; delete operation.error; saveOperation(root, operation)
       // 每棵完整目录通过 rename 发布；中断后按相同身份和摘要继续，绝不覆盖第三方改动。
       if (!existsSync(targetExperiment)) { mkdirSync(dirname(targetExperiment), { recursive: true }); renameSync(stagedExperiment, targetExperiment) }
-      if (operation.target_kind === 'new-agent' && !existsSync(targetAgent)) { mkdirSync(dirname(targetAgent), { recursive: true }); renameSync(stagedAgent, targetAgent) }
+      if (operation.target_kind === 'new-agent' && !existsSync(targetAgent)) {
+        mkdirSync(dirname(targetAgent), { recursive: true }); renameSync(stagedAgent, targetAgent)
+        const stagedEvaluation = join(targetAgent, 'evaluation.md'), targetEvaluation = businessAgentPath(root, operation.agent_id, 'evaluation.md')
+        if (!existsSync(stagedEvaluation)) fail('迁移目标缺少业务评测定义', 'conflict')
+        if (existsSync(targetEvaluation)) fail('业务仓库已有同名评测定义，未覆盖', 'conflict')
+        mkdirSync(dirname(targetEvaluation), { recursive: true }); renameSync(stagedEvaluation, targetEvaluation)
+      }
       if (operation.target_kind === 'new-version' && operation.evaluation_after_sha256 && (existsSync(evaluation) ? sha256(readFileSync(evaluation)) : null) !== operation.evaluation_after_sha256) {
         const temporary = `${evaluation}.${operation.operation_id}.tmp`
         try {
@@ -368,7 +376,7 @@ export function createMigrationsHandler(rootPath: string) {
       if (body.expected_candidate_sha256 !== digest) fail('Candidate 已变化，请重新读取后核对解决项', 'conflict')
       if (!Array.isArray(body.resolutions) || !body.resolutions.length || body.resolutions.length > 500) fail('resolutions 必须包含 1–500 项明确的解决说明')
       jsonSafe(body.resolutions, 'resolutions')
-      const evaluation = dataPath(root, `agents/${change.agent_id}/evaluation.md`), beforeEvaluation = readFileSync(evaluation, 'utf8')
+      const evaluation = businessAgentPath(root, change.agent_id, 'evaluation.md'), beforeEvaluation = readFileSync(evaluation, 'utf8')
       const cases = (await parseEvaluationDocument(root, beforeEvaluation, signal)).cases
       const previous = resolutionState(experiment, change, initial.receipt, initial.sha256, digest)
       const combined = new Map<string, MigrationMap>((previous.resolution.status === 'current' ? previous.resolution.resolutions : []).map((item: MigrationMap) => [item.mapping_index === undefined ? `uncovered:${item.uncovered_index}` : `mapping:${item.mapping_index}`, item]))
@@ -407,7 +415,7 @@ export function createMigrationsHandler(rootPath: string) {
     const changeFile = dataPath(experiment, 'change.yaml'), changeSnapshot = readFileSync(changeFile, 'utf8')
     const change = versionIdentity(root, id), initial = migrationReceipt(experiment, id, change, operation), receipt = initial.receipt
     const candidate = join(experiment, 'candidate'), currentDigest = candidateDigest(candidate)
-    const evaluationFile = dataPath(root, `agents/${change.agent_id}/evaluation.md`)
+    const evaluationFile = businessAgentPath(root, change.agent_id, 'evaluation.md')
     const evaluationSnapshot = existsSync(evaluationFile) ? readFileSync(evaluationFile, 'utf8') : null
     const resolutionPointer = change.migration?.resolution_receipt
     const resolutionFile = typeof resolutionPointer === 'string' && /^evaluation\/evidence\/migration-resolutions\/[a-f0-9]{64}\.json$/.test(resolutionPointer)

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { load } from 'js-yaml'
 import { candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
-import { workspaceConfigPath } from '../workspace.ts'
+import { businessAgentPath, businessAgentsRoot, workspaceConfigPath } from '../workspace.ts'
 import { parseEvaluationDocument } from '../evaluation/cases.ts'
 import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
 import { inspectDecisionTraining } from './compute-training.ts'
@@ -102,18 +102,19 @@ export function createComputeFreezeHandler(assetRoot: string) {
         throw new FreezeError('invalid_request', `冻结未包含完整训练材料：${ref.path}`)
       }
     }
-    const evaluationPath = `agents/${source.agent_id}/evaluation.md`, originalEvaluation = headFile(root, head, evaluationPath)
+    const businessRoot = businessAgentsRoot(root), businessHead = git(businessRoot, ['rev-parse', 'HEAD']).toString().trim()
+    const evaluationPath = `agents/${source.agent_id}/evaluation.md`, originalEvaluation = headFile(businessRoot, businessHead, evaluationPath)
     if (!originalEvaluation) throw new FreezeError('invalid_request', '评测定义缺少 Git 基准，不能局部冻结')
     const evaluationBase = hash(originalEvaluation)
     if (body.evaluation_base_sha256 && body.evaluation_base_sha256 !== evaluationBase) throw new FreezeError('conflict', '评测 Git 基准已变化，请重新预览')
-    const currentEvaluation = readFileSync(dataPath(root, evaluationPath), 'utf8')
+    const currentEvaluation = readFileSync(businessAgentPath(root, source.agent_id, 'evaluation.md'), 'utf8')
     const currentCases = await parseEvaluationDocument(root, currentEvaluation, signal)
     const projectedEvaluation = selectCases(originalEvaluation.toString(), currentEvaluation, caseIds, currentCases.catalog)
     const projectedCases = await parseEvaluationDocument(root, projectedEvaluation, signal)
     for (const id of caseIds) if (!currentCases.cases[id] || planHashes && hash(canonical(currentCases.cases[id])) !== planHashes[id]
       || canonical(currentCases.cases[id]) !== canonical(projectedCases.cases[id])
       || canonical(currentCases.catalog.find(item => item.case_id === id)) !== canonical(projectedCases.catalog.find(item => item.case_id === id))) throw new FreezeError('conflict', '所选 Case 与冻结计划或章节口径不同，请重新确认计划')
-    entries.set(evaluationPath, { content: Buffer.from(projectedEvaluation), mode: '100644' })
+    // 评测定义属于 business-agents；数据仓冻结只提交 Candidate/研究材料，保留业务仓提交和摘要到 Run 来源。
     // 删除仅限当前 Candidate 和研究资料；运行记录与其他 Experiment 均不进入提交。
     const trackedPaths = new Set(git(root, ['ls-tree', '-r', '-z', '--name-only', head]).toString().split('\0').filter(Boolean))
     const trackedOwned = [...trackedPaths].filter(path => path.startsWith(`${base}/candidate/`) || path.startsWith(`${base}/evaluation/`) || researchDocuments.includes(path))
@@ -139,10 +140,10 @@ export function createComputeFreezeHandler(assetRoot: string) {
       const tree = git(root, ['write-tree'], env).toString().trim()
       const diff = git(root, ['diff-tree', '--no-ext-diff', '--no-textconv', '--no-commit-id', '--stat', '-p', head, tree, '--', ...paths]).toString()
       const files = paths.map(path => ({ path, operation: entries.has(path) ? trackedPaths.has(path) ? 'update' : 'create' : 'delete', sha256: entries.has(path) ? hash(entries.get(path)!.content) : null }))
-      const value = { experiment_id: source.id, branch, head, tree, case_ids: caseIds,
+      const value = { experiment_id: source.id, branch, head, tree, business_commit: businessHead, case_ids: caseIds,
         case_hashes: Object.fromEntries(caseIds.map(id => [id, hash(canonical(currentCases.cases[id]))])),
         evaluation_base_sha256: evaluationBase, files, diff,
-        notes: ['仅冻结所列 Candidate、研究计划、本版本 evaluation 研究资料和选定 Case；运行记录与其他版本不进入提交，不推送、不运行 Git hooks。'] }
+        notes: ['仅冻结所列 Candidate、研究计划和选定 Case；当前业务评测定义由 business-agents 提交单独固定，运行记录与其他版本不进入提交，不推送、不运行 Git hooks。'] }
       const previewHash = hash(JSON.stringify(value))
       return { value: { ...value, preview_sha256: previewHash, freeze_input: { experiment_id: source.id, case_ids: caseIds, evaluation_base_sha256: evaluationBase, expected_preview_sha256: previewHash } }, entries, paths, deleted, temp, tempIndex, indexFile, indexBytes, branch, head, tree }
     } catch (error) { rmSync(temp, { recursive: true, force: true }); throw error }

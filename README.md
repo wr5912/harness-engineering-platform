@@ -85,7 +85,7 @@ HARNESS_ASSET_ROOT=~/harness-engineering-platform-data ./platform/dsh-platform a
 
 ## 开发与资料入口
 
-程序、通用工具和研发 Skill 在本仓库；管理助手 Skill、业务资产及运行状态在独立[数据仓库](https://github.com/wr5912/harness-engineering-platform-data)，默认 `~/harness-engineering-platform-data`。平台从自身位置定位程序，从 `HARNESS_ASSET_ROOT` 定位数据，不能靠启动目录切换来源。业务用例只维护在各 Agent 的 `evaluation.md`，历史 Run 保留冻结口径。
+程序、通用工具和研发 Skill 在本仓库；管理助手 Skill 在独立 DSH HOME；业务智能体的策划、需求、验收标准和当前 Harness 在 [business-agents](https://github.com/wr5912/business-agents)；Experiment、Run、Decision、历史证据和运行状态在独立[数据仓库](https://github.com/wr5912/harness-engineering-platform-data)。平台从 `HARNESS_ASSET_ROOT` 定位数据，并通过数据仓 `config/repositories.json` 定位 business-agents，不能靠启动目录切换来源。业务用例只维护在 business-agents 各 Agent 的 `evaluation.md`，历史 Run 保留冻结口径和来源提交。
 
 - [AGENTS.md](AGENTS.md)：研发协作与双仓边界。
 - [平台设计](docs/platform-design/README.md)：当前合同及待实现设计。

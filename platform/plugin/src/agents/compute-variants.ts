@@ -16,6 +16,7 @@ import { COMPUTE_ENTRY, computeGenerationContract, isComputeEntry } from './comp
 import { inspectDecisionTraining, type TrainingFile } from './compute-training.ts'
 import { isCodeOnlyModelRoute, isHybridWorkflowRoute } from '../workflows/code-only-route.ts'
 import { matchesWorkflowModelBinding, validateWorkflowModelRoles, type WorkflowModelRoles } from '../workflows/model-roles.ts'
+import { businessAgentPath, businessAgentsRoot } from '../workspace.ts'
 
 type Map = Record<string, any>
 type Result = { ok: true; value: any } | { ok: false; error: { code: string; message: string } }
@@ -130,7 +131,8 @@ function atomic(file: string, content: string) {
 }
 function head(root: string) { const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }); return result.status === 0 ? result.stdout.trim() : null }
 async function casesFor(root: string, agentId: string, signal?: AbortSignal) {
-  const file = safe(root, `agents/${agentId}/evaluation.md`)
+  const file = businessAgentPath(root, agentId, 'evaluation.md')
+  if (!file.startsWith(businessAgentsRoot(root) + '/') || !existsSync(file)) fail('业务 Agent 评测定义不存在')
   return parseEvaluationDocument(root, readFileSync(file, 'utf8'), signal)
 }
 function makePlan(body: Map, cases: Record<string, any>): ComputePlan {

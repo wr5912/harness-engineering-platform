@@ -233,6 +233,11 @@ export function inspectLab(manifest: LabManifest) {
     for (const key of keys) withLock(manifest.repositories[key], locks[key])
   } catch (error) { issues.push({ code: 'lock_mismatch', message: (error as Error).message }) }
   const registry = join(data, 'registry/agents'), ids = new Set<string>()
+  let businessManifest: Map<string, any> | undefined
+  try {
+    const value = readYaml(join(business.path, 'manifest.yaml'))
+    businessManifest = new Map(Array.isArray(value?.agents) ? value.agents.filter((item: any) => typeof item?.agent_id === 'string').map((item: any) => [item.agent_id, item]) : [])
+  } catch (error) { issues.push({ code: 'business_manifest', path: join(business.path, 'manifest.yaml'), message: error instanceof Error ? error.message : '业务清单无法读取' }) }
   if (!existsSync(registry)) warnings.push({ code: 'registry_missing', path: registry, message: '未找到业务仓库登记，未完成 Agent 引用校验' })
   else for (const file of readdirSync(registry).filter(name => /\.ya?ml$/.test(name)).sort()) {
     try {
@@ -241,6 +246,11 @@ export function inspectLab(manifest: LabManifest) {
       ids.add(id)
       if (item.source_repository !== business.url || item.source_commit !== business.commit) fail('Agent 来源仓库或提交与锁定不一致')
       if (typeof path !== 'string' || !(path === `agents/${id}` || path.startsWith(`agents/${id}/`)) || path.includes('..') || path.includes('\\') || !existsSync(join(business.path, path, 'harness.yaml'))) fail('Agent 源码路径无效或不存在')
+      const source = item.evaluation_source, manifestEntry = businessManifest?.get(id)
+      if (manifestEntry?.status === 'active') {
+        if (!source || source.repository !== business.url || source.commit !== business.commit || source.path !== `agents/${id}/evaluation.md`
+          || !existsSync(join(business.path, source.path))) fail('Agent 当前验收定义未锁定到 business-agents 当前提交')
+      } else if (source !== undefined) fail('archived Agent 不应保留当前 evaluation_source')
     } catch (error) { issues.push({ code: 'agent_reference', path: join(registry, file), message: (error as Error).message }) }
   }
   if (existsSync(join(data, 'agents/platform-owned')) || existsSync(join(data, 'dsh-home-profile'))) issues.push({ code: 'duplicate_source_root', path: data, message: '数据仓库仍存在应迁移的业务源码或管理 HOME 路径' })

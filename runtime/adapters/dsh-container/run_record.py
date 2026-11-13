@@ -164,6 +164,12 @@ def tree_digest(repo: Path, root: Path) -> dict:
     return snapshot(root, allowed_roots={root})
 
 
+def external_tree_digest(root: Path) -> dict:
+    """读取业务仓库的评测定义；该仓库与数据根是两个独立 Git 根。"""
+    root = root.absolute()
+    return snapshot(root, allowed_roots={root})
+
+
 def candidate_digest(root: Path) -> str:
     """与平台版本验证相同：记录 Candidate 文件路径、权限与内容，排除运行状态和依赖。"""
     if root.is_symlink() or not root.is_dir():
@@ -727,7 +733,7 @@ def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
             "source_id", "baseline_ref", "git_version", "evaluation_sha256",
             "executor", "model", "created_at", "compare_to_run_id", "candidate_sha256",
             "review_mode", "configured_capabilities", "dependency_env",
-            "program_origin", "asset_origin", "evaluation_implementation", "declared_guard", "source_ref", "source_snapshot_root", "evaluation_source", "mcp_fixture",
+            "program_origin", "asset_origin", "business_origin", "evaluation_implementation", "declared_guard", "source_ref", "source_snapshot_root", "evaluation_source", "mcp_fixture",
         )}, **({"review_contract": inputs["review_contract"]} if "review_contract" in inputs else {}),
             "candidate_trees": {key: {"tree_sha256": value.get("tree_sha256"),
                                         "file_count": value.get("file_count")}
@@ -975,7 +981,7 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
     if not valid_baseline_ref(baseline_ref):
         raise ValueError("baseline_ref must be git:<commit>, release:<id> or none:first-experiment")
     evaluation_relative = Path("agents") / agent_id / "evaluation.md"
-    evaluation_path = Path(contract.get("evaluation_path", repo / evaluation_relative))
+    evaluation_path = Path(contract.get("evaluation_path", Path(contract.get("reference_root", repo)) / "evaluation.md"))
     evaluation = load_evaluation(evaluation_path)
     cases = execution_from(evaluation, args.case)
     catalog = evaluation["catalog"]
@@ -1029,7 +1035,7 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
                 "presets": tree_digest(repo, Path(contract["presets"])),
                 "managed": tree_digest(repo, Path(contract["managed"])),
             },
-            "reference_tree": tree_digest(repo, Path(contract["reference_root"])) if contract.get("reference_root") else None,
+            "reference_tree": external_tree_digest(Path(contract["reference_root"])) if contract.get("reference_root") else None,
             "evaluation_sha256": cases_digest(cases),
             "evaluation_cases": cases,
             "case_catalog": catalog,
@@ -1044,6 +1050,8 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
             "program_origin": {**git_version(PROGRAM_ROOT), "root": str(PROGRAM_ROOT)},
             "asset_origin": {**version, "workspace_id": workspace_id(repo),
                              "candidate_sha256": source_digest},
+            "business_origin": ({**git_version(Path(contract["business_root"])), "root": str(Path(contract["business_root"]))}
+                                 if contract.get("business_root") else None),
         }
         if inputs["review_mode"] == "ai":
             inputs["review_contract"] = freeze_review_contract(repo, agent_id, run_dir, getattr(args, "model_policy", None))

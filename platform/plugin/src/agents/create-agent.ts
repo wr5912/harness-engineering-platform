@@ -1,8 +1,8 @@
 import { versionSource, versionSources } from './version-source.ts'
-import { programRoot } from '../workspace.ts'
+import { businessAgentPath, businessAgentsRoot, programRoot } from '../workspace.ts'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
@@ -125,6 +125,16 @@ export async function createAgent(rootPath: string, payload: JsonMap, signal?: A
       }
       // 同步发布已校验的两棵目录；不改写其他版本。
       renameSync(agent, targetAgent); moved.push(targetAgent)
+      const stagedEvaluation = join(targetAgent, 'evaluation.md')
+      // 迁移暂存目录仍需保持自包含，只有真实数据工作区才发布到 business-agents。
+      const targetEvaluation = existsSync(join(root, 'config/repositories.json'))
+        ? businessAgentPath(root, agentId, 'evaluation.md') : stagedEvaluation
+      if (!pathExists(stagedEvaluation)) throw new CreationError('creation_failed', '新建 Agent 缺少评测定义')
+      if (targetEvaluation !== stagedEvaluation) {
+        if (pathExists(targetEvaluation)) throw new CreationError('conflict', '业务仓库已有同名评测定义，未覆盖')
+        mkdirSync(dirname(targetEvaluation), { recursive: true })
+        renameSync(stagedEvaluation, targetEvaluation); moved.push(targetEvaluation)
+      }
       renameSync(experiment, targetExperiment); moved.push(targetExperiment)
       moved.length = 0
       return { ok: true, value: { agent_id: agentId, experiment_id: created.experiment_id, source_id: created.source_id, name, profile, status: 'created', started: false, note: `角色和首次研究版本已创建，使用方式为${profile === 'sdk' ? '官方 TypeScript SDK' : 'Web 交互'}；尚未启动实例或完成业务评测。` } }

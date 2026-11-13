@@ -1,6 +1,6 @@
 import { suggestCaseId, validateCaseIds } from './case-ids.ts'
 import { VERSION_ID } from '../version-id.ts'
-import { programRoot } from '../workspace.ts'
+import { businessAgentPath, businessAgentsRoot, programRoot } from '../workspace.ts'
 import { assertVersionIdentity } from '../agents/version-source.ts'
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
@@ -103,8 +103,9 @@ async function documentFor(root: string, body: JsonMap, signal?: AbortSignal) {
   try { assertVersionIdentity(experimentId, change) }
   catch { throw new CaseError('invalid_request', 'Experiment 身份不一致') }
   const path = `agents/${agentId}/evaluation.md`
-  await noLinks(root, join(root, path))
-  const content = await readFile(join(root, path), 'utf8')
+  const file = businessAgentPath(root, agentId, 'evaluation.md')
+  await noLinks(businessAgentsRoot(root), file)
+  const content = await readFile(file, 'utf8')
   const parsed = await parseEvaluationDocument(root, content, signal)
   return { experimentId, agentId, path, content, parsed, sha256: digest(content) }
 }

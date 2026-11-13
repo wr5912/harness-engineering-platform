@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { programRoot } from '../workspace.ts'
+import { businessAgentPath, programRoot } from '../workspace.ts'
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { dataPath } from '../tasks/files.ts'
@@ -39,7 +39,7 @@ export async function migrationRunEvidence(root: string, id: string, agent: stri
   let current: MigrationMap | undefined
   if (required.length) {
     try {
-      const content = evaluationContent === undefined ? readFileSync(dataPath(root, `agents/${agent}/evaluation.md`), 'utf8') : evaluationContent
+      const content = evaluationContent === undefined ? readFileSync(businessAgentPath(root, agent, 'evaluation.md'), 'utf8') : evaluationContent
       if (content === null) throw new Error('当前评测合同不存在')
       current = (await parseEvaluationDocument(root, content, signal)).cases
     }

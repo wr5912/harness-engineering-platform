@@ -185,7 +185,7 @@ python3 runtime/adapters/dsh-container/dsh-dev down security-operations-expert-e
 
 ## 受管评测
 
-`dsh-eval` 从 Agent 的 `evaluation.md` 读取业务 Case 的名称、用户输入和预期，并复用 `dsh-dev` 与 `run_record.py` 完成一次可封存评测。新 Run 的 `inputs.lock.json` 分别记录 `program_origin`（程序提交与 dirty 状态）和 `asset_origin`（数据提交、dirty 状态、workspace ID 与 Candidate 摘要）；既有 `git_version` 继续表示资产来源。历史 Run 不重写，摘要与 dirty 标记本身不等于可还原的源文件包。默认执行器通过 DSH Runtime Session API 运行业务 Case；显式选择 `browser` 时，才使用镜像中已有的 Playwright 依赖做 UI 冒烟：
+`dsh-eval` 从 business-agents 的 Agent `evaluation.md` 读取业务 Case 的名称、用户输入和预期，并复用 `dsh-dev` 与 `run_record.py` 完成一次可封存评测。新 Run 的 `inputs.lock.json` 分别记录 `program_origin`（程序提交与 dirty 状态）、业务 Harness/评测来源提交及 `asset_origin`（数据提交、dirty 状态、workspace ID 与 Candidate 摘要）；既有 `git_version` 继续表示资产来源。历史 Run 不重写，摘要与 dirty 标记本身不等于可还原的源文件包。默认执行器通过 DSH Runtime Session API 运行业务 Case；显式选择 `browser` 时，才使用镜像中已有的 Playwright 依赖做 UI 冒烟：
 
 本地 TypeScript 研究入口直接读取现有来源与 Run，不另存可编辑副本。`edit` 调用编辑器修改所选 Experiment 的 `candidate/`；`run` 默认对显式 Case 启用 AI 证据复核，完成后输出封存状态、工具调用与证据路径。真实业务判断仍需核对原始回答及工具记录。
 
