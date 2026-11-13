@@ -1,8 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { resolve } from 'node:path'
-import { createAgentsHandler } from './index.ts'
-import { defaultAssetRoot } from '../workspace.ts'
 
 // 与页面和助手共用智能体及版本入口；不另建迁移、创建或融合实现。
 try {
@@ -20,6 +18,8 @@ try {
     const request = { ...(input as Record<string, unknown>) }
     if (values['request-id'] !== undefined) request.request_id ??= values['request-id']
     if (values['operation-id'] !== undefined) request.operation_id ??= values['operation-id']
+    const { createAgentsHandler } = await import('./index.ts')
+    const { defaultAssetRoot } = await import('../workspace.ts')
     const result = await createAgentsHandler(resolve(values['asset-root'] ?? defaultAssetRoot()))(positionals[0]!, request, new AbortController().signal, undefined!)
     process.stdout.write(JSON.stringify(result, null, 2) + '\n')
     if (!result.ok) process.exitCode = 1
