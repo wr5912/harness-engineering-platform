@@ -75,6 +75,7 @@ clone_fixed() {
   url=$1
   commit=$2
   target=$3
+  if [ -L "$target" ]; then fail "缓存路径不能是符号链接：$target"; fi
   if [ -e "$target" ]; then
     [ -d "$target/.git" ] || fail "缓存目录不是 Git 仓库：$target"
     origin=$(git -C "$target" remote get-url origin 2>/dev/null || true)
