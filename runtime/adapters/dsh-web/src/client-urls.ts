@@ -49,7 +49,7 @@ export function transformClientUrls(source: string): string {
   const edits: { position: number; end?: number; text: string }[] = []
   function targets(node: ts.Node): void {
     // 锁定版 locale 不允许覆盖已有字典，沿共享 Web 出口适配这两个原生键，保留计时和无障碍提示。
-    if (ts.isPropertyAssignment(node) && ts.isStringLiteral(node.name) && ts.isStringLiteral(node.initializer)
+    if (ts.isPropertyAssignment(node) && ts.isStringLiteralLike(node.name) && ts.isStringLiteralLike(node.initializer)
       && ['chat.deepDiving', 'chat.deepDivingFor'].includes(node.name.text)
       && node.initializer.text.startsWith('深度求索中')) {
       edits.push({ position: node.initializer.getStart(file), end: node.initializer.end,

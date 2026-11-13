@@ -57,12 +57,8 @@ export function planMcpMigration(dataRoot: string) {
     if (lstatSync(file).isSymbolicLink()) throw new Error(`业务源码不能是链接：${file}`)
     const part = relative(join(root, extension, 'src'), file)
     if (part === 'index.ts') continue
-    move(`${extension}/src/${part}`, part === 'asset-alerts.ts' ? 'mcp/compositions/security-asset-related-alerts-readonly/src/index.ts' : `mcp/src/${part}`)
+    move(`${extension}/src/${part}`, part === 'asset-alerts.ts' ? 'mcp/compositions/security-asset-related-alerts-readonly/src/index.ts' : `mcp/.local/migration-originals/extension/src/${part}`)
   }
-  const source = join(root, extension, 'src/threat/source.ts')
-  if (existsSync(source)) write('mcp/src/threat/source.ts', readFileSync(source, 'utf8')
-    .replace("return join(assetRoot, '.local', 'artifacts', 'security-operations')", "return join(assetRoot, 'mcp', '.local')")
-    .replace("join(stateRoot, 'source', THREAT_SOURCE_COMMIT)", "join(stateRoot, 'cache', 'source', THREAT_SOURCE_COMMIT)"))
   for (const part of ['src/index.ts', 'build.mjs', 'package.json']) move(`${extension}/${part}`, `mcp/.local/migration-originals/extension/${part}`)
   const workspace = json(join(root, 'workspace.json'))
   const registration = workspace.extensions?.find((item: any) => item.id === 'security-operations-compositions')

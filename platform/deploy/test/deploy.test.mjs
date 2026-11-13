@@ -13,6 +13,7 @@ import { assertRealWorkspace, inspectDataRoot } from '../data.mts'
 import { pack } from '../pack.mts'
 import { verifyDeployment } from '../verify.mts'
 import { install } from '../install.mts'
+import { copyDataState } from '../state.mts'
 
 function workspace() {
   const root = mkdtempSync(join(tmpdir(), 'hep-deploy-test-'))
@@ -306,7 +307,7 @@ test('路径映射重写实例登记、Compose 与配置', () => {
   } finally { close() }
 })
 
-test('完整包携带原生设置及匹配的目标插件依赖，排除 HOME 运行态和准备机平台链接', () => {
+test('完整包携带原生设置、会话及匹配的目标插件依赖，排除准备机平台链接', () => {
   const { root, close } = workspace()
   try {
     const program = join(root, 'program'), data = join(root, 'data'), assets = join(root, 'assets')
@@ -321,7 +322,7 @@ test('完整包携带原生设置及匹配的目标插件依赖，排除 HOME �
     }
     const patch = '.local/platform-home/profiles/harness-platform/cordis.patch.yml'
     write(join(data, patch), '- id: llm-pi-ai\n  config: {}\n')
-    write(join(data, '.local/platform-home/sessions/private'), 'excluded')
+    write(join(data, '.local/platform-home/sessions/private'), 'session-state')
     write(join(data, '.local/credentials/models.llm-api-key'), '{}')
     for (const path of ['node/stub', 'pnpm/stub', 'python/stub', 'dsh/apps/cli/lib/bin.js',
       'program/platform/plugin/node_modules/stub', 'program/runtime/adapters/dsh-web/node_modules/stub']) write(join(assets, path), '')
@@ -345,7 +346,7 @@ test('完整包携带原生设置及匹配的目标插件依赖，排除 HOME �
     const unpacked = join(root, 'unpacked')
     tarExtract(result.archive, unpacked)
     assert.equal(readFileSync(join(unpacked, 'data', patch), 'utf8'), readFileSync(join(data, patch), 'utf8'))
-    assert.equal(existsSync(join(unpacked, 'data/.local/platform-home/sessions')), false)
+    assert.equal(existsSync(join(unpacked, 'data/.local/platform-home/sessions')), true)
     assert.equal(existsSync(join(unpacked, 'data/.local/credentials/models.llm-api-key')), true)
     assert.equal(readFileSync(join(unpacked, 'data', profile, 'package.json'), 'utf8'), manifest)
     assert.equal(existsSync(join(unpacked, 'data', profile, 'node_modules/dsh-example/index.js')), true)
@@ -359,7 +360,7 @@ test('完整包携带原生设置及匹配的目标插件依赖，排除 HOME �
     assert.equal(readFileSync(join(currentRoot, 'program/platform/deploy/install.sh'), 'utf8'), '# current installer\n')
     assert.equal(readFileSync(join(currentRoot, 'data/agents/new-agent.txt'), 'utf8'), 'uncommitted-agent')
     assert.equal(JSON.parse(readFileSync(join(currentRoot, 'data/workspace.json'), 'utf8')).id, 'current-workspace')
-    assert.equal(existsSync(join(currentRoot, 'data/.local/platform-home/sessions')), false)
+    assert.equal(existsSync(join(currentRoot, 'data/.local/platform-home/sessions')), true)
     const currentManifest = JSON.parse(readFileSync(join(currentRoot, 'manifest.json'), 'utf8'))
     assert.equal(currentManifest.package.snapshot, 'working-tree')
     assert.equal(currentManifest.data.dirty, true)
@@ -427,4 +428,26 @@ test('strict-paths安装接受仍位于旧HOME中的完整目标路径，保留�
     assert.equal(actual.program, prefix); assert.equal(actual.data, join(dataRoot, 'agents/item'))
     assert.ok(!actual.home.startsWith(oldHome + '/'))
   } finally { close() }
+})
+
+
+test('迁移保留数据身份、MCP 配置及外置原生 HOME 文件，缓存与进程文件重新生成', () => {
+  const { root, close } = workspace()
+  const previous = process.env.HARNESS_MANAGER_DSH_HOME
+  try {
+    const source = join(root, 'source'), target = join(root, 'target'), home = join(root, 'manager')
+    const write = (file, value) => { mkdirSync(join(file, '..'), { recursive: true }); writeFileSync(file, value) }
+    for (const path of ['config/mcp-manager.json', '.local/agent-access/state.json', '.local/credentials/models.llm-api-key', 'mcp/.local/runs/one.json']) write(join(source, path), path)
+    for (const path of ['.local/build-cache/obsolete', 'mcp/.local/cache/source/obsolete', '.local/platform-service/status.json']) write(join(source, path), 'transient')
+    for (const path of ['AGENTS.md', '.agents/skills/sample/SKILL.md', 'profiles/harness-platform/cordis.patch.yml', 'sessions/private', 'storages/workspace.json']) write(join(home, path), path)
+    write(join(home, 'profiles/harness-platform/node_modules/obsolete'), 'regenerate')
+    process.env.HARNESS_MANAGER_DSH_HOME = home
+    copyDataState(source, target)
+    for (const path of ['config/mcp-manager.json', '.local/agent-access/state.json', '.local/credentials/models.llm-api-key', 'mcp/.local/runs/one.json']) assert.equal(readFileSync(join(target, path), 'utf8'), path)
+    for (const path of ['AGENTS.md', '.agents/skills/sample/SKILL.md', 'profiles/harness-platform/cordis.patch.yml', 'sessions/private', 'storages/workspace.json']) assert.equal(readFileSync(join(target, '.local/platform-home', path), 'utf8'), path)
+    for (const path of ['.local/build-cache', 'mcp/.local/cache', '.local/platform-service', '.local/platform-home/profiles/harness-platform/node_modules']) assert.equal(existsSync(join(target, path)), false)
+  } finally {
+    if (previous === undefined) delete process.env.HARNESS_MANAGER_DSH_HOME; else process.env.HARNESS_MANAGER_DSH_HOME = previous
+    close()
+  }
 })

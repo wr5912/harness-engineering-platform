@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
+import { managerSources } from '../build.mjs'
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
 import { toNodeHandler } from '@modelcontextprotocol/node'
 import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
@@ -19,12 +20,6 @@ after(() => { if (previousEntry === undefined) delete process.env.HARNESS_DSH_EN
 const directory = await mkdtemp(join(tmpdir(), 'standalone-mcp-'))
 after(() => rm(directory, { recursive: true, force: true }))
 await symlink(join(process.cwd(), 'node_modules'), join(directory, 'node_modules'), 'dir')
-const buildSource = await readFile(new URL('../build.mjs', import.meta.url), 'utf8')
-const start = buildSource.indexOf('export const managerSource ='), end = buildSource.indexOf('\nasync function main()', start)
-assert.ok(start > 0 && end > start)
-const adapter = join(directory, 'adapter.mjs')
-await writeFile(adapter, "import { readFile } from 'node:fs/promises'; import { resolve } from 'node:path';\n" + buildSource.slice(start, end).replace(/fileURLToPath\(new URL\('..\/..\/plugins\/mcp-manager', import.meta.url\)\)/, JSON.stringify(new URL('../../../plugins/mcp-manager', import.meta.url).pathname)))
-const { managerSources } = await import(pathToFileURL(adapter).href)
 const outfile = join(directory, 'plugin.mjs')
 await build({ entryPoints: [new URL('../src/standalone/plugin.ts', import.meta.url).pathname], outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external', plugins: [managerSources] })
 const standalone = await import(pathToFileURL(outfile).href)

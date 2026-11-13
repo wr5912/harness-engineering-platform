@@ -29,15 +29,17 @@ test.after(() => rmSync(instancesBuild, { recursive: true, force: true }))
 const expressionFixture = '先说明结果、影响和用户需要采取的行动。保留失败与未知事实。'
 function fixture(t, responder, root) {
   if (!root) { root = mkdtempSync(join(tmpdir(), 'assistant-data-')); t.after(() => rmSync(root, { recursive: true, force: true })) }
-  if (!existsSync(join(root, 'AGENTS.md'))) writeFileSync(join(root, 'AGENTS.md'), '你是 Harness 工程平台管理助手。业务工作由数据工作区原则和技能指导。')
+  const home = join(root, '.local/platform-home')
+  mkdirSync(home, { recursive: true })
+  if (!existsSync(join(home, 'AGENTS.md'))) writeFileSync(join(home, 'AGENTS.md'), '你是 Harness 工程平台管理助手。业务工作由数据工作区原则和技能指导。')
   for (const name of managementSkills) {
-    const path = join(root, '.agents/skills', name, 'SKILL.md')
+    const path = join(home, '.agents/skills', name, 'SKILL.md')
     mkdirSync(dirname(path), { recursive: true })
     if (!existsSync(path)) writeFileSync(path, `---\nname: ${name}\ndescription: 测试技能\n---\n${name === 'user-facing-output' ? expressionFixture : `测试 ${name} 业务技能`}`)
   }
   const skills = { async get(name, options) {
     assert.equal(options.cwd, root)
-    const path = join(root, '.agents/skills', name, 'SKILL.md')
+    const path = join(home, '.agents/skills', name, 'SKILL.md')
     if (!existsSync(path)) return undefined
     return { name, path, content: readFileSync(path, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, ''), invocation: { modelInvocable: true } }
   } }
@@ -98,7 +100,7 @@ function fixture(t, responder, root) {
   }
   const assembly = id => ctx.systemPrompt.assemble({ agent: { session: sessions.get(id).session } })
   const assemble = async id => (await assembly(id)).sections.filter(item => ['harness-platform/assistant', 'harness-platform/assistant-output'].includes(item.name)).map(item => item.text).filter(Boolean).join('\n')
-  return { root, ctx, sessions, services, tools, calls, peers, prompts, rpc, status, execute, operation, assemble, assembly, addSession,
+  return { root, home, ctx, sessions, services, tools, calls, peers, prompts, rpc, status, execute, operation, assemble, assembly, addSession,
     async reload() { await assistant.dispose(); assistant = create() } }
 }
 
@@ -153,7 +155,7 @@ test('真实 Session 投影隔离上下文、冷恢复固定任务，用户 prom
 test('旧引导名创建会话后写入规范上下文，配置、describe和模型装配使用工作区入口', async t => {
   const f = fixture(t), context = { skill: 'harness-guided-workflow', agent_id: 'fixed-agent', page: 'agents' }
   const canonical = { ...context, skill: 'workspace-management' }
-  assert.equal(existsSync(join(f.root, '.agents/skills/harness-guided-workflow/SKILL.md')), false)
+  assert.equal(existsSync(join(f.home, '.agents/skills/harness-guided-workflow/SKILL.md')), false)
   const config = (await f.rpc('configuration', { context })).value
   assert.equal(config.ready, true)
   assert.equal(config.requested_skill, 'workspace-management')
@@ -258,8 +260,8 @@ test('原生 Session 事件冷恢复保留上下文，不新增提示词段落�
 test('管理资产诊断只报告缺失，不阻断原生装配、续接或工具执行', async t => {
   const f = fixture(t)
   const id = (await f.rpc('session', {})).value.session_id
-  rmSync(join(f.root, '.agents/skills/user-facing-output/SKILL.md'))
-  rmSync(join(f.root, 'AGENTS.md'))
+  rmSync(join(f.home, '.agents/skills/user-facing-output/SKILL.md'))
+  rmSync(join(f.home, 'AGENTS.md'))
   assert.equal((await f.rpc('configuration', {})).value.core_ready, false)
   assert.equal((await f.rpc('session', { task: '新任务' })).ok, true)
   assert.equal((await f.rpc('session', { session_id: id, task: '继续' })).ok, true)
@@ -269,7 +271,7 @@ test('管理资产诊断只报告缺失，不阻断原生装配、续接或工�
 
 test('配置检查区分核心和专项缺失，并拒绝原生注册表同名的程序来源', async t => {
   const f = fixture(t)
-  rmSync(join(f.root, '.agents/skills/decision-sample-extraction/SKILL.md'))
+  rmSync(join(f.home, '.agents/skills/decision-sample-extraction/SKILL.md'))
   const general = (await f.rpc('configuration', {})).value
   assert.equal(general.ready, true)
   assert.equal(general.tasks['decision-sample-extraction'], false)
@@ -926,6 +928,15 @@ test('普通派生、用例更新与业务样例创建可达，写操作经原�
     const response = await f.execute(id, 'mcp', action, { run_id: 'basic-run', artifactId: 'summary' })
     assert.equal(response.state, 'completed')
   }
+})
+
+test('MCP 编排详情与运行制品查询直接读取，不产生写操作回执', async t => {
+  const f = fixture(t)
+  const id = (await f.rpc('session', {})).value.session_id
+  for (const action of ['compositionDetails', 'compositionRun', 'compositionArtifact']) {
+    assert.equal((await f.execute(id, 'mcp', action, { compositionId: 'basic', run_id: 'basic-run', artifactId: 'summary' })).state, 'completed')
+  }
+  assert.deepEqual((await f.status(id)).proposals, [])
 })
 
 test('任务目标只补齐缺省参数，显式目标和其他领域动作不被平台限制', async t => {

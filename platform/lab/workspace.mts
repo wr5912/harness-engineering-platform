@@ -30,9 +30,12 @@ const commitPattern = /^[0-9a-f]{40}$/
 const keys = Object.keys(repositoryNames) as RepositoryKey[]
 function fail(message: string): never { throw new Error(message) }
 function git(cwd: string | undefined, args: string[]): string {
-  const result = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', ...(cwd ? ['-C', cwd] : []), ...args], { encoding: 'utf8', timeout: 120_000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
-  // Git 的远端诊断可能回显 URL 或凭据；公开错误只报告操作。
-  if (result.status !== 0 || result.error) fail(`Git ${args[0]} 失败，请核对仓库地址、认证和版本`)
+  const result = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', ...(cwd ? ['-C', cwd] : []), ...args], { encoding: 'utf8', timeout: ['clone', 'fetch'].includes(args[0]) ? 900_000 : 120_000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
+  if (result.status !== 0 || result.error) {
+    const detail = (result.error?.message || result.stderr || '').trim().split('\n').slice(-4).join('\n')
+      .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/g, '$1***@')
+    fail(`Git ${args[0]} 失败${detail ? '：' + detail : '，请核对仓库地址、认证和版本'}`)
+  }
   return result.stdout.trim()
 }
 function clean(root: string) {
@@ -105,14 +108,14 @@ function inspectRepository(root: string, input: RepositoryInput, reuse: boolean)
   if (git(root, ['remote', 'get-url', 'origin']) !== input.url) fail(`已有仓库 origin 不匹配：${root}`)
   const commit = git(root, ['rev-parse', 'HEAD'])
   if (input.commit && input.commit !== commit) fail(`已有仓库提交不同，请先查看 update --plan-only：${root}`)
-  if (input.ref) {
+  if (input.ref && !input.commit) {
     const value = git(root, ['rev-parse', '--verify', `${input.ref}^{commit}`])
     if (value !== commit) fail(`已有仓库 ref 与当前提交不一致：${root}`)
   }
   return { ...input, commit, path: root }
 }
 function resolveRemote(input: RepositoryInput): string {
-  if (input.commit && !input.ref) return input.commit
+  if (input.commit) return input.commit
   const ref = input.ref ?? 'HEAD'
   const rows = git(undefined, ['ls-remote', input.url, ref, `refs/heads/${ref}`, `refs/tags/${ref}`, `refs/tags/${ref}^{}`]).split('\n').filter(Boolean).map(line => line.split(/\s+/))
   const peeled = rows.find(row => row[1]?.endsWith('^{}'))
@@ -228,7 +231,7 @@ export function inspectLab(manifest: LabManifest) {
       if (typeof id !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) || ids.has(id)) fail('Agent ID 无效或重复')
       ids.add(id)
       if (item.source_repository !== business.url || item.source_commit !== business.commit) fail('Agent 来源仓库或提交与锁定不一致')
-      if (typeof path !== 'string' || !path.startsWith(`agents/${id}/`) || path.includes('..') || path.includes('\\') || !existsSync(join(business.path, path))) fail('Agent 源码路径无效或不存在')
+      if (typeof path !== 'string' || !(path === `agents/${id}` || path.startsWith(`agents/${id}/`)) || path.includes('..') || path.includes('\\') || !existsSync(join(business.path, path, 'harness.yaml'))) fail('Agent 源码路径无效或不存在')
     } catch (error) { issues.push({ code: 'agent_reference', path: join(registry, file), message: (error as Error).message }) }
   }
   if (existsSync(join(data, 'agents/platform-owned')) || existsSync(join(data, 'dsh-home-profile'))) issues.push({ code: 'duplicate_source_root', path: data, message: '数据仓库仍存在应迁移的业务源码或管理 HOME 路径' })
@@ -265,7 +268,7 @@ function inspectProfiles(home: string, expected: string | undefined, issues: Fin
         if (typeof name !== 'string') fail('Profile bundle 名称无效')
         try { resolver.resolve(name) } catch { warnings.push({ code: 'profile_dependency_pending', path: profile, message: `Profile bundle ${name} 尚未安装；请运行平台 prepare` }) }
       }
-      for (const file of readdirSync(profile).filter(name => name.endsWith('.yml') || name.endsWith('.yaml'))) {
+      for (const file of ['cordis.yml', 'cordis.patch.yml'].filter(name => existsSync(join(profile, name)))) {
         const path = join(profile, file), source = readFileSync(path, 'utf8')
         if (/\{\{HARNESS_[A-Z_]+\}\}/.test(source)) fail('Profile 含未解析的路径模板')
         let parsed: any

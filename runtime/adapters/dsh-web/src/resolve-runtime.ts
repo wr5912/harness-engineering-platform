@@ -25,7 +25,7 @@ export function runtimeRequire(name: string, containerManifest?: string): NodeRe
     }
     for (const anchor of anchors) {
       try { anchor.resolve(name) } catch { continue }
-      if (!containerManifest) process.env.HARNESS_DSH_ENTRY = canonical
+      if (!containerManifest && !process.env.HARNESS_DSH_ENTRY) process.env.HARNESS_DSH_ENTRY = canonical
       return anchor
     }
   }

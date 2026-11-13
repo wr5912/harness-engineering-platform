@@ -149,7 +149,9 @@ class HarnessRuntimeTest(unittest.TestCase):
             self.assertIn('target: "/var/lib/dsh/private"\n        read_only: true', rendered)
             self.assertNotIn("private-test-value", rendered)
             self.assertEqual(dev.runtime_mounts(contract, "analysis"), [])
-            self.assertEqual(dev.runtime_mounts({**contract, "business_control": {"configured": True}}), [])
+            managed = {**contract, "business_control": {"configured": True}}
+            self.assertEqual(dev.runtime_mounts(managed), mounts)
+            self.assertEqual(dev.runtime_mounts(managed, private_directory=folder), [])
             self.assertEqual(dev.runtime_mounts({"experiment_id": "EXP-sample-002-r0123456789ab"}), [])
             secret.chmod(0o644)
             with self.assertRaises(SystemExit):

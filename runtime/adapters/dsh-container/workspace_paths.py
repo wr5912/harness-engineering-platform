@@ -13,7 +13,7 @@ PROGRAM_ROOT = Path(os.environ.get("HARNESS_PROGRAM_ROOT", Path(__file__).resolv
 
 def asset_root() -> Path:
     selected = os.environ.get("HARNESS_ASSET_ROOT")
-    locator = Path.home() / ".config/harness-engineering-platform/workspace.json"
+    locator = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "harness-engineering-platform/workspace.json"
     if not selected and locator.exists():
         value = json.loads(locator.read_text(encoding="utf-8"))
         selected = value.get("assetRoot") if isinstance(value, dict) else None

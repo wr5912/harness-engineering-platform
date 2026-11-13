@@ -15,6 +15,30 @@ const { default: NativeWebServer } = await import(pathToFileURL(require.resolve(
 const nativeRequire = createRequire(require.resolve('@deepseek-ai/dsh-host-webserver'))
 const { default: z } = await import(pathToFileURL(nativeRequire.resolve('@deepseek-ai/schemastery')).href)
 
+test('原生 Fetch 资源保留查询、请求头和 Peer，并与资源型页面共同挂载', async t => {
+  const root = new Context()
+  t.after(() => root.fiber.dispose())
+  await root.plugin(createMountedWebServer(NativeWebServer, '/hep/'), { host: '127.0.0.1', port: 0 })
+  const server = root.webServer, base = `http://127.0.0.1:${server.port}`
+  const peer = { fixture: true }
+  server.register({ kind: 'prefix', path: '/assets', resource: async (request, admitted) => {
+    if (admitted) assert.equal(admitted, peer)
+    return new Response(JSON.stringify({ path: new URL(request.url).pathname, query: new URL(request.url).search, header: request.headers.get('x-fixture') }))
+  } })
+  server.registerFallback({ resource: async request => new Response(new URL(request.url).pathname) })
+  const response = await fetch(base + '/hep/assets/file?q=a%2Fb', { headers: { 'x-fixture': 'kept' } })
+  assert.deepEqual(await response.json(), { path: '/assets/file', query: '?q=a%2Fb', header: 'kept' })
+  const internal = await server.readResource(new Request(base + '/hep/assets/file'), peer)
+  assert.equal(internal.status, 200)
+  for (const path of ['/', '/hep']) {
+    const redirect = await fetch(base + path + '?q=a%2Fb', { redirect: 'manual' })
+    assert.equal(redirect.status, 302)
+    assert.equal(redirect.headers.get('location'), '/hep/?q=a%2Fb')
+  }
+  assert.equal(await (await fetch(base + '/hep/page')).text(), '/page')
+  assert.equal((await fetch(base + '/outside')).status, 404)
+})
+
 test('既有 LAN 仅兼容明确的 IPv4 wildcard，其他原生配置校验保持有效', () => {
   const schema = legacyLanConfig(NativeWebServer, z)
   assert.equal(schema({ host: '0.0.0.0', port: 3080 }).host, '0.0.0.0')

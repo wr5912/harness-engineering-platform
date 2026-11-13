@@ -43,6 +43,7 @@ class RunInitializationTest(unittest.TestCase):
         candidate = f"evolution/experiments/{EXPERIMENT}/candidate"
         self.write(candidate + "/harness.yaml", "schema_version: '1.0'\nloadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: alpha\n  profile_patch: dsh/managed/alpha.patch.yml\ncredential_environment_keys: []\nrole_instructions:\n  alpha: dsh/workspace/AGENTS.md\n")
         self.write(candidate + "/dsh/workspace/AGENTS.md", "初始化夹具角色。\n")
+        self.write(candidate + "/dsh/workspace/.env", "# DSH Bootstrap environment is supplied only by the invoking container environment.\n")
         self.write(candidate + "/dsh/presets/alpha/agent.cordis.yml", "[]\n")
         self.write(candidate + "/dsh/managed/alpha.patch.yml", "[]\n")
         self.git("init", "-q")

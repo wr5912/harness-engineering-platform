@@ -1,3 +1,4 @@
+import { managerHome } from '../manager-home.mts'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
@@ -11,6 +12,7 @@ import { assertRealWorkspace } from './data.mts'
 import { restoreRepository } from './repository.mts'
 import { prepareDeploymentFirewall } from './firewall.mts'
 import { validatePlatformEntryUrl } from '../plugin/src/business-control/group-link.ts'
+import { copyDataState } from './state.mts'
 
 export interface InstallOptions {
   bundleRoot: string
@@ -118,10 +120,11 @@ export function install(options: InstallOptions): InstallReport {
       dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
       if (dataCheck.kind === 'fixture') warnings.push('安装的是夹具数据根；管理助手工作区和管理 Skill 不完整')
     }
-    if (manifest.source.programRoot !== prefix || manifest.source.dataRoot !== dataRoot || manifest.source.home !== homedir()) {
+    if (manifest.source.programRoot !== prefix || manifest.source.dataRoot !== dataRoot || manifest.source.home !== homedir() || manifest.source.managerDshHome) {
       const mappings = [{ from: manifest.source.home, to: homedir() }]
       if (manifest.source.programRoot) mappings.push({ from: manifest.source.programRoot, to: prefix })
       if (manifest.source.dataRoot) mappings.push({ from: manifest.source.dataRoot, to: dataRoot })
+      if (manifest.source.managerDshHome) mappings.push({ from: manifest.source.managerDshHome, to: join(dataRoot, '.local/platform-home') })
       const changedMappings = mappings.filter(mapping => mapping.from !== mapping.to)
       const rewritten = rewriteKnownPaths(dataRoot, mappings)
       report.rewritten = rewritten.changed
@@ -132,14 +135,18 @@ export function install(options: InstallOptions): InstallReport {
     }
     if (options.preserveFrom) {
       // 现场配置和原生 HOME 属于目标安装，业务资产则完整采用包内快照。
-      for (const [source, target, paths] of [
-        [options.preserveFrom.prefix, prefix, ['.local']],
-        [options.preserveFrom.dataRoot, dataRoot, ['config', '.local', 'mcp/.local']],
-      ] as const) for (const relative of paths) {
+      for (const relative of ['.local']) {
+        const source = options.preserveFrom.prefix, target = prefix
         if (!existsSync(join(source, relative))) continue
         rmSync(join(target, relative), { recursive: true, force: true })
         copyTree(join(source, relative), join(target, relative))
       }
+      copyDataState(options.preserveFrom.dataRoot, dataRoot)
+      report.rewritten.push(...rewriteKnownPaths(dataRoot, [
+        { from: options.preserveFrom.prefix, to: prefix },
+        { from: options.preserveFrom.dataRoot, to: dataRoot },
+        { from: managerHome(options.preserveFrom.dataRoot), to: managerHome(dataRoot) },
+      ]).changed)
       const workspacePath = join(dataRoot, 'workspace.json')
       const workspace = JSON.parse(readFileSync(workspacePath, 'utf8'))
       const previous = JSON.parse(readFileSync(join(options.preserveFrom.dataRoot, 'workspace.json'), 'utf8'))
@@ -194,14 +201,14 @@ export function install(options: InstallOptions): InstallReport {
       if (prepared.status !== 0) throw new Error(`离线 prepare 失败（退出码 ${prepared.status}）`)
       report.prepare = 'ok'
       if (dataCheck?.kind === 'workspace') {
-        const patch = join(dataRoot, '.local', 'platform-home', 'profiles', 'harness-platform', 'harness-platform.patch.yml')
+        const patch = join(managerHome(dataRoot), 'profiles', 'harness-platform', 'harness-platform.patch.yml')
         if (!existsSync(patch) || !readFileSync(patch, 'utf8').includes(join(dataRoot, '.agents', 'skills'))) {
           throw new Error('平台 Profile 未装载数据工作区的 .agents/skills；管理助手工作区不完整')
         }
-        const locator = join(homedir(), '.config', 'harness-engineering-platform', 'workspace.json')
+        const locator = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'harness-engineering-platform', 'workspace.json')
         if (!existsSync(locator)) {
-          mkdirSync(join(homedir(), '.config', 'harness-engineering-platform'), { recursive: true })
-          writeFileSync(locator, JSON.stringify({ assetRoot: dataRoot }, null, 2) + '\n', { mode: 0o600 })
+          mkdirSync(join(locator, '..'), { recursive: true })
+          writeFileSync(locator, JSON.stringify({ assetRoot: dataRoot, managerDshHome: managerHome(dataRoot) }, null, 2) + '\n', { mode: 0o600 })
         }
       }
     }

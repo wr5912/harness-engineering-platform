@@ -29,6 +29,7 @@ function fixture(t, id = 'EXP-alpha-001-raaaaaaaaaaaa') {
   write(root, `evolution/experiments/${id}/hypothesis.md`, '验证真实固定来源。\n')
   write(candidate, 'harness.yaml', "schema_version: '1.0'\nloadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: alpha\n  profile_patch: dsh/managed/alpha.patch.yml\ncredential_environment_keys: []\nrole_instructions:\n  alpha: dsh/workspace/AGENTS.md\n")
   write(candidate, 'dsh/workspace/AGENTS.md', '原角色\n')
+  write(candidate, 'dsh/workspace/.env', '# DSH Bootstrap environment is supplied only by the invoking container environment.\n')
   write(candidate, 'dsh/presets/alpha/agent.cordis.yml', '[]\n')
   write(candidate, 'dsh/managed/alpha.patch.yml', '[]\n')
   write(candidate, 'dsh/managed/web-profile.seed.patch.yml', '- insert:\n  - id: mcp-session-manager\n    config:\n      servers:\n      - id: readonly\n        serverName: readonly\n        enabled: false\n        url: http://old.test/mcp\n        headers: [{name: Authorization, value: ""}]\n        tools: {mode: selected, names: [get_asset]}\n      groups: [{id: original, members: [{serverId: readonly, names: [get_asset]}]}]\n')

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { fstabForBind, planRelocation, relocate } from '../relocate.mts'
+import { fstabForBind, planRelocation, relocate, relocationSource } from '../relocate.mts'
 
 function fixture(t) {
   const base = mkdtempSync(join(tmpdir(), 'hep relocate '))
@@ -94,7 +94,7 @@ test('同文件系统迁移保留 inode、历史 Session 和挂载别名，重�
 test('远端工具源码可由安装器 Node 以 TypeScript stdin 执行，参数含空格不改变路径', async t => {
   const options = fixture(t)
   const { execFileSync } = await import('node:child_process')
-  const source = readFileSync(new URL('../relocate.mts', import.meta.url), 'utf8')
+  const source = relocationSource()
   const input = source + '\nconsole.log(JSON.stringify(await relocate(JSON.parse(process.argv[2]))))\n'
   const result = execFileSync(process.execPath, ['--input-type=module-typescript', '-', JSON.stringify({ ...options, dryRun: true })], { input, encoding: 'utf8' })
   assert.equal(JSON.parse(result).dataRoot, options.dataRoot)

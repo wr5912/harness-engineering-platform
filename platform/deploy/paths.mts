@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { managerHome } from '../manager-home.mts'
 import { prepareBusinessRuntimeFile } from '../plugin/src/business-control/secret-file.ts'
 import { initializeBusinessGateway } from '../plugin/src/business-control/configuration.ts'
 import { validatePlatformEntryUrl } from '../plugin/src/business-control/group-link.ts'
@@ -28,10 +29,13 @@ function instanceFiles(dataRoot: string): string[] {
 }
 
 export function knownPathFiles(dataRoot: string): string[] {
+  const home = managerHome(dataRoot)
   const files = [
     join(dataRoot, 'workspace.json'),
     join(dataRoot, 'config', 'business-access.json'),
-    join(dataRoot, '.local/platform-home/profiles/harness-platform/cordis.patch.yml'),
+    join(home, 'storages/workspace.json'),
+    join(home, 'profiles/harness-platform/cordis.patch.yml'),
+    join(home, 'profiles/harness-platform/harness-platform.patch.yml'),
   ].filter(existsSync)
   return files.concat(instanceFiles(dataRoot))
 }

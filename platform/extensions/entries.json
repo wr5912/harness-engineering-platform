@@ -1,0 +1,4 @@
+{
+  "security-operations-compositions": "platform/mcp/security-operations/build.mjs",
+  "task-examples": "platform/extensions/task-examples/build.mjs"
+}

@@ -91,7 +91,7 @@ export function defaultAssetRoot(): string {
     const value = process.env.HARNESS_ASSET_ROOT
     return resolve(value === '~' ? homedir() : value.startsWith('~/') ? join(homedir(), value.slice(2)) : value)
   }
-  const locator = join(homedir(), '.config/harness-engineering-platform/workspace.json')
+  const locator = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'harness-engineering-platform/workspace.json')
   if (existsSync(locator)) {
     const value = JSON.parse(readFileSync(locator, 'utf8'))
     if (typeof value?.assetRoot !== 'string' || !isAbsolute(value.assetRoot)) throw new Error('部署定位文件必须包含绝对 assetRoot')

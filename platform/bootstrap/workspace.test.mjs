@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { initializeWorkspace, inspectWorkspace, previewWorkspace } from './workspace.ts'
 import { createBootstrapServer } from './server.ts'
@@ -50,7 +50,6 @@ test('新工作区预览无写入，初始化保持空业务并可复用账号�
 test('迁移后的 MCP 根扩展可直接启动，旧组合目录仍能读取且不生成第二份', async t => {
   const f = fixture(t)
   await initializeWorkspace({ action: 'new', root: f.root })
-  writeFileSync(join(f.root, 'mcp/build.mjs'), 'export {}')
   const workspace = JSON.parse(readFileSync(join(f.root, 'workspace.json')))
   workspace.extensions = [{ id: 'security-operations-compositions', path: 'mcp' }]
   writeFileSync(join(f.root, 'workspace.json'), JSON.stringify(workspace))
@@ -143,10 +142,16 @@ test('初始化HTTP要求一次性入口和同源写，prepare失败可重试且
 test('克隆的扩展必须先盘点再确认，预览后源码变化阻止装载', async t => {
   const f = fixture(t), source = join(f.directory, 'extension source'), oldHome = process.env.HOME
   process.env.HOME = join(f.directory, 'home')
+  const oldProgram = process.env.HARNESS_PROGRAM_ROOT
+  process.env.HARNESS_PROGRAM_ROOT = join(f.directory, 'program')
+  const entry = join(process.env.HARNESS_PROGRAM_ROOT, 'platform/extensions/basic/build.mjs')
+  mkdirSync(dirname(entry), { recursive: true })
+  writeFileSync(entry, '// 平台中的扩展构建入口\n')
+  t.after(() => { if (oldProgram === undefined) delete process.env.HARNESS_PROGRAM_ROOT; else process.env.HARNESS_PROGRAM_ROOT = oldProgram })
   t.after(() => { if (oldHome === undefined) delete process.env.HOME; else process.env.HOME = oldHome })
   mkdirSync(join(source, 'extensions/basic'), { recursive: true })
   writeFileSync(join(source, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-basic', extensions: [{ id: 'basic', path: 'extensions/basic' }] }))
-  writeFileSync(join(source, 'extensions/basic/build.mjs'), '// 基本模拟扩展，测试中不执行。\n')
+  writeFileSync(join(source, 'extensions/basic/config.json'), '{}')
   execFileSync('git', ['init', '--quiet', source])
   execFileSync('git', ['add', '.'], { cwd: source })
   execFileSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'], { cwd: source })
@@ -166,7 +171,7 @@ test('克隆的扩展必须先盘点再确认，预览后源码变化阻止装�
   assert.equal(existsSync(resultFile), false)
   const existing = { action: 'existing', root: f.root }
   const reviewed = await (await post('preview', existing)).json()
-  writeFileSync(join(f.root, 'extensions/basic/build.mjs'), '// 更新过的基本模拟扩展。\n')
+  writeFileSync(entry, '// 更新平台中的扩展构建入口。\n')
   const stale = await post('apply', { ...existing, previewRevision: reviewed.revision })
   assert.equal(stale.status, 400)
   assert.equal(prepared, 0)

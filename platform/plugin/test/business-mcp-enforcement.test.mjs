@@ -14,12 +14,7 @@ async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'business-mcp-execution-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   await symlink(join(process.cwd(), 'node_modules'), join(root, 'node_modules'), 'dir')
-  const source = await readFile(new URL('../build.mjs', import.meta.url), 'utf8')
-  const adapter = join(root, 'adapter.mjs')
-  const start = source.indexOf('export const managerSource ='), end = source.indexOf('\nasync function main()', start)
-  await writeFile(adapter, "import { readFile } from 'node:fs/promises'; import { resolve } from 'node:path';\n" + source.slice(start, end)
-    .replace(/fileURLToPath\(new URL\('..\/..\/plugins\/mcp-manager', import.meta.url\)\)/, JSON.stringify(new URL('../../../plugins/mcp-manager', import.meta.url).pathname)))
-  const { managerSources } = await import(pathToFileURL(adapter).href)
+  const { managerSources } = await import('../build.mjs')
   const output = join(root, 'execution.mjs')
   await build({ stdin: { contents: "export * from 'harness-mcp-manager-server'; export { createMcpHandler, createPublishedCompositionClient } from './src/mcp/index.ts'; export { publishedCompositionService } from './src/mcp/compositions.ts'; export * from './src/business-control/core.ts'; export { managedDispatch } from './src/mcp/control.ts'", resolveDir: process.cwd(), loader: 'ts' },
     outfile: output, bundle: true, platform: 'node', format: 'esm', packages: 'external', plugins: [managerSources] })

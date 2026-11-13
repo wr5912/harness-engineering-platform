@@ -1,3 +1,4 @@
+import { programRoot } from '../workspace.ts'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -57,7 +58,9 @@ export function loadLfxBundle(root: string, id: string, config: CompositionConfi
     return bundle
   }
   const flow = validateLfxFlow(JSON.parse(readFileSync(join(base, 'flow.json'), 'utf8')))
-  const own = realpathSync(base), shared = existsSync(join(root, 'mcp/src')) ? realpathSync(join(root, 'mcp/src')) : join(root, 'mcp/src')
+  const own = realpathSync(base), framework = join(programRoot(), 'platform/mcp/security-operations/src')
+  const shared = existsSync(framework) ? realpathSync(framework) : framework
+  const contracts = join(programRoot(), 'platform/plugin/src/mcp')
   const within = (directory: string, path: string) => { const name = relative(directory, path); return name !== '..' && !name.startsWith('../') && !name.startsWith('..\\') }
   let typescript: string | undefined
   if (flow.metadata?.hep?.typescript !== undefined) {
@@ -66,18 +69,20 @@ export function loadLfxBundle(root: string, id: string, config: CompositionConfi
     const source = realpathSync(resolve(base, entry))
     if (!within(own, source)) throw new Error('LFX TypeScript 入口必须属于本编排')
     // 只静态编译，不导入业务模块；发布包保存实际执行的完整依赖字节。
-    const compiled = buildSync({ absWorkingDir: join(root, 'mcp'), entryPoints: [source], bundle: true, write: false, format: 'esm', platform: 'node', target: 'node24', metafile: true, logLevel: 'silent' })
+    const compiled = buildSync({ absWorkingDir: join(root, 'mcp'), entryPoints: [source], bundle: true, write: false, format: 'esm', platform: 'node', target: 'node24', metafile: true, logLevel: 'silent',
+      alias: { '@harness-platform/security-operations': shared, '@harness-platform/mcp': contracts, '@mcp/inspection': join(shared, 'inspection/index.ts') } })
     for (const path of Object.keys(compiled.metafile!.inputs)) {
       const actual = realpathSync(resolve(root, 'mcp', path))
-      if (!within(own, actual) && !within(shared, actual)) throw new Error('LFX TypeScript 依赖只能来自本编排或 MCP 共用源码')
+      if (!within(own, actual) && !within(shared, actual) && !within(contracts, actual)) throw new Error('LFX TypeScript 依赖只能来自本编排或平台 MCP 框架')
     }
     typescript = compiled.outputFiles![0].text
   }
   const modules: Record<string, string> = {}
   for (const [name, path] of Object.entries(flow.metadata?.hep?.modules ?? {})) {
     if (!/^[a-z][a-z0-9_]*$/.test(name) || typeof path !== 'string') throw new Error('LFX 模块引用无效')
-    const source = realpathSync(resolve(root, 'mcp', path))
-    if (!within(own, source) && !within(shared, source)) throw new Error('LFX 模块只能来自本编排或 MCP 共用源码')
+    const prefix = '@harness-platform/security-operations/'
+    const source = realpathSync(path.startsWith(prefix) ? resolve(shared, path.slice(prefix.length)) : resolve(root, 'mcp', path))
+    if (!within(own, source) && !within(shared, source)) throw new Error('LFX 模块只能来自本编排或平台 MCP 框架')
     modules[name] = readFileSync(source, 'utf8')
   }
   const children: Record<string, LfxBundle> = {}

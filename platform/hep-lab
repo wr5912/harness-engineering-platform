@@ -43,4 +43,4 @@ else
   exit 2
 fi
 [ "$ACTUAL" = "$BOOTSTRAP_SHA256" ] || { echo "hep-lab: 固定 Bootstrap 校验失败" >&2; exit 2; }
-HEP_LAB_DATA_COMMIT="$BOOTSTRAP_DATA_COMMIT" exec sh "$TMP" "$@"
+HEP_LAB_DATA_COMMIT="$BOOTSTRAP_DATA_COMMIT" sh "$TMP" "$@"

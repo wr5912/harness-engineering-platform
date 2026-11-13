@@ -26,11 +26,23 @@ function entryResponse(url: string): Promise<{ status: number; type: string; ver
   return new Promise((resolve, reject) => {
     const request = (url.startsWith('https:') ? httpsRequest : httpRequest)(url, {
       method: 'GET', headers: { accept: 'text/html' }, signal: AbortSignal.timeout(5000),
-    }, response => {
+    }, async response => {
       const header = response.headers[BUSINESS_TRANSPORT_HEADER]
-      resolve({ status: response.statusCode!, type: String(response.headers['content-type'] || ''),
-        version: Array.isArray(header) ? header[0] : header })
-      response.destroy()
+      let version = Array.isArray(header) ? header[0] : header
+      const type = String(response.headers['content-type'] || '')
+      try {
+        // 原生 Fetch 首页只提供 writeHead/end，运行版本随原生 index injection 输出。
+        if (!version && /^text\/html(?:;|$)/i.test(type)) {
+          let html = ''
+          for await (const chunk of response) {
+            html += chunk.toString()
+            version = new RegExp(`<meta name="${BUSINESS_TRANSPORT_HEADER}" content="([^"]+)">`).exec(html)?.[1]
+            if (version || html.includes('</head>') || html.length > 262144) break
+          }
+        }
+        resolve({ status: response.statusCode!, type, version })
+      } catch (error) { reject(error) }
+      finally { response.destroy() }
     })
     request.on('error', reject)
     request.end()

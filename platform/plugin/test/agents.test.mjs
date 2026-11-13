@@ -2322,22 +2322,23 @@ test('详情派生引用绑定所选版本的可恢复提交，未提交版本�
 })
 
 
-test('研究资料按固定主题从数据工作区读取，拒绝任意路径、链接与过大资料', async () => {
+test('研究资料按固定主题从管理助手 HOME 读取，拒绝任意路径、链接与过大资料', async () => {
   const { createAgentsHandler } = await loadServer()
   const fx = fixture()
   try {
     const handler = createAgentsHandler(fx.root)
+    const home = join(fx.root, '.local/platform-home')
     const path = 'docs/harness-research/controlled-improvement.md'
-    write(join(fx.root, path), '# 受控改进\n\n先固定来源，再比较任务效果。\n')
+    write(join(home, path), '# 受控改进\n\n先固定来源，再比较任务效果。\n')
     const value = await rpc(handler, 'research/read-reference', { topic: 'controlled-improvement' })
     assert.equal(value.path, path)
-    assert.equal(value.sha256, createHash('sha256').update(readFileSync(join(fx.root, path))).digest('hex'))
+    assert.equal(value.sha256, createHash('sha256').update(readFileSync(join(home, path))).digest('hex'))
     assert.match(value.content, /固定来源/)
     await assert.rejects(() => rpc(handler, 'research/read-reference', { topic: '../../AGENTS' }), /invalid_request/)
     await assert.rejects(() => rpc(handler, 'research/read-reference', { topic: 'decision-samples' }), /not_found/)
-    write(join(fx.root, 'docs/harness-research/compute-variants.md'), 'a'.repeat(128 * 1024 + 1))
+    write(join(home, 'docs/harness-research/compute-variants.md'), 'a'.repeat(128 * 1024 + 1))
     await assert.rejects(() => rpc(handler, 'research/read-reference', { topic: 'compute-variants' }), /128 KiB/)
-    symlinkSync(join(fx.root, path), join(fx.root, 'docs/harness-research/decision-samples.md'))
+    symlinkSync(join(home, path), join(home, 'docs/harness-research/decision-samples.md'))
     await assert.rejects(() => rpc(handler, 'research/read-reference', { topic: 'decision-samples' }), /符号链接/)
   } finally { await rm(fx.root, { recursive: true, force: true }) }
 })

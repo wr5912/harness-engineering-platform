@@ -5,6 +5,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { gzipSync, gunzipSync } from 'node:zlib'
 import { pathToFileURL } from 'node:url'
+import { dataStatePaths, isDataState } from './state.mts'
 
 type Target = { prefix: string; dataRoot: string; dryRun?: boolean; installDeps?: boolean; minimalData?: boolean; start?: boolean; cancelPrepare?: number }
 type File = { path: string; before: string | null; accepted?: (string | null)[]; content: string | null; mode: number }
@@ -302,7 +303,7 @@ export function applyUpdate(target: Target, update: Update) {
   for (const [index, repo] of update.repositories.entries()) {
     if (head(repo.root) !== repo.before || git(repo.root, 'diff', '--cached', '--name-only').length) throw new Error('远端提交或暂存区已变化，未更新')
     for (const file of [...repo.files, ...(index === 0 ? update.artifacts : [])]) {
-      if (index === 1 && (file.path.startsWith('config/') || file.path === 'workspace.json' || file.path.startsWith('.local/'))) throw new Error('增量更新不得覆盖现场配置或运行状态')
+      if (index === 1 && isDataState(file.path)) throw new Error('增量更新不得覆盖现场配置或运行状态')
       const path = safe(repo.root, file.path), current = digest(path), bytes = content(file), desired = bytes === null ? null : hash(bytes)
       if (current !== file.before && current !== desired && !file.accepted?.includes(current)) throw new Error(`远端文件存在冲突，未覆盖：${file.path}`)
       if (current !== desired || current !== null && (statSync(path).mode & 0o777) !== file.mode) changed.push({ path, file, before: current === null ? null : readFileSync(path), mode: current === null ? file.mode : statSync(path).mode & 0o777, repo: index })
@@ -410,6 +411,7 @@ export function applyUpdate(target: Target, update: Update) {
 export function updateRemote(ssh: string | undefined, target: Target, programRoot: string, dataRoot: string) {
   if (ssh !== undefined && !/^(?:[a-zA-Z0-9._-]+@)?[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(ssh)) throw new Error('SSH 目标无效')
   const source = readFileSync(new URL('./remote-update.mts', import.meta.url), 'utf8')
+    .replace("import { dataStatePaths, isDataState } from './state.mts'", `const dataStatePaths = ${JSON.stringify(dataStatePaths)}; const isDataState = ${isDataState.toString()}`)
   const remote = (expression: string) => {
     const command = `HEP_ROOT=${quote(target.prefix)} . ${quote(join(target.prefix, 'bin/hep-env.sh'))} && ${quote(join(target.prefix, 'runtime/node/bin/node'))} --input-type=module-typescript -`
     return JSON.parse(run(ssh === undefined ? 'sh' : 'ssh', ssh === undefined ? ['-c', command] : ['-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', ssh, command], undefined,

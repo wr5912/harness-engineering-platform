@@ -70,7 +70,16 @@ export function createMountedWebServer(NativeWebServer: any, basePath: string, p
       req.url = (req.url ?? '/').slice(prefix.length) || '/'
     }
 
+    private resource(resource: (request: Request, peer?: any) => Promise<Response>) {
+      return (request: Request, peer?: any) => {
+        const url = new URL(request.url)
+        url.pathname = url.pathname.slice(prefix.length) || '/'
+        return resource(new Request(url, request), peer)
+      }
+    }
+
     register(route: any): () => void {
+      if (route.resource) return super.register({ ...route, path: this.publicPath(route.path), resource: this.resource(route.resource) })
       const handler: Handler = route.kind === 'prefix' && route.path === '/plugins'
         ? (req, res) => this.serveClients(req, res)
         : route.handler
@@ -87,7 +96,18 @@ export function createMountedWebServer(NativeWebServer: any, basePath: string, p
       } })
     }
 
-    registerFallback(handler: Handler): () => void {
+    registerFallback(handler: Handler | { resource: (request: Request, peer?: any) => Promise<Response> }): () => void {
+      if (typeof handler !== 'function') {
+        const resource = this.resource(handler.resource)
+        return super.registerFallback({ resource: (request: Request, peer?: any) => {
+          const url = new URL(request.url)
+          if ((url.pathname === '/' || url.pathname === prefix) && ['GET', 'HEAD'].includes(request.method)) {
+            return new Response(null, { status: 302, headers: { location: basePath + url.search, 'cache-control': 'no-store' } })
+          }
+          if (!url.pathname.startsWith(basePath)) return new Response(null, { status: 404 })
+          return resource(request, peer)
+        } })
+      }
       return super.registerFallback((req: IncomingMessage, res: ServerResponse) => {
         const raw = req.url ?? '/'
         const at = raw.indexOf('?')

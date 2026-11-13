@@ -17,13 +17,13 @@ function fixture(t) {
     writeFileSync(join(path, 'README.md'), 'fixture\n')
     writeFileSync(join(path, '.gitignore'), '.env\nsessions/\nnode_modules/\n')
     if (key === 'platform_manager_dsh_home') { mkdirSync(join(path, 'profiles/web'), { recursive: true }); writeFileSync(join(path, 'profiles/web/package.json'), '{"dsh":{"profile":{"bundles":[]}}}\n') }
-    if (key === 'business_agents') { mkdirSync(join(path, 'agents/demo/agent'), { recursive: true }); writeFileSync(join(path, 'agents/demo/agent/harness.yaml'), 'schema_version: 1\n') }
+    if (key === 'business_agents') { mkdirSync(join(path, 'agents/demo'), { recursive: true }); writeFileSync(join(path, 'agents/demo/harness.yaml'), 'schema_version: 1\n') }
     git(path, 'add', '.'); git(path, 'commit', '-qm', 'fixture')
     repositories[key] = { url: path, ref: 'main', commit: git(path, 'rev-parse', 'HEAD') }
   }
   const data = repositories.data.url
   mkdirSync(join(data, 'registry/agents'), { recursive: true })
-  writeFileSync(join(data, 'registry/agents/demo.yaml'), `agent_id: demo\nsource_repository: ${repositories.business_agents.url}\nsource_commit: ${repositories.business_agents.commit}\nagent_path: agents/demo/agent\n`)
+  writeFileSync(join(data, 'registry/agents/demo.yaml'), `agent_id: demo\nsource_repository: ${repositories.business_agents.url}\nsource_commit: ${repositories.business_agents.commit}\nagent_path: agents/demo\n`)
   git(data, 'add', '.'); git(data, 'commit', '-qm', 'registry')
   repositories.data.commit = git(data, 'rev-parse', 'HEAD')
   return { root, destination, repositories }
@@ -110,14 +110,29 @@ test('dirty工作树、非空目录、origin和版本冲突均保留用户内容
   git(join(f.destination, 'business-agents'), 'remote', 'set-url', 'origin', f.repositories.data.url)
   assert.throws(() => initializeLab({ ...f, reuse: true }), /未提交|origin/)
 })
-test('显式浮动开发分支仍冻结实际SHA，分支和SHA不一致拒绝', t => {
+test('浮动分支冻结实际 SHA，固定提交不受来源分支后续移动影响', t => {
   const f = fixture(t)
   const floating = Object.fromEntries(Object.entries(f.repositories).map(([key, { url, ref }]) => [key, { url, ref }]))
   assert.throws(() => initializeLab({ ...f, repositories: floating }), /缺少 commit/)
   const result = initializeLab({ ...f, repositories: floating, allowFloatingRef: true })
   assert.equal(result.manifest.repositories.business_agents.commit, f.repositories.business_agents.commit)
-  const invalid = structuredClone(f.repositories); invalid.business_agents.commit = 'a'.repeat(40)
-  assert.throws(() => initializeLab({ ...f, destination: join(f.root, 'other'), repositories: invalid }), /ref 与指定 commit/)
+  const source = f.repositories.business_agents.url
+  writeFileSync(join(source, 'README.md'), 'new branch head\n')
+  git(source, 'add', '.'); git(source, 'commit', '-qm', 'advance branch')
+  const pinned = initializeLab({ ...f, destination: join(f.root, 'other') })
+  assert.equal(pinned.manifest.repositories.business_agents.commit, f.repositories.business_agents.commit)
+  assert.equal(initializeLab({ ...f, destination: join(f.root, 'other'), reuse: true }).validation.valid, true)
+})
+test('原生 Profile 只读取 Cordis 入口与 patch，不把包管理元数据作为配置', t => {
+  const f = fixture(t), home = f.repositories.platform_manager_dsh_home.url
+  writeFileSync(join(home, 'profiles/web/pnpm-workspace.yaml'), 'packages:\n  - .\nnodeLinker: hoisted\n')
+  writeFileSync(join(home, 'profiles/web/metadata.yaml'), 'description: profile metadata\n')
+  writeFileSync(join(home, 'profiles/web/cordis.yml'), '[]\n')
+  writeFileSync(join(home, 'profiles/web/cordis.patch.yml'), '[]\n')
+  git(home, 'add', '.'); git(home, 'commit', '-qm', 'native profile')
+  f.repositories.platform_manager_dsh_home.commit = git(home, 'rev-parse', 'HEAD')
+  assert.equal(initializeLab(f).validation.valid, true)
+  assert.equal(doctorLab(f.destination).valid, true)
 })
 test('lock不一致先拒绝，不写入目标仓库或用户文件', t => {
   const f = fixture(t), data = f.repositories.data.url

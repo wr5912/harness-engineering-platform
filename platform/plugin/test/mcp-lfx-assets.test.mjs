@@ -22,6 +22,14 @@ function workspace(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }))
   return root
 }
+function framework(t) {
+  const root = workspace(t), previous = process.env.HARNESS_PROGRAM_ROOT
+  process.env.HARNESS_PROGRAM_ROOT = root
+  t.after(() => { if (previous === undefined) delete process.env.HARNESS_PROGRAM_ROOT; else process.env.HARNESS_PROGRAM_ROOT = previous })
+  const source = join(root, 'platform/mcp/security-operations/src')
+  mkdirSync(source, { recursive: true }); mkdirSync(join(root, 'platform/plugin/src/mcp'), { recursive: true })
+  return source
+}
 function save(root, id, native) {
   const dir = join(root, 'mcp/compositions', id)
   mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'flow.json'), JSON.stringify(native))
@@ -116,26 +124,26 @@ test('原生固定子编排参与发布、下架和删除依赖检查，父绑�
 })
 
 test('Python 模块仅允许本编排和 MCP 共用源码，禁止跨包及符号链接逃逸', t => {
-  const root = workspace(t), native = flow()
+  const root = workspace(t), native = flow(), sharedRoot = framework(t)
   save(root, 'leaf', native)
   for (const name of ['compositions/leaf/src', 'compositions/sibling/src', 'src']) mkdirSync(join(root, 'mcp', name), { recursive: true })
-  const own = join(root, 'mcp/compositions/leaf/src/own.py'), shared = join(root, 'mcp/src/shared.py'), other = join(root, 'mcp/compositions/sibling/src/private.py')
+  const own = join(root, 'mcp/compositions/leaf/src/own.py'), shared = join(sharedRoot, 'shared.py'), other = join(root, 'mcp/compositions/sibling/src/private.py')
   for (const file of [own, shared, other]) writeFileSync(file, 'value = 1')
   const check = path => { native.metadata = { hep: { modules: { code: path } } }; save(root, 'leaf', native); return loadLfxBundle(root, 'leaf', config('leaf')) }
   assert.equal(check('compositions/leaf/src/own.py').modules.code, 'value = 1')
-  assert.equal(check('src/shared.py').modules.code, 'value = 1')
-  assert.throws(() => check('compositions/sibling/src/private.py'), /本编排或 MCP 共用源码/)
+  assert.equal(check('@harness-platform/security-operations/shared.py').modules.code, 'value = 1')
+  assert.throws(() => check('compositions/sibling/src/private.py'), /本编排或平台 MCP 框架/)
   symlinkSync(other, join(root, 'mcp/compositions/leaf/src/link.py'))
-  assert.throws(() => check('compositions/leaf/src/link.py'), /本编排或 MCP 共用源码/)
+  assert.throws(() => check('compositions/leaf/src/link.py'), /本编排或平台 MCP 框架/)
 })
 
 test('TypeScript 静态打包不执行；固定发布后组件及其共用依赖保持原字节', async t => {
-  const root = workspace(t), native = flow(), own = join(root, 'mcp/compositions/typed/src')
+  const root = workspace(t), native = flow(), own = join(root, 'mcp/compositions/typed/src'), sharedRoot = framework(t)
   native.metadata = { hep: { typescript: 'src/index.ts' } }; save(root, 'typed', native)
   mkdirSync(own, { recursive: true }); mkdirSync(join(root, 'mcp/src'), { recursive: true })
-  const shared = join(root, 'mcp/src/value.ts')
+  const shared = join(sharedRoot, 'value.ts')
   writeFileSync(shared, 'export const value = 1')
-  writeFileSync(join(own, 'index.ts'), 'import { value } from "../../../src/value.ts"; export function create() { return { prepare: async () => ({ value }), components: { echo: () => ({ value }) } } }')
+  writeFileSync(join(own, 'index.ts'), 'import { value } from "@harness-platform/security-operations/value.ts"; export function create() { return { prepare: async () => ({ value }), components: { echo: () => ({ value }) } } }')
   const first = freezeLfxBundle(root, 'typed', config('typed')), fixed = { ...config('typed'), flowDigest: first }
   writeFileSync(shared, 'export const value = 2')
   assert.notEqual(freezeLfxBundle(root, 'typed', config('typed')), first)
@@ -147,7 +155,7 @@ test('TypeScript 静态打包不执行；固定发布后组件及其共用依赖
   save(root, 'sibling', flow()); mkdirSync(join(root, 'mcp/compositions/sibling/src'), { recursive: true })
   writeFileSync(join(root, 'mcp/compositions/sibling/src/private.ts'), 'export const value = 3')
   writeFileSync(join(own, 'index.ts'), 'import { value } from "../../sibling/src/private.ts"; export { value }')
-  assert.throws(() => freezeLfxBundle(root, 'typed', config('typed')), /本编排或 MCP 共用源码/)
+  assert.throws(() => freezeLfxBundle(root, 'typed', config('typed')), /本编排或平台 MCP 框架/)
 })
 
 test('官方 HTTP 嵌套流程执行冻结 TS 组件，状态轮询不复用旧回执', { skip: !existsSync(python) }, t => {

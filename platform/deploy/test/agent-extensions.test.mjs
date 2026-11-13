@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,10 +16,10 @@ const run = (data, args) => { const result = spawnSync('git', ['-C', data, ...ar
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'agent-extensions-')), assetRoot = join(root, 'data'), staging = join(root, 'stage'), business = join(assetRoot, 'extensions/security-operations')
   t.after(() => rmSync(root, { recursive: true, force: true }))
-  const sourceDirectory = 'evolution/experiments/EXP-soc-001/candidate/dsh/managed/threat-analysis'
-  write(join(assetRoot, sourceDirectory, 'algorithm.py'), 'import json\nfrom pathlib import Path\nVALUE="固定算法原文"\n')
-  write(join(assetRoot, sourceDirectory, 'catalog/fixture.json'), '{"source":"固定目录"}\n')
-  write(join(assetRoot, sourceDirectory + '.mjs'), 'export const inferFrozen=async()=>({frozen:true});\n')
+  const sourceDirectory = 'threat-analysis'
+  write(join(business, 'algorithm', sourceDirectory, 'algorithm.py'), 'import json\nfrom pathlib import Path\nVALUE="固定算法原文"\n')
+  write(join(business, 'algorithm', sourceDirectory, 'catalog/fixture.json'), '{"source":"固定目录"}\n')
+  write(join(business, 'algorithm', sourceDirectory + '.mjs'), 'export const inferFrozen=async()=>({frozen:true});\n')
   run(assetRoot, ['init', '-q']); run(assetRoot, ['add', '.']); run(assetRoot, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', '固定算法'])
   const commit = run(assetRoot, ['rev-parse', 'HEAD'])
   write(join(assetRoot, 'workspace.json'), JSON.stringify({ extensions: [{ id: 'security-operations-compositions', path: 'extensions/security-operations' }, { id: 'unrelated', path: 'extensions/unrelated' }] }))
@@ -84,7 +84,7 @@ test('缺少业务声明、固定算法、循环与缺少版本引用均阻止�
   await assert.rejects(stageSelectedExtensions({ ...x.input, compositions: { compositions: [{ id: 'a', published: { kind: 'composite', steps: [{ compositionId: 'a', versionId: 'missing' }] } }] } }), /缺少所引用/)
   const loop = { kind: 'composite', steps: [{ compositionId: 'a', versionId: 'v1' }] }
   await assert.rejects(stageSelectedExtensions({ ...x.input, compositions: { compositions: [{ id: 'a', published: loop, versions: [{ versionId: 'v1', config: loop }] }] } }), /循环/)
-  rmSync(join(x.assetRoot, '.git'), { recursive: true })
+  rmSync(join(x.business, 'algorithm'), { recursive: true })
   await assert.rejects(stageSelectedExtensions(x.input), /固定算法来源不可用/)
 })
 
@@ -108,13 +108,18 @@ test('仅SOC查询流程不携带威胁分析固定算法', async t => {
 
 test('巡检独立包只带选中代码和公共依赖，不要求威胁算法或模型服务', async t => {
   const x = fixture(t), business = join(x.assetRoot, 'mcp')
+  const fixtureProgram = join(x.root, 'program')
+  cpSync(join(programRoot, 'platform/plugin/src/standalone-extensions'), join(fixtureProgram, 'platform/plugin/src/standalone-extensions'), { recursive: true })
+  symlinkSync(join(programRoot, 'platform/plugin/node_modules'), join(fixtureProgram, 'platform/plugin/node_modules'), 'dir')
+  write(join(fixtureProgram, 'platform/plugin/package.json'), '{}')
   write(join(x.assetRoot, 'workspace.json'), JSON.stringify({ extensions: [{ id: 'security-operations-compositions', path: 'mcp' }] }))
-  write(join(business, 'src/inspection/index.ts'), 'export const marker="public";\n')
-  write(join(business, 'src/soc.ts'), 'export const createSoc=()=>async()=>({ok:true});\n')
+  write(join(fixtureProgram, 'platform/mcp/security-operations/src/inspection/index.ts'), 'export const marker="public";\n')
+  write(join(fixtureProgram, 'platform/mcp/security-operations/build.mjs'), '// 平台构建入口\n')
+  write(join(fixtureProgram, 'platform/mcp/security-operations/src/soc.ts'), 'export const createSoc=()=>async()=>({ok:true});\n')
   write(join(business, 'compositions/inspection-status/src/index.ts'), "import {marker} from '@mcp/inspection';export const create=soc=>({inputSchema:{type:'object'},marker,execute:()=>soc()});\n")
   write(join(business, 'compositions/inspection-deep/src/private.ts'), 'throw new Error("不应入包")\n')
   write(join(business, 'build.mjs'), 'throw new Error("不执行数据构建脚本")\n')
-  const info = await stageSelectedExtensions({ ...x.input, compositions: { compositions: [{ published: { kind: 'workflow', workflow: 'inspection-status' } }] } })
+  const info = await stageSelectedExtensions({ ...x.input, programRoot: fixtureProgram, compositions: { compositions: [{ published: { kind: 'workflow', workflow: 'inspection-status' } }] } })
   assert.equal(info.fixedSource, undefined)
   assert.ok(info.sources.every(file => !/threat|inspection-deep/.test(file.path)))
   const {ctx} = context(); delete ctx.llm; delete ctx.settingsController

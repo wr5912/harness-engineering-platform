@@ -1,0 +1,100 @@
+{
+  "items": [
+    {
+      "name": "ai_soc_graph__get_graph_enrich_topology_by_asset_id",
+      "resource_id": "e1bae1f6-b54c-4e8a-a393-cac600fcef59",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "assetId": {
+              "type": "integer",
+              "format": "int64",
+              "description": "资产 ID"
+            }
+          },
+          "required": [
+            "assetId"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_graph__get_graph_flow_host_pair_ports",
+      "resource_id": "e1bae1f6-b54c-4e8a-a393-cac600fcef59",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "srcIp": {
+              "type": "string",
+              "description": "源 IP"
+            },
+            "dstIp": {
+              "type": "string",
+              "description": "目的 IP"
+            },
+            "timeFrom": {
+              "type": "string",
+              "description": "时间窗起 (ISO-8601, 可空)"
+            }
+          },
+          "required": [
+            "dstIp",
+            "srcIp"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_graph__get_graph_identity_asset_accounts",
+      "resource_id": "e1bae1f6-b54c-4e8a-a393-cac600fcef59",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "assetId": {
+              "type": "integer",
+              "format": "int64",
+              "description": "资产 ID"
+            }
+          },
+          "required": [
+            "assetId"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_graph__get_graph_lm_login_sequence",
+      "resource_id": "e1bae1f6-b54c-4e8a-a393-cac600fcef59",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "account": {
+              "type": "string"
+            },
+            "windowStart": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "windowEnd": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "required": [
+            "account",
+            "windowEnd",
+            "windowStart"
+          ]
+        }
+      }
+    }
+  ]
+}

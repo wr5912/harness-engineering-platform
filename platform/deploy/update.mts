@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { managedState, ownsPort, platformNodeOptions, processBirth, restoreManagedProcess, serviceOwner } from '../lifecycle.mts'
 import { workspaceIdentity, instanceStateRoot, workspaceLocalPath, workspaceOwnsCwd, mcpLocalPath } from '../plugin/src/workspace.ts'
+import { managerHome } from '../manager-home.mts'
 
 export type UpdateOptions = { programRoot: string; dataRoot: string; dryRun?: boolean; interruptSessions?: boolean; clientOnly?: boolean }
 type ServiceState = NonNullable<ReturnType<typeof managedState>>
@@ -43,16 +44,16 @@ function files(path: string): string[] {
   return stat.isDirectory() ? readdirSync(path).sort().filter(name => !['node_modules', '.git', '__pycache__'].includes(name)).flatMap(name => files(join(path, name))) : stat.isFile() ? [path] : []
 }
 function sourceSnapshot(options: UpdateOptions) {
-  const roots = ['platform/plugin/src', 'platform/plugin/assets', 'platform/plugin/business', 'platform/mcp/lfx', 'plugins/mcp-manager', 'runtime/adapters/dsh-web/src', 'platform/profile']
+  const roots = ['platform/plugin/src', 'platform/plugin/assets', 'platform/plugin/business', 'platform/mcp/lfx', 'platform/mcp/security-operations', 'platform/extensions', 'plugins/mcp-manager', 'runtime/adapters/dsh-web/src', 'platform/profile']
   const selected = roots.flatMap(path => files(join(options.programRoot, path)))
   selected.push(join(options.programRoot, 'runtime/adapters/dsh-container/dsh-browser-inspect.mjs'))
   for (const folder of ['platform/plugin', 'runtime/adapters/dsh-web']) for (const name of ['package.json', 'pnpm-lock.yaml', 'build.mjs']) selected.push(join(options.programRoot, folder, name))
   for (const name of ['platform/dsh-platform-internal.py', 'platform/dsh-platform', 'platform/lifecycle.mts', 'platform/deploy/update.mts']) selected.push(join(options.programRoot, name))
-  for (const name of ['workspace.json', 'AGENTS.md']) if (existsSync(join(options.dataRoot, name))) selected.push(join(options.dataRoot, name))
+  for (const name of ['workspace.json']) if (existsSync(join(options.dataRoot, name))) selected.push(join(options.dataRoot, name))
   for (const extension of options.clientOnly ? [] : json(join(options.dataRoot, 'workspace.json')).extensions ?? []) {
     const directory = resolve(options.dataRoot, extension.path)
     if (!directory.startsWith(options.dataRoot + '/') || !(extension.path === 'mcp' || extension.path.startsWith('extensions/'))) throw new Error('扩展路径不属于当前数据根')
-    selected.push(...files(join(directory, 'src')), join(directory, 'build.mjs'), join(directory, 'package.json'))
+    for (const name of ['manager.json', 'compositions.json']) if (existsSync(join(directory, name))) selected.push(join(directory, name))
     if (extension.path === 'mcp') for (const entry of readdirSync(join(directory, 'compositions'))) {
       selected.push(...files(join(directory, 'compositions', entry, 'src')))
       const flow = join(directory, 'compositions', entry, 'flow.json'); if (existsSync(flow)) selected.push(flow)
@@ -65,7 +66,7 @@ function liveSnapshot(options: UpdateOptions) {
     const path = join(options.programRoot, 'platform/plugin/lib/client.js')
     return Object.fromEntries(files(path).map(file => [file, sha(file)]))
   }
-  const overlay = join(options.dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
+  const overlay = join(managerHome(options.dataRoot), 'profiles/harness-platform/harness-platform.patch.yml')
   const activeExtensions = existsSync(overlay) ? readFileSync(overlay, 'utf8').split('\n').flatMap(line => {
     const value = line.match(/^\s+name: (.+)$/)?.[1]
     if (!value?.includes('/.local/build-cache/')) return []
@@ -78,7 +79,7 @@ function liveSnapshot(options: UpdateOptions) {
     ...files(join(options.programRoot, 'runtime/adapters/dsh-web/lib')),
     ...[join(options.programRoot, 'runtime/adapters/dsh-container/dsh-browser-inspect.mjs')].filter(existsSync),
     ...['runtime.js', 'mcp-manager.js'].map(name => join(options.programRoot, 'platform/plugin/business', name)).filter(existsSync),
-    ...files(join(options.dataRoot, '.local/platform-home/profiles/harness-platform')).filter(path => !path.includes('/node_modules/') && !path.endsWith('/node_modules')),
+    ...files(join(managerHome(options.dataRoot), 'profiles/harness-platform')).filter(path => !path.includes('/node_modules/') && !path.endsWith('/node_modules')),
     ...activeExtensions,
   ].map(path => [path, sha(path)]))
 }
@@ -102,9 +103,9 @@ function preparedProfile(options: UpdateOptions, environment: NodeJS.ProcessEnv)
   }
   if (options.clientOnly) return {}
   // 只调用现有渲染与兼容检查，不调用会修改运行目录的 prepare。
-  const script = `import importlib.util,json,sys\nfrom pathlib import Path\nspec=importlib.util.spec_from_file_location('platform_update_source',sys.argv[1])\nm=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\nhome=m.platform_home();m.global_dsh(home);r=m.rendered_profile();p=home/'profiles'/m.PROFILE_NAME\na=(p/'package.json').read_text();r['package.json']=m.merged_profile_manifest(a,r['package.json'])\nassert json.loads(a)==json.loads(r['package.json']), 'Profile依赖合同变化，需要prepare'\nassert (p/'pnpm-workspace.yaml').read_text()==r['pnpm-workspace.yaml'], 'Profile模板变化，需要prepare'\nassert (p/'node_modules/@ai-agent-harness/harness-platform').resolve()==m.PLUGIN, 'Profile程序链接不符'\nassert m.normalized_mcp_patch(p)==(p/'cordis.patch.yml').read_text(), '用户Patch需要prepare'\nprint(json.dumps({'overlay':r[m.PLATFORM_PATCH],'userPatch':m.normalized_retry_patch((p/'cordis.patch.yml').read_text()),'extensions':[{'entry':str(m.asset_root()/e['path']/'build.mjs'),'output':str(m.extension_output(e,path_only=True))} for e in m.workspace_extensions()]}))\n`
+  const script = `import importlib.util,json,sys\nfrom pathlib import Path\nspec=importlib.util.spec_from_file_location('platform_update_source',sys.argv[1])\nm=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\nhome=m.platform_home();m.global_dsh(home);r=m.rendered_profile();p=home/'profiles'/m.PROFILE_NAME\na=(p/'package.json').read_text();r['package.json']=m.merged_profile_manifest(a,r['package.json'])\nassert json.loads(a)==json.loads(r['package.json']), 'Profile依赖合同变化，需要prepare'\nassert (p/'pnpm-workspace.yaml').read_text()==r['pnpm-workspace.yaml'], 'Profile模板变化，需要prepare'\nassert (p/'node_modules/@ai-agent-harness/harness-platform').resolve()==m.PLUGIN, 'Profile程序链接不符'\nassert m.normalized_mcp_patch(p)==(p/'cordis.patch.yml').read_text(), '用户Patch需要prepare'\nprint(json.dumps({'overlay':r[m.PLATFORM_PATCH],'userPatch':m.normalized_retry_patch((p/'cordis.patch.yml').read_text()),'extensions':[{'entry':str(m.extension_entry(e)),'output':str(m.extension_output(e,path_only=True))} for e in m.workspace_extensions()]}))\n`
   const value = JSON.parse(command(environment.HARNESS_PYTHON || '/usr/bin/python3.10', ['-c', script, join(options.programRoot, 'platform/dsh-platform-internal.py')], { cwd: options.programRoot, env: environment }))
-  const path = join(options.dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
+  const path = join(managerHome(options.dataRoot), 'profiles/harness-platform/harness-platform.patch.yml')
   // 依赖与 Runtime 合同已在上方核对；渲染后的模板与程序制品一起暂存、应用和回滚。
   return { overlay: { path, text: value.overlay as string }, userPatch: { path: join(dirname(path), 'cordis.patch.yml'), text: value.userPatch as string }, extensions: value.extensions as Array<{ entry: string; output: string }> }
 }
@@ -226,7 +227,7 @@ async function inspect(options: UpdateOptions): Promise<UpdateInspection> {
   const state = managedState(options.dataRoot, options.programRoot)
   if (!state || !state.detached || !ownsPort(state.pid, state.host, state.port)) throw new Error('更新只支持当前已启动并受管的本机平台')
   const environment = processEnvironment(state.pid)
-  if (environment.HARNESS_PROGRAM_ROOT !== options.programRoot || environment.HARNESS_ASSET_ROOT !== options.dataRoot || environment.DSH_HOME !== join(options.dataRoot, '.local/platform-home') || !environment.HOME || !isAbsolute(environment.HOME)) throw new Error('进程程序根、数据根或HOME身份不符，未应用')
+  if (environment.HARNESS_PROGRAM_ROOT !== options.programRoot || environment.HARNESS_ASSET_ROOT !== options.dataRoot || environment.DSH_HOME !== managerHome(options.dataRoot, environment) || !environment.HOME || !isAbsolute(environment.HOME)) throw new Error('进程程序根、数据根或HOME身份不符，未应用')
   const workspaceId = workspaceIdentity(options.dataRoot).id
   const prepared = preparedProfile(options, environment)
   const command = [readlinkSync(`/proc/${state.pid}/exe`), ...readFileSync(`/proc/${state.pid}/cmdline`, 'utf8').split('\0').filter(Boolean).slice(1)]

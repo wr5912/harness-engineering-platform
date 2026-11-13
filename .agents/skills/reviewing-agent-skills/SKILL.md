@@ -42,7 +42,7 @@ metadata:
 
 - **事实优先**：不存在的路径、工具、测试结果不得编造；无法访问文件则陈述审查范围。
 - **误报克制**：静态出现 `mcp__<server>__<tool>`、长脚本或多个步骤不自动等于缺陷。只有当接口不稳定、编排可确定性下沉、或存在实际运行证据时才升级严重度。
-- **职责优先**：Agent 做意图/策略/判断；Skill 描述任务方法；脚本处理局部确定性操作；原 MCP 服务封装同域操作；涉及 MCP 时按数据工作区 [mcp-composition 的公开开发入口](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/mcp-composition/SKILL.md#开发方法) 比较原始工具 + Skill 和组合的必要性，跨服务本身不构成新增组合的理由。拒绝不必要的基础设施迁移。
+- **职责优先**：Agent 做意图/策略/判断；Skill 描述任务方法；脚本处理局部确定性操作；原 MCP 服务封装同域操作；涉及 MCP 时按数据工作区 [mcp-composition 的公开开发入口](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/mcp-composition/SKILL.md#开发方法) 比较原始工具 + Skill 和组合的必要性，跨服务本身不构成新增组合的理由。拒绝不必要的基础设施迁移。
 - **审查应公平**：安全检查适度且有明确风险；不因“更安全”而要求复杂多余的审批、鉴权和治理。
 - **先验证收益**：声称“减少 Token、改善成功率”必须有可比较的运行数据；否则只称预期改善。
 - **终止条件**：核心问题有证据、建议可执行、验收标准明确即完成。不要以无限自检替代交付。

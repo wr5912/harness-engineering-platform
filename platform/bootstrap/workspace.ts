@@ -4,6 +4,7 @@ import { accessSync, appendFileSync, constants, existsSync, lstatSync, mkdirSync
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
+import { extensionEntry } from '../extensions/entries.mts'
 
 const execute = promisify(execFile)
 export const defaultRepository = 'git@github.com:wr5912/harness-engineering-platform-data.git'
@@ -66,7 +67,7 @@ export async function inspectWorkspace(rootValue: string) {
   let extensions: { id: string; path: string }[] = []
   if (checks.find(c => c.id === 'workspace.json')?.status === 'ok') {
     const declared = JSON.parse(readFileSync(join(root, 'workspace.json'), 'utf8')).extensions ?? []
-    const valid = Array.isArray(declared) && new Set(declared.map(e => e?.id)).size === declared.length && declared.every(e => e && typeof e.id === 'string' && /^[a-z][a-z0-9-]*$/.test(e.id) && typeof e.path === 'string' && (e.path === 'mcp' || e.path.startsWith('extensions/')) && !e.path.split('/').includes('..') && existsSync(join(root, e.path, 'build.mjs')))
+    const valid = Array.isArray(declared) && new Set(declared.map(e => e?.id)).size === declared.length && declared.every(e => e && typeof e.id === 'string' && /^[a-z][a-z0-9-]*$/.test(e.id) && typeof e.path === 'string' && (e.path === 'mcp' || e.path.startsWith('extensions/')) && !e.path.split('/').includes('..') && existsSync(extensionEntry(e.id)))
     checks.push({ id: 'extensions', label: '声明的工作区扩展', status: valid ? 'ok' : 'invalid', detail: valid ? '仅在明确执行初始化后构建装载已声明扩展' : '扩展声明或构建入口无效；请先修复' })
     if (valid) extensions = declared.map(e => ({ id: e.id, path: e.path }))
   }
@@ -77,14 +78,18 @@ export async function inspectWorkspace(rootValue: string) {
 
 export function extensionDigest(root: string, extensions: { id: string; path: string }[]) {
   const digest = createHash('sha256').update(JSON.stringify(extensions))
-  function visit(path: string) {
+  function visit(path: string, base: string, label: string) {
     const stat = lstatSync(path)
     if (stat.isSymbolicLink()) throw new Error('扩展源码包含符号链接，请先核对并使用实体源码')
     if (stat.isDirectory()) {
-      for (const name of readdirSync(path).sort()) if (!['node_modules', '.git', '.local', '__pycache__'].includes(name)) visit(join(path, name))
-    } else if (stat.isFile()) digest.update(path.slice(root.length)).update('\0').update(readFileSync(path))
+      for (const name of readdirSync(path).sort()) if (!['node_modules', '.git', '.local', '__pycache__'].includes(name)) visit(join(path, name), base, label)
+    } else if (stat.isFile()) digest.update(label).update(path.slice(base.length)).update('\0').update(readFileSync(path))
   }
-  for (const extension of extensions) visit(join(root, extension.path))
+  for (const extension of extensions) {
+    const source = dirname(extensionEntry(extension.id))
+    visit(source, source, `program/${extension.id}`)
+    if (existsSync(join(root, extension.path))) visit(join(root, extension.path), root, 'data')
+  }
   return digest.digest('hex')
 }
 

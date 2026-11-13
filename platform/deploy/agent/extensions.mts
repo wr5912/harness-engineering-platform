@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { builtinModules, createRequire } from 'node:module'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
-import { spawnSync } from 'node:child_process'
 import { sha256File } from '../manifest.mts'
 import type { StandaloneExtension } from '../../plugin/src/standalone-extensions/index.ts'
 import { sourceTreeDigest } from '../../plugin/src/mcp/source-digest.ts'
@@ -50,12 +49,6 @@ function plainFile(root: string, file: string) {
   if (!path.startsWith(base + sep) || lstatSync(file).isSymbolicLink() || !lstatSync(file).isFile()) throw new Error('业务扩展包含包外链接或无效文件')
   return path
 }
-function git(root: string, args: string[]) {
-  const result = spawnSync('git', ['-C', root, ...args], { maxBuffer: 32 * 1024 * 1024, timeout: 30_000 })
-  if (result.status !== 0) throw new Error('业务扩展的固定算法来源不可用，请恢复声明的 Git 提交后重试')
-  return result.stdout
-}
-
 /** 仅静态构建平台明确装载的安全运营扩展；不执行数据工作区的 build 或安装脚本。 */
 export async function stageSelectedExtensions(options: Options) {
   const needed = requiredBusiness(options.compositions, options.assetRoot)
@@ -66,8 +59,10 @@ export async function stageSelectedExtensions(options: Options) {
   let declared: any
   try { declared = JSON.parse(readFileSync(join(assetRoot, 'workspace.json'), 'utf8')).extensions?.find((item: any) => item.id === id) } catch { /* 缺口用统一业务说明。 */ }
   if (!['extensions/security-operations', 'mcp'].includes(declared?.path)) throw new Error('所选组合需要工作区声明的 security-operations 业务扩展')
-  const business = realpathSync(join(assetRoot, declared.path))
-  if (!business.startsWith(assetRoot + sep)) throw new Error('业务扩展不在当前数据工作区内')
+  const compositionRoot = realpathSync(join(assetRoot, declared.path))
+  const modern = declared.path === 'mcp'
+  const business = modern ? join(programRoot, 'platform/mcp/security-operations') : compositionRoot
+  if (!compositionRoot.startsWith(assetRoot + sep)) throw new Error('业务扩展不在当前数据工作区内')
   const sources: SourceFile[] = []
   for (const config of needed.lfx.values()) {
     const path = `mcp/compositions/${config.workflow}/versions/${config.flowDigest}/bundle.json`
@@ -82,25 +77,17 @@ export async function stageSelectedExtensions(options: Options) {
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const file = join(directory, entry.name)
       if (entry.isDirectory()) collect(file)
-      else { plainFile(business, file); sources.push({ path: relative(assetRoot, file).split(sep).join('/'), sha256: sha256File(file) }) }
+      else { plainFile(assetRoot, file); sources.push({ path: relative(assetRoot, file).split(sep).join('/'), sha256: sha256File(file) }) }
     }
   }
-  const modern = declared.path === 'mcp'
   if (!modern) collect(join(business, 'src'))
   else {
-    if (needed.threat) { collect(join(business, 'src/threat')); sources.push({ path: 'mcp/src/threat-services.ts', sha256: sha256File(join(business, 'src/threat-services.ts')) }) }
-    if (needed.flow) collect(join(business, 'compositions/security-asset-related-alerts-readonly/src'))
-    if (needed.workflows.size) {
-      collect(join(business, 'src/inspection'))
-      sources.push({ path: 'mcp/src/soc.ts', sha256: sha256File(join(business, 'src/soc.ts')) })
-      for (const workflow of needed.workflows) collect(join(business, 'compositions', workflow, 'src'))
-      sources.push({ path: 'mcp/build.mjs', sha256: sha256File(join(business, 'build.mjs')) })
-    }
+    for (const workflow of needed.workflows) collect(join(compositionRoot, 'compositions', workflow, 'src'))
   }
   if (existsSync(join(business, 'package.json'))) {
     const manifest = plainFile(business, join(business, 'package.json')), pkg = JSON.parse(readFileSync(manifest, 'utf8'))
     if (Object.keys(pkg.dependencies ?? {}).length || Object.keys(pkg.peerDependencies ?? {}).length) throw new Error('业务扩展声明了额外 Node 环境，尚未准备独立部署依赖')
-    sources.push({ path: relative(assetRoot, manifest).split(sep).join('/'), sha256: sha256File(manifest) })
+    if (!modern) sources.push({ path: relative(assetRoot, manifest).split(sep).join('/'), sha256: sha256File(manifest) })
   }
   for (const entry of readdirSync(business)) if (/^(?:requirements[^/]*\.txt|pyproject\.toml)$/.test(entry)) throw new Error('业务扩展声明了额外 Python 环境，尚未准备独立部署依赖')
   const sourceText = needed.threat ? readFileSync(plainFile(business, join(business, 'src/threat/source.ts')), 'utf8') : ''
@@ -111,17 +98,18 @@ export async function stageSelectedExtensions(options: Options) {
   mkdirSync(destination, { recursive: true })
   let fixed: { commit: string; directory: string; digest: string; files: SourceFile[] } | undefined
   if (needed.threat) {
-    const rows = git(assetRoot, ['ls-tree', '-r', '-z', commit, '--', sourceDirectory, sourceDirectory + '.mjs']).toString('utf8').split('\0').filter(Boolean)
-    if (!rows.length) throw new Error('业务扩展的固定算法来源为空')
     const contents = new Map<string, Buffer>()
-    for (const row of rows) {
-      options.signal?.throwIfAborted()
-      const match = /^(100644|100755) blob [0-9a-f]+\t(.+)$/.exec(row)
-      if (!match) throw new Error('固定算法包含链接或非普通文件')
-      const name = match[2], path = name === sourceDirectory + '.mjs' ? 'threat-analysis.mjs' : 'threat-analysis/' + name.slice(sourceDirectory.length + 1)
-      if (!name.startsWith(sourceDirectory + '/') && name !== sourceDirectory + '.mjs') throw new Error('固定算法路径无效')
-      contents.set(path, git(assetRoot, ['show', `${commit}:${name}`]))
+    const algorithm = join(business, 'algorithm')
+    if (!existsSync(algorithm)) throw new Error('固定算法来源不可用：平台程序缺少 algorithm 目录')
+    function collectAlgorithm(directory: string) {
+      for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+        options.signal?.throwIfAborted()
+        const file = join(directory, entry.name)
+        if (entry.isDirectory()) collectAlgorithm(file)
+        else contents.set(relative(algorithm, plainFile(algorithm, file)).split(sep).join('/'), readFileSync(file))
+      }
     }
+    collectAlgorithm(algorithm)
     if (!contents.has('threat-analysis.mjs')) throw new Error('固定算法缺少模型适配入口')
     const localModules = new Set([...contents.keys()].filter(name => name.endsWith('.py')).map(name => basename(name, '.py')))
     for (const [path, bytes] of contents) {
@@ -145,22 +133,27 @@ export async function stageSelectedExtensions(options: Options) {
   const compiledInputs: Array<{ path: string; sha256: string; absolute: string }> = []
   const require = createRequire(join(programRoot, 'platform/plugin/package.json'))
   const { build } = require('esbuild')
-  const runtime = join(business, 'src/threat/runtime.ts'), services = join(business, 'src/threat-services.ts'), flow = join(business, modern ? 'compositions/security-asset-related-alerts-readonly/src/index.ts' : 'src/asset-alerts.ts')
+  const runtime = join(business, 'src/threat/runtime.ts'), services = join(business, 'src/threat-services.ts'), flow = join(business, 'src/asset-alerts.ts')
   const includeThreat = needed.threat || !modern, includeFlow = needed.flow || !modern
   const includeSoc = needed.workflows.size || needed.lfx.size
   const includeProposals = [...needed.lfx.values()].some(config => config.workflow.startsWith('troubleshooting-'))
-  const workflowDigests = Object.fromEntries([...needed.workflows].map(workflow => [workflow, sourceTreeDigest(business, [join(business, 'compositions', workflow, 'src'), join(business, 'src/inspection'), join(business, 'src/soc.ts'), join(business, 'build.mjs')])]))
+  const aliases = { '@mcp/inspection': join(business, 'src/inspection/index.ts'), '@harness-platform/security-operations': join(business, 'src'), '@harness-platform/mcp': join(programRoot, 'platform/plugin/src/mcp') }
+  const workflowDigests = Object.fromEntries(await Promise.all([...needed.workflows].map(async workflow => {
+    const compiled = await build({ absWorkingDir: compositionRoot, entryPoints: [join(compositionRoot, 'compositions', workflow, 'src/index.ts')], bundle: true, write: false, platform: 'node', target: 'node24', format: 'esm', packages: 'external', metafile: true, logLevel: 'silent', alias: aliases })
+    const paths = Object.keys(compiled.metafile.inputs).map(path => resolve(compositionRoot, path)).sort()
+    return [workflow, sourceTreeDigest(modern ? { program: programRoot, data: assetRoot } : business, [...paths, join(business, 'src/soc.ts'), join(business, 'build.mjs')])]
+  })))
   const entry = `import { populateSecurityOperations } from ${JSON.stringify(join(adapter, 'security-operations.ts'))};\n`
     + (includeThreat ? `import { createThreatRuntime } from ${JSON.stringify(runtime)};\nimport { createNativeThreatServices } from ${JSON.stringify(services)};\n` : '')
     + (includeFlow ? `import { assetAlertsFlow } from ${JSON.stringify(flow)};\n` : '')
     + (includeSoc ? `import { createSoc } from ${JSON.stringify(join(business, 'src/soc.ts'))};\n` : '')
     + (includeProposals ? `import { diagnosticProposalService } from ${JSON.stringify(join(business, 'src/diagnostic-services.ts'))};\n` : '')
-    + [...needed.workflows].map((workflow, index) => `import { create as workflow${index} } from ${JSON.stringify(join(business, 'compositions', workflow, 'src/index.ts'))};\n`).join('')
+    + [...needed.workflows].map((workflow, index) => `import { create as workflow${index} } from ${JSON.stringify(join(compositionRoot, 'compositions', workflow, 'src/index.ts'))};\n`).join('')
     + `export const populate=(ctx,options)=>populateSecurityOperations(ctx,options,{${includeThreat ? 'createThreatRuntime,createNativeThreatServices,' : ''}${includeFlow ? 'assetAlertsFlow,' : ''}${includeSoc ? includeProposals ? "createSoc:(dispatch,servers,ctx)=>Object.assign(createSoc(dispatch,servers),{propose:diagnosticProposalService(ctx.llm,()=>ctx.settingsController.describe().namespaces.find(item=>item.ns==='agent-default-model')?.value)})," : 'createSoc,' : ''}frozenWorkflows:${JSON.stringify([...needed.lfx.values()])},workflows:{${[...needed.workflows].map((workflow, index) => `${JSON.stringify(workflow)}:soc=>({...workflow${index}(soc),sourceDigest:${JSON.stringify(workflowDigests[workflow])}})`).join(',')}}});\n`
   options.signal?.throwIfAborted()
   const output = await build({ stdin: { contents: entry, resolveDir: business, sourcefile: 'standalone-security-operations.ts', loader: 'ts' }, bundle: true, write: false,
     platform: 'node', target: 'node24', format: 'esm', metafile: true, logLevel: 'silent',
-    nodePaths: [join(programRoot, 'platform/plugin/node_modules')],
+    nodePaths: [join(programRoot, 'platform/plugin/node_modules')], alias: aliases,
     define: { __STANDALONE_THREAT_SOURCE_COMMIT__: JSON.stringify(commit ?? ''), __STANDALONE_THREAT_SOURCE_DIRECTORY__: JSON.stringify(sourceDirectory ?? ''), __STANDALONE_THREAT_SOURCE_DIGEST__: JSON.stringify(fixed?.digest ?? '') },
     plugins: [{ name: 'standalone-business-boundaries', setup(builder: any) {
       builder.onResolve({ filter: /^@harness-platform\/mcp\// }, (args: any) => ({ path: join(programRoot, 'platform/plugin/src/mcp', args.path.split('/').at(-1) + '.ts') }))

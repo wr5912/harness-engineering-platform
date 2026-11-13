@@ -1,0 +1,8 @@
+{
+  "name": "@harness-platform/security-operations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "安全运营 MCP 框架与测试",
+  "scripts": { "build": "node build.mjs", "test": "node test.mjs" }
+}

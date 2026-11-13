@@ -18,7 +18,7 @@ async function fixture(t) {
     loaded.requests.push(req.headers)
     if (loaded.version) res.setHeader(BUSINESS_TRANSPORT_HEADER, loaded.version)
     res.writeHead(loaded.status, { 'content-type': loaded.type, ...(loaded.status === 302 ? { location: '/unexpected' } : {}) })
-    res.end(loaded.type === 'text/html' ? '<html>业务对话</html>' : '业务访问被拒绝')
+    res.end(loaded.type === 'text/html' ? `<html><head>${loaded.metaVersion ? `<meta name="${BUSINESS_TRANSPORT_HEADER}" content="${loaded.metaVersion}">` : ''}</head>业务对话</html>` : '业务访问被拒绝')
   })
   await new Promise(resolve => runtime.listen(0, '127.0.0.1', resolve))
   t.after(() => new Promise(resolve => runtime.close(resolve)))
@@ -74,6 +74,16 @@ test('新网关与未重载 Runtime 不得通过入口核验；重载后恢复�
   assert.equal((await checkRunningBusinessEntries(root, root))[0].ready, false, '网关已监听不能掩盖旧 Runtime')
   observation.push({ name: 'unknown', state: 'unknown' }); observe()
   assert.equal((await checkRunningBusinessEntries(root, root))[1].ready, false, '状态未知不能当作没有运行实例')
+})
+
+test('原生 Fetch 首页通过文件装载的版本标记完成入口核对', async t => {
+  const { loaded, check } = await fixture(t)
+  Object.assign(loaded, { status: 200, type: 'text/html', metaVersion: BUSINESS_TRANSPORT_VERSION })
+  assert.equal((await check()).ready, true)
+  loaded.metaVersion = '1'
+  assert.equal((await check()).ready, false)
+  loaded.metaVersion = undefined
+  assert.equal((await check()).ready, false)
 })
 
 test('HTTP 拒绝、重定向及非网页响应各自报告，不把当前版本的拒绝误判为版本问题', async t => {

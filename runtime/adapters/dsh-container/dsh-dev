@@ -805,6 +805,15 @@ def needs_schedule_compat(profile_manifest: str | None) -> bool:
     return "@deepseek-ai/dsh-experimental-schedule-bundle" in profile.get("dsh", {}).get("profile", {}).get("bundles", [])
 
 
+def runtime_user(home_directory: str | None = None) -> dict:
+    if home_directory and Path(home_directory).is_dir():
+        owner = Path(home_directory).stat()
+        uid, gid = owner.st_uid, owner.st_gid
+    else:
+        uid, gid = os.geteuid(), os.getegid()
+    return {"DSH_RUNTIME_UID": str(uid or 1000), "DSH_RUNTIME_GID": str(gid if uid else 1000)}
+
+
 def compose_env(contract: dict, mode: str, port: int, name: str,
                 image_id: str | None = None, analysis_workspace: str | None = None,
                 plugin_node_modules: str | None = None) -> dict:
@@ -812,6 +821,7 @@ def compose_env(contract: dict, mode: str, port: int, name: str,
     environment = dict(os.environ)
     environment.update({
         "DSH_IMAGE_TAG": image_reference(contract["image"]["local_image_tag"], image_id),
+        **runtime_user(contract.get("reload_manifest", {}).get("home_directory") or str(instance_dir(name) / "dsh-home")),
         "DSH_ADAPTER_HOST": str(ADAPTER),
         "DSH_HOME_HOST": contract.get("reload_manifest", {}).get("home_directory") or str(instance_dir(name) / "dsh-home"),
         "DSH_SITES_CONFIG_HOST": str(sites_config(REPO)),
@@ -1500,6 +1510,7 @@ def instance_compose_env(manifest: dict) -> dict:
     """
     mounts = manifest.get("mounts") or {}
     values = {
+        **runtime_user(manifest.get("home_directory")),
         "DSH_IMAGE_TAG": image_reference(manifest.get("image_tag"), manifest.get("image_id")),
         "DSH_ADAPTER_HOST": manifest.get("adapter_root") or str(ADAPTER),
         "DSH_HOME_HOST": manifest.get("home_directory"),
@@ -3197,7 +3208,10 @@ def validate_existing_identity(name: str, manifest: dict, contract: dict, mode: 
     existing_source = manifest.get("source_id")
     existing_mode = manifest.get("mode")
     existing_analysis = (manifest.get("mounts") or {}).get("analysis_workspace")
-    same_source = existing_source == contract["source_id"] or instance_desired_source(manifest, repo=REPO) == contract["source_id"]
+    same_source = isinstance(existing_source, str) and (
+        existing_source == contract["source_id"]
+        or instance_desired_source(manifest, repo=REPO) == contract["source_id"]
+    )
     if not same_source or existing_mode != mode \
             or existing_analysis != analysis_workspace:
         fail(

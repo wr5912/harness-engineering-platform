@@ -63,7 +63,7 @@ def copy_repository(destination: Path) -> Path:
     shutil.copytree(
         ROOT,
         target,
-        ignore=lambda folder, names: set(ignored(folder, names)) | ({"agents", "evolution"} if Path(folder) == ROOT else set()),
+        ignore=lambda folder, names: set(ignored(folder, names)) | ({"agents", "evolution"} if Path(folder) == ROOT else {"fixtures"} if Path(folder) == ROOT / "tests" else set()),
     )
     # 副本仍运行真实 TypeScript 来源解析器，共用已安装的锁定依赖。
     dependencies = ROOT / "platform/plugin/node_modules"
@@ -146,10 +146,10 @@ def write_minimal_experiment(root: Path, *, status: str = "active", outcome: str
         '  managed_root: dsh/managed\n'
         '  preset_id: example-agent\n'
         '  profile_patch: dsh/managed/base.patch.yml\n', encoding="utf-8")
-    for relative in ("workspace/AGENTS.md", "presets/example-agent/agent.cordis.yml", "managed/base.patch.yml"):
+    for relative in ("workspace/AGENTS.md", "workspace/.env", "presets/example-agent/agent.cordis.yml", "managed/base.patch.yml"):
         asset = experiment / "candidate/dsh" / relative
         asset.parent.mkdir(parents=True, exist_ok=True)
-        asset.write_text("# 最小合同夹具\n", encoding="utf-8")
+        asset.write_bytes((ROOT / "runtime/adapters/dsh-container/verification-home-controls/locked-bootstrap.env").read_bytes()) if relative.endswith(".env") else asset.write_text("# 最小合同夹具\n", encoding="utf-8")
     if status == "completed":
         (experiment / "decision.md").write_text("# 决定\n\n根据观察停止本实验。\n", encoding="utf-8")
     return experiment
@@ -871,12 +871,12 @@ class RunRecordTests(unittest.TestCase):
         unconfirmed = subprocess.run(["node", str(script)], input=json.dumps({"left": old, "right": new}),
                                      text=True, capture_output=True, check=False)
         self.assertEqual(unconfirmed.returncode, 0, unconfirmed.stderr)
-        self.assertIn("U-INS-001: right 巡检服务依赖未确认可用", json.loads(unconfirmed.stdout)["limits"])
+        self.assertFalse(any("巡检服务依赖" in item for item in json.loads(unconfirmed.stdout)["limits"]))
         new["cases"][0]["tool_calls"] = [{"name": None, "status": "ok"}]
         unnamed = subprocess.run(["node", str(script)], input=json.dumps({"left": old, "right": new}),
                                  text=True, capture_output=True, check=False)
         self.assertEqual(unnamed.returncode, 0, unnamed.stderr)
-        self.assertIn("U-INS-001: right 巡检服务依赖未确认可用", json.loads(unnamed.stdout)["limits"])
+        self.assertFalse(any("巡检服务依赖" in item for item in json.loads(unnamed.stdout)["limits"]))
 
     def test_init_captures_clean_git_before_creating_run(self) -> None:
         spec = importlib.util.spec_from_file_location("run_record_contract", RUN_RECORD)
@@ -2444,14 +2444,15 @@ print(json.dumps({"schema_version": "1.0", "rows": rows}))
             repository, env, _ = self.runtime_fixture(root, mode="hang")
             # 本例检查已创建 Run 的到期封存，为真实来源预检和初始化留出准备时间。
             env["HARNESS_EVAL_DEADLINE_AT"] = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(time.time() + 60))
-            env["HARNESS_EVAL_JOB_ID"] = str(uuid.uuid4())
+            env["HARNESS_EVAL_RUN_ID"] = "run-" + str(uuid.uuid4())
             completed, payload = self.run_eval(repository, env, "U-INS-001")
             self.assertEqual(completed.returncode, 2, completed.stderr)
             self.assertTrue(payload["cancelled"])
             self.assertTrue(payload["instance_stopped"])
             execution = json.loads(((repository / payload["summary"]).parent / "execution.json").read_text())
             self.assertEqual(execution["failure_reason"], "budget-deadline-exceeded")
-            self.assertEqual(execution["job_id"], env["HARNESS_EVAL_JOB_ID"])
+            self.assertEqual(execution["run_id"], env["HARNESS_EVAL_RUN_ID"])
+            self.assertNotIn("job_id", execution)
 
 
 class EvaluationSourceTests(unittest.TestCase):

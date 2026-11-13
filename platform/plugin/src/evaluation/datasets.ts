@@ -1,3 +1,4 @@
+import { managerHome } from '../manager-home.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -183,7 +184,7 @@ function identities(datasets: Dataset[]) {
 function harnessSources(root: string) {
   const paths = HARNESS_PATHS
   const files = paths.map(path => {
-    let file = root
+    let file = managerHome(root)
     for (const part of path.split('/')) {
       file = join(file, part)
       if (!existsSync(file)) return { path, source_sha256: null }

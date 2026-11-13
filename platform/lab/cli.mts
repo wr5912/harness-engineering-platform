@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { parseArgs } from 'node:util'
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -31,7 +32,7 @@ function emit(value: unknown) { process.stdout.write(JSON.stringify(value, null,
 function failure(error: unknown) {
   const message = error instanceof Error ? error.message : '操作失败'
   const conflict = /已存在|工作树存在|不同|不一致|冲突|过期|stale/i.test(message)
-  const result = { schema_version: 1, operation_id: `op_${Date.now().toString(36)}`, request_id: requestId ?? null, status: conflict ? 'failed' : 'failed', error: { code: conflict ? 'conflict' : 'invalid_input', message }, next_action: conflict ? 'status_or_reconcile' : null }
+  const result = { schema_version: 1, operation_id: `op_${randomUUID()}`, request_id: requestId ?? null, status: 'failed', error: { code: conflict ? 'conflict' : 'invalid_input', message }, next_action: conflict ? 'status_or_reconcile' : null }
   if (jsonRequested) emit(result)
   else process.stderr.write(`hep-lab: ${message}\n`)
   process.exitCode = conflict ? 3 : 2
@@ -78,7 +79,7 @@ try {
       else throw new Error('未知 hep-lab 命令')
     }
     const status = result?.validation?.valid === false || result?.valid === false ? 'failed' : command === 'update' ? 'planned' : 'succeeded'
-    emit({ schema_version: 1, operation_id: `op_${Date.now().toString(36)}`, request_id: requestId ?? null, status, ...result, next_action: status === 'planned' ? 'apply_or_reconcile' : null })
+    emit({ schema_version: 1, operation_id: `op_${randomUUID()}`, request_id: requestId ?? null, status, ...result, next_action: status === 'planned' ? 'apply_or_reconcile' : null })
   }
 } catch (error) {
   failure(error)

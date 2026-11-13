@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { build } from 'esbuild'
@@ -15,6 +17,32 @@ const built = mkdtempSync(join(tmpdir(), 'compute-build-freeze-module-'))
 await build({ stdin: { contents: "export * from './src/agents/compute-build.ts'; export * from './src/agents/compute-freeze.ts'; export * from './src/agents/compute-training.ts'; export * from './src/tasks/files.ts'; export * from './src/tasks/llm-key.ts'", resolveDir: new URL('../', import.meta.url).pathname, loader: 'ts' }, outfile: join(built, 'module.mjs'), bundle: true, platform: 'node', format: 'esm' })
 const { createComputeBuildHandler, inspectComputeBuild, createComputeFreezeHandler, archiveDecisionTraining, inspectDecisionTraining, candidateDigest, containsLiteralLlmKey } = await import(`file://${join(built, 'module.mjs')}`)
 test.after(() => rmSync(built, { recursive: true, force: true }))
+
+const sdkRequire = createRequire(createRequire(import.meta.url).resolve('@deepseek-ai/dsh-api-session-controller'))
+const sdk = name => import(pathToFileURL(sdkRequire.resolve(name)).href)
+const [{ Context }, { SystemPrompt }, { ToolRuntime }, { createScope }] = await Promise.all([
+  sdk('@deepseek-ai/cordis'), sdk('@deepseek-ai/dsh-system-prompt'), sdk('@deepseek-ai/dsh-tools'), sdk('@deepseek-ai/dsh-scope'),
+])
+function nativeWorkflow(t, plugin, dispatch) {
+  const ctx = new Context(), registered = new Map()
+  new SystemPrompt(ctx, {}); new ToolRuntime(ctx)
+  const register = ctx.tools.register.bind(ctx.tools)
+  ctx.tools.register = value => { registered.set(value.name, value); return register(value) }
+  const executable = ctx.tools.executable.bind(ctx.tools)
+  ctx.tools.executable = (name, ...args) => name === 'query_asset_alerts' ? executable(name, ...args) : {
+    name, parameters: { type: 'object' },
+    output: { schema: {}, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] },
+    execute: (args, exec) => dispatch({ ...exec, name, arguments: args }),
+  }
+  const agent = { session: { id: 'session-native' } }, scope = createScope(ctx, agent)
+  agent.ctx = scope.ctx
+  t.after(async () => { await scope.dispose(); await ctx.fiber.dispose() })
+  plugin.apply(ctx)
+  return { registered, execute: args => registered.get('query_asset_alerts').execute(args, {
+    signal: new AbortController().signal, callId: 'outer', rootCallId: 'outer', token: Symbol('native'), agent,
+  }) }
+}
+
 const id = 'EXP-alpha-002-r222222222222', exp = `evolution/experiments/${id}`, base = `${exp}/candidate`
 const hash = value => createHash('sha256').update(value).digest('hex')
 const write = (root, path, text) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text) }
@@ -84,9 +112,8 @@ test('固定编译不执行Candidate，生成的独立ESM可真实导入并执�
   const result = await handler('build', { experiment_id: id, expected_candidate_sha256: candidate, expected_preview_sha256: preview.value.preview_sha256 })
   assert.equal(result.ok, true, JSON.stringify(result)); assert.equal(inspectComputeBuild(f.root, id).verified, true)
   const plugin = await import(`file://${join(f.root, base, result.value.output_path)}`)
-  let tool
-  plugin.apply({ tools: { register(value) { tool = value }, async execute(input) { return { isError: false, value: input.name === 'get_asset' ? { id: 'asset-1' } : { alerts: ['alert-2'] } } } } })
-  const value = await tool.execute({ asset: '真实资产' }, { signal: new AbortController().signal, callId: 'call', token: Symbol(), agent: { session: { id: 'session' } } })
+  const native = nativeWorkflow(t, plugin, input => input.name === 'get_asset' ? { id: 'asset-1' } : { alerts: ['alert-2'] })
+  const value = await native.execute({ asset: '真实资产' })
   assert.equal(value.ok, true); assert.equal(value.result.alerts.alerts[0], 'alert-2')
   assert.equal(value.graph_execution.build_digest, result.value.build_digest)
   assert.equal(value.graph_execution.esm_sha256, result.value.esm_sha256)
@@ -137,13 +164,13 @@ test('固定组合绑定可编入独立ESM，原生派发使用稳定alias并拒
   const built = await handler('build', { experiment_id: id, expected_candidate_sha256: candidate, expected_preview_sha256: preview.value.preview_sha256 })
   assert.equal(built.ok, true, JSON.stringify(built))
   const plugin = await import(`file://${join(f.root, base, built.value.output_path)}`)
-  const registered = new Map(), dispatched = []
-  plugin.apply({ tools: { register(value) { registered.set(value.name, value) }, async execute(input) {
+  const dispatched = []
+  const native = nativeWorkflow(t, plugin, input => {
     dispatched.push(input.name)
-    return { isError: false, value: { isError: true, content: [{ type: 'text', text: '实际MCP业务错误' }] } }
-  } } })
-  assert.equal([...registered.keys()].filter(name => name.startsWith('hep_fixed_')).length, 1)
-  const result = await registered.get('query_asset_alerts').execute({}, { signal: new AbortController().signal, callId: 'outer', token: Symbol(), agent: { session: { id: 'session' } } })
+    return { isError: true, content: [{ type: 'text', text: '实际MCP业务错误' }] }
+  })
+  assert.equal([...native.registered.keys()].filter(name => name.startsWith('hep_fixed_')).length, 1)
+  const result = await native.execute({})
   assert.equal(result.ok, false)
   assert.equal(dispatched.length, 1)
   assert.match(dispatched[0], /^hep_fixed_[0-9a-f]{32}$/)

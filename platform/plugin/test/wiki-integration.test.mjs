@@ -62,6 +62,7 @@ test('Wiki 经真实资产接口形成可读独立副本，并按来源合同挂
     write(join(root, 'agents', target.agent, 'manifest.yaml'), `agent_id: ${target.agent}\nactive_experiment: ${target.active}\n`)
     write(join(root, 'evolution/experiments', target.id, 'change.yaml'), `experiment_id: ${target.id}\nagent_id: ${target.agent}\nstatus: active\n`)
     write(join(target.candidate, 'harness.yaml'), `loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: ${target.agent}\n  profile_patch: dsh/managed/agent.patch.yml\ncredential_environment_keys: []\n`)
+    write(join(target.candidate, 'dsh/workspace/.env'), readFileSync(join(repo, 'runtime/adapters/dsh-container/verification-home-controls/locked-bootstrap.env')))
     write(join(target.candidate, 'dsh/workspace/AGENTS.md'), `# ${target.agent}\n\n按既有职责回答。\n`)
     write(join(target.candidate, `dsh/presets/${target.agent}/agent.cordis.yml`), '[]\n')
     write(join(target.candidate, 'dsh/managed/agent.patch.yml'), '[]\n')
@@ -86,7 +87,7 @@ test('Wiki 经真实资产接口形成可读独立副本，并按来源合同挂
     assert.equal(detail.selection.basis, target.id === target.active ? 'active_experiment' : 'explicit')
     const harness = loadYaml((await rpc(handler, 'edit/read', { experiment_id: target.id, path: 'candidate/harness.yaml' })).content)
     target.workspace = resolve(target.candidate, harness.loadable_assets.workspace)
-    assert.equal(detail.declared.source_contract.workspace, target.workspace)
+    assert.equal(detail.declared.source_contract.workspace, target.workspace, spawnSync('/usr/bin/python3', [join(repo, 'runtime/adapters/dsh-container/source_contract.py'), '--source', `experiment:${target.id}`], {env:process.env,encoding:'utf8'}).stderr)
     assert.equal(resolve(root, detail.declared.loadable_source.candidate_root, 'workspace'), target.workspace)
 
     const edits = []

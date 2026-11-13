@@ -143,6 +143,7 @@ test('全局连接测试按保存配置检查全部启用服务，忽略筛选�
   ui.input('描述（可选）').props.onChange({ target: { value: '未保存输入' } }); ui.render()
   ui.nodes().find(node => node.type === 'input' && node.props.type === 'search').props.onChange({ target: { value: '不存在的服务' } }); ui.render()
   ui.enableBatch()
+  void ui.button('连接测试').props.onClick(); ui.render()
   assert.equal(ui.button('连接测试中 0/4').props.disabled, true)
   assert.equal(ui.nodes().filter(node => node.type === 'button' && ui.text(node) === '连接测试').length, 0, '服务卡片不再显示单项按钮')
   await flushBatch(ui)
@@ -162,18 +163,20 @@ test('全局连接测试按保存配置检查全部启用服务，忽略筛选�
   assert.deepEqual(ui.writes[0].ops.find(op => op.path[0] === 'groups').value, groups)
 })
 
-test('自动检查每次进入执行一次，页签和选择不重复触发，手动检查可再次运行', async () => {
+test('进入页面和切换页签不自动检查，手动检查可再次运行', async () => {
   let requests = 0
   const ui = editor({ fetch: async () => { requests++; return discoveryReply() } })
   ui.enableBatch(); await flushBatch(ui)
-  assert.equal(requests, 2)
+  assert.equal(requests, 0)
   ui.setView('groups'); ui.setServerId('platform-compositions'); ui.setView('connection'); ui.render()
-  assert.equal(requests, 2)
+  assert.equal(requests, 0)
   ui.setView('servers')
+  await ui.button('连接测试').props.onClick(); await flushBatch(ui)
+  assert.equal(requests, 2)
   await ui.button('连接测试').props.onClick(); await flushBatch(ui)
   assert.equal(requests, 4)
   ui.setActive(false); ui.setActive(true); await flushBatch(ui)
-  assert.equal(requests, 6)
+  assert.equal(requests, 4)
 })
 
 test('批量检查最多四个并发，失败后继续，单项20秒超时不会阻塞剩余服务', async () => {
@@ -188,6 +191,7 @@ test('批量检查最多四个并发，失败后继续，单项20秒超时不会
     }) })
   ui.refreshValue({ servers: Array.from({ length: 6 }, (_, i) => ({ id: `service-${i}`, url: `https://service-${i}.test` })), groups: [] })
   ui.enableBatch()
+  void ui.button('连接测试').props.onClick(); ui.render()
   assert.equal(inflight, 4)
   ui.setView('groups')
   assert.ok(ui.nodes().filter(node => node.type === 'button' && ui.text(node) === '发现工具与资源').every(node => node.props.disabled))
@@ -208,13 +212,14 @@ test('批量检查最多四个并发，失败后继续，单项20秒超时不会
 test('离开、版本更新和卸载取消请求，迟到响应不能覆盖新状态', async () => {
   const pending = []
   const ui = editor({ fetch: (_url, options) => new Promise(resolve => pending.push({ options, resolve })) })
-  ui.enableBatch(); ui.setActive(false)
+  ui.enableBatch(); void ui.button('连接测试').props.onClick(); ui.render(); ui.setActive(false)
   assert.ok(pending.every(item => item.options.signal.aborted))
   pending.forEach(item => item.resolve(discoveryReply([{ name: 'stale_tool' }])))
   await flushBatch(ui)
   assert.match(ui.text(ui.render()), /检查已取消 0\/2/)
   assert.doesNotMatch(ui.text(ui.render()), /stale_tool|规范已读取/)
   ui.setActive(true)
+  void ui.button('连接测试').props.onClick(); ui.render()
   assert.equal(pending.length, 4)
   ui.refreshValue(undefined, 'r2')
   assert.ok(pending.slice(2).every(item => item.options.signal.aborted))

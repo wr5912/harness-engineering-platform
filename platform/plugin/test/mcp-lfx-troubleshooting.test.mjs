@@ -1,8 +1,9 @@
+import '../../mcp/security-operations/test-bootstrap.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { lfxWorkflow } from '../src/mcp/lfx-runtime.ts'
 
-const root = '/home/cmp/harness-engineering-platform-data'
+const root = process.env.HARNESS_ASSET_ROOT ?? new URL('../../../../harness-engineering-platform-data/', import.meta.url).pathname
 const { create } = await import(`${root}/mcp/compositions/troubleshooting-business-access/src/index.ts`)
 const input = { source: { ip: '172.16.138.226', assetId: 3617426 }, target: { ip: '172.16.1.160', assetId: 3617438 }, protocol: 'tcp', port: 8834 }
 const config = { workflow: 'troubleshooting-business-access', engine: 'lfx', title: '业务访问故障排查', connections: { master: 'm', detect: 'd', graph: 'g' } }

@@ -40,9 +40,9 @@ function fixture(t, { count = 3, largeUser } = {}) {
   const caseId = index => `U-BASIC-${String(index).padStart(3, '0')}`
   const path = index => `${base}/evidence/${caseId(index)}/trace.jsonl`
   const manifest = values => Object.entries({ ...identity, status: 'completed', ...values }).map(([key, value]) => `${key}: ${value}`).join('\n') + '\n'
-  write(join(root, 'AGENTS.md'), '管理身份读取决策前材料。\n')
-  write(join(root, '.agents/skills/decision-sample-extraction/SKILL.md'), '---\nname: decision-sample-extraction\n---\n\n保留来源与人工逐题复核。\n')
-  write(join(root, 'docs/harness-research/decision-samples.md'), '输入与目标分开，AI建议不等于人工真值。\n')
+  write(join(root, '.local/platform-home', 'AGENTS.md'), '管理身份读取决策前材料。\n')
+  write(join(root, '.local/platform-home', '.agents/skills/decision-sample-extraction/SKILL.md'), '---\nname: decision-sample-extraction\n---\n\n保留来源与人工逐题复核。\n')
+  write(join(root, '.local/platform-home', 'docs/harness-research/decision-samples.md'), '输入与目标分开，AI建议不等于人工真值。\n')
   write(join(root, base, 'run.yaml'), manifest())
   write(join(root, base, 'inputs.lock.json'), JSON.stringify({ ...sourceVersion, evaluation_cases: Array.from({ length: count }, (_, index) => ({ case_id: caseId(index), inputs: [`查询测试资产${index}。`], expected_behavior: '只读返回实际状态。' })) }))
   for (let index = 0; index < count; index++) {

@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "id": "92a84e41-d340-4fb9-af8a-f7c7d41b0b54",
+      "slug": "ai_soc_detect"
+    },
+    {
+      "id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "slug": "ai_soc_correlate"
+    },
+    {
+      "id": "84183787-6570-42af-80d2-a33f70536dac",
+      "slug": "ai_soc_ingest"
+    },
+    {
+      "id": "763bd53e-f72b-4fbf-ab39-1245ae15dd14",
+      "slug": "ai_soc_event"
+    },
+    {
+      "id": "01450128-fd2d-4aec-a5d1-0986683b3355",
+      "slug": "ai_soc_master"
+    },
+    {
+      "id": "e1bae1f6-b54c-4e8a-a393-cac600fcef59",
+      "slug": "ai_soc_graph"
+    }
+  ]
+}

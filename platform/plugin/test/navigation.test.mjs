@@ -95,7 +95,7 @@ async function clientModule(path, exports, stubs) {
 test('平台通过原生插槽只替换 Codex 更新弹窗，加载顺序、刷新与卸载均保持正确', async () => {
   const source = await clientModule('../src/client.tsx', '', shellViews)
   const module = { exports: {} }
-  vm.runInNewContext(source, { module, exports: module.exports, require })
+  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === '@deepseek-ai/dsh-client-ui-primitives' ? { Tooltip: () => null } : require(name) })
   for (const pluginFirst of [false, true]) {
     const slots = new SlotCore(), disposers = [], injections = []
     slots.register({ name: 'root', children: { 'shell.overlay': { kind: 'list', scope: 'root' } } }, () => null)

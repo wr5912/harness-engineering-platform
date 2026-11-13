@@ -52,6 +52,7 @@ export interface Manifest {
     home: string
     programRoot: string
     dataRoot?: string
+    managerDshHome?: string
     programOrigin?: string
     dataOrigin?: string
   }

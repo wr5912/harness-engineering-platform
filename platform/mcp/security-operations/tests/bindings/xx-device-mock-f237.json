@@ -1,0 +1,38 @@
+{
+  "instanceId": "xx-device-mock-f237",
+  "sourceDigest": "sha256:bd4890e38f7d94388bada5d149c4b1f6517396e9170ed0327b8298ba136e82e8",
+  "compositions": [
+    {
+      "id": "xx-device-command",
+      "config": {
+        "toolName": "xx_device_command",
+        "title": "XX设备固定指令（开发模拟）",
+        "description": "XX固定指令开发Mock：查主机、核对11项ID并组装三字符串实体；preview只返回本地请求草案，apply模拟提交一次，不连接真实设备。",
+        "connectionId": "platform-compositions",
+        "readonly": false,
+        "workflow": "xx-device-command",
+        "connections": {},
+        "kind": "workflow",
+        "engine": "lfx",
+        "flowDigest": "04cdfaeb33b4783de2cde5c7f11734fda0b92675a63b0175ee038ddd862a40a4"
+      },
+      "implementationDigest": "d5d1904d3544f18fe506dd54043ceb3a7ac4272cebf8fcd742f817cc0d3a6fb8"
+    },
+    {
+      "id": "xx-device-policy",
+      "config": {
+        "toolName": "xx_device_policy",
+        "title": "XX设备策略模板（开发模拟）",
+        "description": "XX模板开发Mock：读取设备控制/login/net，校验字符串字段并装配五字段实体；preview仅返回本地参数差异，apply模拟下发一次，不创建或应用真实模板。",
+        "connectionId": "platform-compositions",
+        "readonly": false,
+        "workflow": "xx-device-policy",
+        "connections": {},
+        "kind": "workflow",
+        "engine": "lfx",
+        "flowDigest": "8702c1fff861c31e39a8c724cc2fddcf68e314f0ab521c9942cae2038e5805cb"
+      },
+      "implementationDigest": "82abd244223467d6e9718018662405627479c8b960941783a19beed2db07e99a"
+    }
+  ]
+}

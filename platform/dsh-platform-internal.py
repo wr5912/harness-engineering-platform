@@ -48,10 +48,12 @@ def asset_root():
 def platform_home():
     selected = os.environ.get("HARNESS_MANAGER_DSH_HOME")
     if not selected:
-        locator = Path.home() / ".config/harness-engineering-platform/workspace.json"
+        locator = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "harness-engineering-platform/workspace.json"
         if locator.is_file():
             try:
-                selected = json.loads(locator.read_text()).get("managerDshHome")
+                workspace = json.loads(locator.read_text())
+                if workspace.get("assetRoot") and Path(workspace["assetRoot"]).resolve() == asset_root().resolve():
+                    selected = workspace.get("managerDshHome")
             except (OSError, ValueError):
                 raise PlatformError("无法读取平台管理助手 HOME 定位。") from None
     if not selected:
@@ -106,9 +108,7 @@ def runtime_environment(home):
 
 def native_home_environment(home):
     environment = runtime_environment(home)
-    skill_dirs = [asset_root() / ".agents/skills"]
-    skill_dirs += [asset_root() / item["path"] / "skills" for item in workspace_extensions()
-                   if (asset_root() / item["path"] / "skills").is_dir()]
+    skill_dirs = [platform_home() / ".agents/skills"]
     extensions = [{"id": item["id"], "name": str(extension_output(item, path_only=True) / "plugin.js"),
                    "disabled": False} for item in workspace_extensions()]
     environment["HARNESS_MANAGER_SKILL_DIRS"] = json.dumps([str(path) for path in skill_dirs])
@@ -165,9 +165,7 @@ def global_dsh(home):
 
 
 def rendered_profile():
-    skill_dirs = [asset_root() / ".agents/skills"]
-    skill_dirs += [asset_root() / item["path"] / "skills" for item in workspace_extensions()
-                   if (asset_root() / item["path"] / "skills").is_dir()]
+    skill_dirs = [platform_home() / ".agents/skills"]
     result = {}
     for name in PROFILE_FILES:
         path = REPO / "platform" / "profile" / name
@@ -213,13 +211,18 @@ def workspace_extensions():
         if not isinstance(relative, str) or not (relative == "mcp" or relative.startswith("extensions/")) or ".." in Path(relative).parts:
             raise PlatformError("工作区扩展必须位于数据根 mcp/ 或 extensions/。")
         directory = (asset_root() / relative).resolve()
-        if not directory.is_relative_to(asset_root()) or not (directory / "build.mjs").is_file():
-            raise PlatformError("工作区扩展构建入口不存在或超出数据根。")
+        if not directory.is_relative_to(asset_root()) or not extension_entry(item).is_file():
+            raise PlatformError("工作区扩展缺少平台构建入口或数据路径超出数据根。")
     return declared
 
 
+def extension_entry(extension):
+    entries = json.loads((REPO / "platform/extensions/entries.json").read_text())
+    return REPO / entries.get(extension["id"], f"platform/extensions/{extension['id']}/build.mjs")
+
+
 def extension_output(extension, path_only=False):
-    command = ["node", str(asset_root() / extension["path"] / "build.mjs")]
+    command = ["node", str(extension_entry(extension))]
     if path_only:
         command.append("--path")
     try:
@@ -922,6 +925,13 @@ def prepare(home, offline=False):
         rendered = {PLATFORM_PATCH: rendered[PLATFORM_PATCH]}
     for name, content in rendered.items():
         (profile / name).write_text(content, encoding="utf-8")
+    inputs = [REPO / "runtime/adapters/dsh-container/source.lock.json",
+              REPO / "platform/plugin/pnpm-lock.yaml", REPO / "platform/profile/package.json"]
+    sources = {"schemaVersion": 1, "dshVersion": version,
+               "inputs": {str(path.relative_to(REPO)): hashlib.sha256(path.read_bytes()).hexdigest()
+                          for path in inputs if path.is_file()},
+               "overlaySha256": hashlib.sha256((profile / PLATFORM_PATCH).read_bytes()).hexdigest()}
+    (profile / "harness-platform.sources.json").write_text(json.dumps(sources, indent=2) + "\n", encoding="utf-8")
     print(f"平台准备完成：DSH {version} ({executable})")
     print(f"Profile：{profile}")
     print("启动：./platform/dsh-platform start")

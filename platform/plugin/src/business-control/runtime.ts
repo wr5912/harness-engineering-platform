@@ -163,10 +163,11 @@ export class BusinessConnection extends NativeConnection.HostConnectionService {
   override authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean {
     const actualResponse = response as ServerResponse
     // 来自已装载模块，挂载目录中的文件更新不能冒充进程已更新。
-    actualResponse.setHeader(BUSINESS_TRANSPORT_HEADER, BUSINESS_TRANSPORT_VERSION)
+    actualResponse.setHeader?.(BUSINESS_TRANSPORT_HEADER, BUSINESS_TRANSPORT_VERSION)
     const admitted = this.admit(request)
     if ('rejection' in admitted) { response.writeHead(admitted.rejection); response.end('业务访问被拒绝'); return false }
-    actualResponse.once?.('finish', () => { void admitted.release() })
+    if (actualResponse.once) actualResponse.once('finish', () => { void admitted.release() })
+    else void admitted.release()
     return true
   }
   override authorizeConnect(_request: ConnectionIndexRequest, response: ConnectionIndexResponse): void { response.writeHead(403); response.end('业务入口不提供 owner 接入') }
@@ -306,6 +307,7 @@ export function registerBusinessRemotePolicy(ctx: Context, control: BusinessCont
   })
   // HTML首帧永远不带owner baseline；原生follow会立刻取得该主体的实际快照。
   ctx.on('webserver/index-inject', table => {
+    table.push({ kind: 'html', placement: 'head', html: `<meta name="${BUSINESS_TRANSPORT_HEADER}" content="${BUSINESS_TRANSPORT_VERSION}">` })
     table.push({ kind: 'global', name: '__DSH_REMOTE_ACCESS__', value: { type: 'baseline', owner: false, grants: [] } })
     // 仅业务 Runtime 装载此样式；只隐藏原生工作区按钮，保留同一行的模型等选项。
     table.push({ kind: 'style', text: '[data-conversation-content] button[aria-haspopup="menu"][aria-label="选择工作区"], [data-conversation-content] button[aria-haspopup="menu"][aria-label="Choose workspace"] { display: none !important; }' })

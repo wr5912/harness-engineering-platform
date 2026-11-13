@@ -8,6 +8,7 @@ import { sha256File, type Manifest } from './manifest.mts'
 import { validateBusinessGateway } from '../plugin/src/business-control/configuration.ts'
 import { resolveBusinessSecretFile } from '../plugin/src/business-control/secret-file.ts'
 import { checkRunningBusinessEntries } from '../business-readiness.mts'
+import { managerHome } from '../manager-home.mts'
 
 export interface DeploymentCheck {
   id: string
@@ -51,7 +52,8 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
     status: data.kind === 'workspace' ? 'ok' : 'missing',
     detail: data.kind === 'workspace' ? `${data.skills} skills, ${data.workspaceId}` : `缺少 ${data.missing.join('、')}`,
   })
-  const profile = join(dataRoot, '.local', 'platform-home', 'profiles', 'harness-platform', 'harness-platform.patch.yml')
+  const home = managerHome(dataRoot)
+  const profile = join(home, 'profiles', 'harness-platform', 'harness-platform.patch.yml')
   if (!existsSync(profile)) {
     checks.push({ id: 'profile', status: 'missing', detail: profile })
   } else {
@@ -63,7 +65,7 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
       detail: patch.includes(expected) ? expected : `Profile 未包含 ${expected}`,
     })
   }
-  const storage = join(dataRoot, '.local', 'platform-home', 'storages', 'workspace.json')
+  const storage = join(home, 'storages', 'workspace.json')
   if (!existsSync(storage)) {
     checks.push({ id: 'default-workspace', status: 'missing', detail: storage })
   } else {

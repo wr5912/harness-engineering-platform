@@ -42,13 +42,15 @@ test('真实HTTP管理任务切换保留全部原生工具、Skill和权限决�
   await build({ entryPoints: [new URL('../src/mcp/index.ts', import.meta.url).pathname], outfile: handlerFile,
     bundle: true, platform: 'node', format: 'esm', packages: 'external' })
   const { createMcpHandler } = await import(pathToFileURL(handlerFile).href)
-  writeFileSync(join(assetRoot, 'AGENTS.md'), '管理当前测试数据工作区。')
+  const home = join(assetRoot, '.local/platform-home')
+  mkdirSync(home, { recursive: true })
+  writeFileSync(join(home, 'AGENTS.md'), '管理当前测试数据工作区。')
   for (const name of ['workspace-management', 'user-facing-output', 'compute-variant-research', 'task-builder', 'kev-training']) {
-    const directory = join(assetRoot, '.agents/skills', name)
+    const directory = join(home, '.agents/skills', name)
     mkdirSync(directory, { recursive: true })
     writeFileSync(join(directory, 'SKILL.md'), `---\nname: ${name}\ndescription: 作用域切换测试技能\n---\n仅办理本测试的管理任务。`)
   }
-  const extensionSkills = join(assetRoot, 'extensions/basic/skills')
+  const extensionSkills = join(home, '.agents/skills')
   mkdirSync(join(extensionSkills, 'basic-data'), { recursive: true })
   writeFileSync(join(extensionSkills, 'basic-data/SKILL.md'), '---\nname: basic-data\ndescription: 声明扩展业务技能\n---\n读取基础模拟数据。')
   writeFileSync(join(assetRoot, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-scope-switch', extensions: [{ id: 'basic', path: 'extensions/basic' }] }))
@@ -80,7 +82,7 @@ test('真实HTTP管理任务切换保留全部原生工具、Skill和权限决�
     new SystemPrompt(inner, {})
     new SkillRegistry(inner, {})
     inner.skills.registerProvider(control => skillProvider = new FileSystemSkillProvider(inner, control, {
-      includeDefaultRoots: false, customSkillDirs: [join(assetRoot, '.agents/skills'), extensionSkills], watch: false,
+      includeDefaultRoots: false, customSkillDirs: [join(home, '.agents/skills'), extensionSkills], watch: false,
     }))
     new ToolRuntime(inner)
     const toolPipeline = new ToolExecutionPipeline(inner)

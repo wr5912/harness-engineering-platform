@@ -25,15 +25,7 @@ async function managerModule(t) {
   const directory = await mkdtemp(join(tmpdir(), 'mcp-group-v2-'))
   t.after(() => rm(directory, { recursive: true, force: true }))
   await symlink(join(process.cwd(), 'node_modules'), join(directory, 'node_modules'), 'dir')
-  const source = await readFile(new URL('../build.mjs', import.meta.url), 'utf8')
-  const start = source.indexOf('export const managerSource =')
-  const end = source.indexOf('\nasync function main()', start)
-  assert.ok(start > 0 && end > start)
-  const adapter = join(directory, 'adapter.mjs')
-  await writeFile(adapter, "import { readFile } from 'node:fs/promises'; import { resolve } from 'node:path';\n"
-    + source.slice(start, end).replace(/fileURLToPath\(new URL\('..\/..\/plugins\/mcp-manager', import.meta.url\)\)/,
-      JSON.stringify(new URL('../../../plugins/mcp-manager', import.meta.url).pathname)))
-  const { managerSources } = await import(pathToFileURL(adapter).href)
+  const { managerSources } = await import('../build.mjs')
   const outfile = join(directory, 'manager.mjs')
   await build({ stdin: { contents: "export * from 'harness-mcp-manager-server'", resolveDir: process.cwd(), loader: 'ts' },
     outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external', plugins: [managerSources] })

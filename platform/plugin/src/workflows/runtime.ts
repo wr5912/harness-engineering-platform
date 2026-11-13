@@ -20,6 +20,8 @@ const loadedEsmSha256 = createHash('sha256').update(readFileSync(fileURLToPath(i
 const toolsManifest = '/opt/dsh/packages/core/tools/package.json'
 const { snapshotJsonValue } = await runtimeModule('@deepseek-ai/dsh-util-values', existsSync(toolsManifest) ? toolsManifest
   : runtimeRequire('@deepseek-ai/dsh-api-session-controller').resolve('@deepseek-ai/dsh-api-session-controller'))
+const { ToolExecutionPipeline } = await runtimeModule('@deepseek-ai/dsh-tools/pipeline', existsSync(toolsManifest) ? toolsManifest
+  : runtimeRequire('@deepseek-ai/dsh-api-session-controller').resolve('@deepseek-ai/dsh-api-session-controller'))
 const nativeLlm = await runtimeModule('@deepseek-ai/dsh-llm', existsSync(toolsManifest) ? toolsManifest
   : runtimeRequire('@deepseek-ai/dsh-api-session-controller').resolve('@deepseek-ai/dsh-api-session-controller'))
 /** 原生 Provider 适配器复用当前 Runtime 的归属头和结构化错误。 */
@@ -116,15 +118,15 @@ export function registerWorkflowTool(ctx: any, definition: WorkflowDefinition, o
         const callId = `${exec.callId}:workflow:${trace.length}:${randomUUID()}`
         const started = Date.now()
         const result = await withFixedCompositionExecution(identity, async () => {
-          // DSH 0.2.2 批量工具执行器统一接收 ToolCallBlock；保留原调用身份、父 token、取消信号和单调用回执。
-          const batch = await ctx.tools.execute({
-            calls: [{ id: callId, name: aliases.get(name) ?? name, arguments: JSON.stringify(args) }],
-            agent: exec.agent,
-            signal: exec.signal,
+          const pipeline = new ToolExecutionPipeline(ctx.tools.ctx)
+          const prepared = await pipeline.prepare({
+            callId, name: aliases.get(name) ?? name, arguments: args,
+            agent: exec.agent, signal: exec.signal,
+            rootCallId: exec.rootCallId ?? exec.callId, parent: exec.token,
+            ...(exec.toolSet ? { toolSet: exec.toolSet } : {}),
           })
-          const settled = batch.results[0]?.result
-          if (!settled) return { isError: true, error: { message: '原生工具未返回回执' }, content: [] }
-          return settled
+          const outcome = prepared.kind === 'dispatch' ? await pipeline.dispatch(prepared.exec) : prepared
+          return pipeline.complete(prepared.exec, outcome)
         })
         const failed = result.isError || result.value?.isError === true
         trace.push({ node: name, call_id: callId, arguments: args, status: failed ? 'failed' : 'completed',

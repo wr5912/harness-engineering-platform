@@ -1,3 +1,4 @@
+import { executeNative } from './fixtures/native-tool.mjs'
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
@@ -126,7 +127,7 @@ test('平台管理 Session 不等待失联 MCP 来源，仍可调用平台工具
   assert.equal(agent.session.header.cwd, root, '原生 Session 固定使用数据仓库工作区')
   assert.equal(requests, 0, '管理会话创建不能探测失联来源')
   assert.equal(ctx.tools.get('mcp__Offline__echo', agent), undefined)
-  const listed = await ctx.tools.execute({ name: 'platform_agents', arguments: { action: 'list', input: {} },
+  const listed = await executeNative(ctx, { name: 'platform_agents', arguments: { action: 'list', input: {} },
     callId: 'management-agents', agent, signal: new AbortController().signal })
   assert.equal(listed.isError, false, JSON.stringify(listed))
   assert.ok(platformCalls.some(call => call.endpoint === 'agents/list'), '平台工具仍能到达平台业务入口')

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, readSync, realpathSync, renameSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chownSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, readSync, realpathSync, renameSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -183,6 +183,21 @@ export async function prepareControlledHome() {
   const mode = process.env.DSH_HARNESS_MODE
   if (mode !== 'verification') {
     throw new Error('DSH_HARNESS_MODE must be verification')
+  }
+  if (process.getuid() === 0) {
+    const uid = Number(process.env.DSH_RUNTIME_UID || 1000)
+    const gid = Number(process.env.DSH_RUNTIME_GID || 1000)
+    // 卷由 Docker 初始化为镜像用户所有；与 bind HOME 的宿主用户统一后再降权运行。
+    for (const directory of [home, join(home, 'profiles'), join(home, 'profiles', 'web'), fallbackDir]) {
+      ensureDirectory(directory)
+      chownSync(directory, uid, gid)
+    }
+    for (const entry of readdirSync(fallbackDir, { withFileTypes: true })) {
+      if (entry.isDirectory()) chownSync(join(fallbackDir, entry.name), uid, gid)
+    }
+    process.setgroups([])
+    process.setgid(gid)
+    process.setuid(uid)
   }
   ensureDirectory(home)
   ensureDirectory(join(home, 'profiles'))

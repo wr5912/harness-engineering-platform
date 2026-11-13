@@ -120,17 +120,17 @@ test('取消下载立即终止，不发布完整索引；离线provider不回退
   await assert.rejects(provider.fetch({ url: s.base + '/guide.md' }), /摘要不符/)
 })
 
-test('完整平台只检查管理入口与声明扩展，业务Skill不混入管理知识清单', t => {
+test('完整平台只检查管理助手 HOME，业务Skill与数据目录说明不混入管理知识清单', t => {
   const f = fixture(t)
-  f.write('AGENTS.md', '管理身份 [研究资料](docs/research.md)')
-  f.write('docs/research.md', '[参考](https://example.test/docs/nested)')
-  f.write('.agents/skills/manage/SKILL.md', '[参考](https://example.test/docs/management)')
+  f.write('.local/platform-home/AGENTS.md', '管理身份 [研究资料](docs/research.md)')
+  f.write('.local/platform-home/docs/research.md', '[参考](https://example.test/docs/nested)')
+  f.write('.local/platform-home/.agents/skills/manage/SKILL.md', '[参考](https://example.test/docs/management)')
   f.write('extensions/declared/skills/one/SKILL.md', '[参考](https://example.test/docs/extension)')
   f.write('evolution/experiments/EXP-business-001/candidate/dsh/workspace/.agents/skills/business/SKILL.md', '[参考](https://example.test/docs/business)')
   f.write('workspace.json', JSON.stringify({ extensions: [{ path: 'extensions/declared' }] }))
   const roots = managementKnowledgeRoots(f.root)
   const result = inspectKnowledge({ roots, mode: 'offline' })
-  assert.deepEqual(result.references.map(ref => ref.url).sort(), ['https://example.test/docs/extension', 'https://example.test/docs/management', 'https://example.test/docs/nested'])
+  assert.deepEqual(result.references.map(ref => ref.url).sort(), ['https://example.test/docs/management', 'https://example.test/docs/nested'])
 })
 
 test('用户可用冻结版本内的本地文档补齐指定URL，不能读取版本外文件', async t => {
@@ -152,9 +152,9 @@ test('用户可用冻结版本内的本地文档补齐指定URL，不能读取�
 
 test('完整平台同步打包接入使用冻结管理快照，并清理暂存输入', t => {
   const f = fixture(t)
-  f.write('data/AGENTS.md', '管理助手使用本地资料。')
-  f.write('data/.agents/skills/manage/SKILL.md', '---\nname: manage\ndescription: 本地技能\n---\n[参考](reference.md)')
-  f.write('data/.agents/skills/manage/reference.md', '已经保存在本地的知识。')
+  f.write('data/.local/platform-home/AGENTS.md', '管理助手使用本地资料。')
+  f.write('data/.local/platform-home/.agents/skills/manage/SKILL.md', '---\nname: manage\ndescription: 本地技能\n---\n[参考](reference.md)')
+  f.write('data/.local/platform-home/.agents/skills/manage/reference.md', '已经保存在本地的知识。')
   const metadata = collectPlatformKnowledge(f.root)
   assert.equal(metadata.path, 'data/knowledge/offline/index.json')
   const index = JSON.parse(readFileSync(join(f.root, metadata.path), 'utf8'))
@@ -167,11 +167,11 @@ test('完整平台同步打包接入使用冻结管理快照，并清理暂存�
 test('两仓 main 文档引用使用本包冻结快照，包括尚未提交的内容', t => {
   const f = fixture(t)
   const url = 'https://github.com/wr5912/harness-engineering-platform/blob/main/runtime/research/compute-assets.md'
-  const dataUrl = 'https://github.com/wr5912/harness-engineering-platform-data/blob/main/docs/research.md'
+  const dataUrl = 'https://github.com/wr5912/platform-manager-dsh-home/blob/main/docs/research.md'
   const codeUrl = 'https://github.com/wr5912/harness-engineering-platform/blob/main/runtime/research/evaluation_contract.py'
-  f.write('data/AGENTS.md', `[资产归拢](${url})\n[研究方法](${dataUrl})\n[评测实现](${codeUrl})`)
+  f.write('data/.local/platform-home/AGENTS.md', `[资产归拢](${url})\n[研究方法](${dataUrl})\n[评测实现](${codeUrl})`)
   f.write('program/runtime/research/compute-assets.md', '# 本次冻结版本的实际用法\n')
-  f.write('data/docs/research.md', '# 数据工作树当前尚未提交的内容\n')
+  f.write('data/.local/platform-home/docs/research.md', '# 数据工作树当前尚未提交的内容\n')
   f.write('program/runtime/research/evaluation_contract.py', 'raise RuntimeError("只读归档，不应执行")\n')
   const metadata = collectPlatformKnowledge(f.root)
   const index = JSON.parse(readFileSync(join(f.root, metadata.path), 'utf8'))
@@ -188,8 +188,8 @@ test('两仓 main 文档引用使用本包冻结快照，包括尚未提交的�
 
 test('完整平台复用资源目录中按摘要核对的知识；缓存正文不扩充依赖，损坏仍拒绝出包', async t => {
   const f = fixture(t), s = await server(t), data = join(f.root, 'data'), cache = join(f.root, 'prepared/knowledge')
-  f.write('data/AGENTS.md', `[参考](${s.base}/guide.md)`)
-  const prepared = await collectKnowledge({ roots: [{ root: data, label: 'management' }], mode: 'offline', outDir: cache, fetcher: s.fetcher })
+  f.write('data/.local/platform-home/AGENTS.md', `[参考](${s.base}/guide.md)`)
+  const prepared = await collectKnowledge({ roots: [{ root: join(data, '.local/platform-home'), label: 'management' }], mode: 'offline', outDir: cache, fetcher: s.fetcher })
   writeFileSync(join(cache, 'unselected.md'), '[参考](https://docs.invalid/unselected.md)')
   const before = s.requests.length
   const metadata = collectPlatformKnowledge(f.root, cache)

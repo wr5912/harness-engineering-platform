@@ -1,8 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { managerHome } from '../manager-home.mts'
 
 export interface RelocateOptions {
   prefix: string
@@ -80,7 +81,7 @@ function platformCommand(prefix: string, root: string, args: string[], log: stri
 }
 
 function verifyWorkspace(dataRoot: string) {
-  const storage = json(join(dataRoot, '.local/platform-home/storages/workspace.json'))
+  const storage = json(join(managerHome(dataRoot), 'storages/workspace.json'))
   const ids = storage.global?.workspaceIds
   if (!Array.isArray(ids) || ids.length !== 1 || storage.tables?.workspaces?.[ids[0]]?.path !== dataRoot) throw new Error('原生管理工作区未绑定新数据根')
 }
@@ -142,9 +143,10 @@ export async function relocate(options: RelocateOptions) {
   mkdirSync(backup, { recursive: true, mode: 0o700 })
   chmodSync(backup, 0o700)
   report.backup = backup
-  const profile = join(fromDataRoot, '.local/platform-home/profiles/harness-platform')
+  const home = managerHome(fromDataRoot)
+  const profile = join(home, 'profiles/harness-platform')
   const files = [envFile, locator, join(fromDataRoot, 'workspace.json'),
-    join(fromDataRoot, '.local/platform-home/storages/workspace.json'),
+    join(home, 'storages/workspace.json'),
     ...['package.json', 'harness-platform.patch.yml', 'cordis.patch.yml'].map(name => join(profile, name)),
     ...(fstab === undefined ? [] : ['/etc/fstab'])]
   const saved = files.map((file, index) => {
@@ -235,9 +237,14 @@ export async function relocate(options: RelocateOptions) {
 }
 
 /** 远端执行的仍是本工具源码；只上传工具本身，不复制业务或程序仓库。 */
+export function relocationSource(): string {
+  return readFileSync(fileURLToPath(import.meta.url), 'utf8')
+    .replace("import { managerHome } from '../manager-home.mts'", managerHome.toString())
+}
+
 export function relocateRemote(target: string, options: RelocateOptions): number {
   if (!/^(?:[A-Za-z0-9_.-]+@)?[A-Za-z0-9][A-Za-z0-9.-]*$/.test(target)) throw new Error('--ssh 需要 user@host，不接受 shell 参数')
-  const source = readFileSync(fileURLToPath(import.meta.url), 'utf8')
+  const source = relocationSource()
   const node = join(options.prefix, 'runtime/node/bin/node')
   const script = source + '\ntry { console.log(JSON.stringify(await relocate(JSON.parse(process.argv[2])), null, 2)) } catch (error) { console.error(error.message); process.exitCode = 1 }\n'
   return spawnSync('ssh', ['-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', target,

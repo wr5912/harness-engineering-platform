@@ -1,3 +1,4 @@
+import { executeNative } from './fixtures/native-tool.mjs'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
@@ -40,7 +41,7 @@ function fixture(t, { parentPtc = false, actualPlatformTools = false } = {}) {
   const other = { id: 'other-agent', session: {} }
   const otherScope = createScope(ctx, other)
   other.ctx = otherScope.ctx
-  const execute = (name, arguments_ = {}, target = agent) => ctx.tools.execute({ name, arguments: arguments_, callId: `call-${name}-${calls.length}`, agent: target, signal: new AbortController().signal })
+  const execute = (name, arguments_ = {}, target = agent) => executeNative(ctx, { name, arguments: arguments_, callId: `call-${name}-${calls.length}`, agent: target, signal: new AbortController().signal })
   const toolSchemas = async target => (await ctx.systemPrompt.assemble({ scope: target, agent: target })).tools
   const schemas = async target => (await toolSchemas(target)).map(tool => tool.name).sort()
   t.after(async () => { await assistant?.dispose(); await agentScope.dispose(); await otherScope.dispose(); if (parent) await parent.dispose(); await ctx.fiber.dispose() })

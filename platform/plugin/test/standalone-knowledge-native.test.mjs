@@ -1,8 +1,10 @@
+import { runtimeModule } from '../../../runtime/adapters/dsh-web/src/resolve-runtime.ts'
+import { executeNative } from './fixtures/native-tool.mjs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -41,10 +43,10 @@ async function fixture(t) {
   const origin = `http://127.0.0.1:${server.address().port}`
   async function write(path, text) { const file = join(data, path); await mkdir(dirname(file), { recursive: true }); await writeFile(file, text) }
   const managementSkill = `[管理资料](${origin}/docs/management.html)\n`, businessSkill = `[业务资料](${origin}/docs/business.html)\n`
-  await write('AGENTS.md', '# 平台管理身份\n')
-  await write('.agents/skills/manage/SKILL.md', managementSkill)
+  await write('.local/platform-home/AGENTS.md', '# 平台管理身份\n')
+  await write('.local/platform-home/.agents/skills/manage/SKILL.md', managementSkill)
   await write('workspace.json', JSON.stringify({ extensions: [{ path: 'extensions/declared' }] }))
-  await write('extensions/declared/skills/helper/SKILL.md', `[管理扩展](${origin}/docs/extension.html)\n`)
+  await write('.local/platform-home/.agents/skills/helper/SKILL.md', `[管理扩展](${origin}/docs/extension.html)\n`)
   await write('extensions/unselected/skills/helper/SKILL.md', `[不应采集](${origin}/docs/unselected.html)\n`)
   await write('evolution/experiments/EXP-one-001/candidate/dsh/workspace/.agents/skills/business/SKILL.md', businessSkill)
   await write('evolution/experiments/EXP-other-001/candidate/dsh/workspace/.agents/skills/other/SKILL.md', `[其他业务](${origin}/docs/other.html)\n`)
@@ -66,7 +68,8 @@ async function mountNative(t, indexPath, config) {
     process.env.DSH_WEB_FETCH_PROVIDER = OfflineKnowledge.OFFLINE_KNOWLEDGE_PROVIDER_ID
     ctx = new Context()
     await ctx.plugin(SystemPrompt)
-    await ctx.plugin(ToolRuntime, { mode: 'native' })
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(await runtimeModule('@deepseek-ai/dsh-tool-executor-native'))
     await ctx.plugin(WebRuntime, config)
   } finally { if (previous === undefined) delete process.env.DSH_WEB_FETCH_PROVIDER; else process.env.DSH_WEB_FETCH_PROVIDER = previous }
   t.after(() => ctx.fiber.dispose())
@@ -79,12 +82,14 @@ async function mountNative(t, indexPath, config) {
   const provider = await ctx.plugin(OfflineKnowledge, { indexPath })
   await ctx.plugin(ToolWeb, { search: false })
   let calls = 0
-  return { ctx, provider, networkAttempts: () => networkAttempts, call: url => ctx.tools.execute({ name: 'web_fetch', arguments: { url }, callId: `offline-native-${++calls}`, signal: new AbortController().signal }) }
+  return { ctx, provider, networkAttempts: () => networkAttempts, call: url => executeNative(ctx, { name: 'web_fetch', arguments: { url }, callId: `offline-native-${++calls}`, signal: new AbortController().signal }) }
 }
 
 async function generatedWebConfig(fixture, offlineKnowledge) {
   const root = join(fixture.directory, 'bundle'), home = join(fixture.directory, 'home')
   await mkdir(join(root, 'assets/managed'), { recursive: true })
+  await mkdir(join(home, 'profiles'), { recursive: true })
+  await symlink(dirname(dirname(dirname(sdk.resolve('@deepseek-ai/dsh/package.json')))), join(home, 'profiles/node_modules'), 'dir')
   // 模拟既有业务配置；离线投影必须在其后明确覆盖原生 base 默认的 http。
   await writeFile(join(root, 'assets/managed/one.patch.yml'), '- id: web\n  config:\n    fetchProvider: http\n')
   generateProfile({ agentId: 'one', experimentId: 'EXP-one-001', presetId: 'one', profilePatch: 'one.patch.yml', modelPatch: [], mcp: { servers: [], groups: [], sharedToken: 'a'.repeat(64) }, ...(offlineKnowledge ? { offlineKnowledge: { indexPath: join(fixture.businessOut, 'index.json') } } : {}) }, home, root)
@@ -101,7 +106,7 @@ test('真实原生 Web 与 web_fetch 使用生成的离线选择，来源关闭�
   const raw = await native.ctx.web.fetch({ url })
   assert.equal(raw.body.kind, 'html'); assert.equal(raw.body.content, f.pages['/docs/business.html'])
   const result = await native.call(url)
-  assert.equal(result.isError, false)
+  assert.equal(result.isError, false, JSON.stringify(result))
   assert.match(result.content.map(block => block.text ?? '').join('\n'), /业务操作规则[\s\S]*冻结知识/)
   assert.equal(globalThis.__offlineKnowledgeScriptExecuted, undefined)
   const missing = await native.call('https://www.w3.org/TR/not-in-offline-fixture')
@@ -125,7 +130,7 @@ test('管理助手与选定业务 Skill 独立归档并独立接入原生 Web，
   await assert.rejects(business.ctx.web.fetch({ url: f.origin + '/docs/other.html' }), /未包含/)
   assert.equal(business.networkAttempts() + management.networkAttempts(), 0)
   assert.equal(await readFile(join(f.candidate, 'workspace/.agents/skills/business/SKILL.md'), 'utf8'), f.businessSkill)
-  assert.equal(await readFile(join(f.data, '.agents/skills/manage/SKILL.md'), 'utf8'), f.managementSkill)
+  assert.equal(await readFile(join(f.data, '.local/platform-home/.agents/skills/manage/SKILL.md'), 'utf8'), f.managementSkill)
 })
 
 test('原生 provider 生命周期与取消不触发公网兜底；在线投影保持原生 http 配置', async t => {

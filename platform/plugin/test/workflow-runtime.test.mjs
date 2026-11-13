@@ -34,10 +34,28 @@ test('生成适配器复用锁定Runtime的真实Provider错误事实和归属�
   assert.ok(headers && typeof headers === 'object' && Object.keys(headers).length > 0)
 })
 
+const fixtureContexts = []
+test.after(async () => { for (const ctx of fixtureContexts) await ctx.fiber.dispose() })
 function fixture(dispatch, llm) {
+  const ctx = new Context()
+  new SystemPrompt(ctx, {})
+  new ToolRuntime(ctx)
+  fixtureContexts.push(ctx)
   let tool
-  const ctx = { tools: { register(value) { tool = value }, execute: dispatch }, llm }
+  const register = ctx.tools.register.bind(ctx.tools)
+  ctx.tools.register = value => { tool = value; return register(value) }
+  const executable = ctx.tools.executable.bind(ctx.tools)
+  ctx.tools.executable = (name, ...args) => executable(name, ...args) ?? {
+    name, parameters: { type: 'object' },
+    output: { schema: {}, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] },
+    async execute(args, exec) {
+      const receipt = await dispatch({ ...exec, arguments: args })
+      return receipt.isError ? receipt : receipt.value
+    },
+  }
+  if (llm) ctx.provide('llm', llm)
   const identity = { callId: 'outer', rootCallId: 'outer-root', token: Symbol('native'), agent: { session: { id: 'session-real' } }, signal: new AbortController().signal }
+  identity.agent.ctx = createScope(ctx, identity.agent).ctx
   return { ctx, identity, tool: () => tool }
 }
 test('真实 LangGraph 执行两步原生子工具，传递参数和身份并保留ESM来源', async () => {
@@ -99,7 +117,7 @@ function nativeFixture(t, llm) {
   t.after(async () => { await scope.dispose(); await ctx.fiber.dispose() })
   let call = 0
   return { ctx, registration: { tools: ctx.tools, llm }, agent,
-    execute: name => ctx.tools.execute({ name, arguments: {}, callId: `native-workflow-${++call}`, agent, signal: new AbortController().signal }),
+    execute: async name => (await ctx.tools.execute({ calls: [{ id: `native-workflow-${++call}`, name, arguments: '{}' }], agent, signal: new AbortController().signal })).results[0].result,
     register(name, execute) { ctx.tools.register({ name, description: '真实原生边界测试', parameters: { type: 'object' },
       output: { schema: { type: 'object', additionalProperties: true }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] }, execute }) },
   }
@@ -365,7 +383,7 @@ function codeOnlyFixture(t, run, renderResult, hybrid) {
   async function execute(turn, response, target = agent) {
     const call = response.chunks.find(chunk => chunk.type === 'block-end' && chunk.block.type === 'tool-call').block
     events.push({ type: 'tool/call', data: { turn, step: 1, callId: call.id, name: call.name, arguments: call.arguments } })
-    const result = await f.ctx.tools.execute({ name: call.name, arguments: JSON.parse(call.arguments), callId: call.id, agent: target, signal })
+    const result = (await f.ctx.tools.execute({ calls: [call], agent: target, signal })).results[0].result
     events.push({ type: 'tool/result', data: { turn, step: 1, message: { role: 'tool', toolCallId: call.id,
       source: { kind: 'tool', callId: call.id, name: call.name }, content: result.content, ...(result.isError ? { isError: true } : {}) },
       ...(result.meta ? { meta: result.meta } : {}), ...(result.isError ? { error: { code: 'TOOL_FAILED' } } : {}) } })
@@ -426,10 +444,10 @@ test('工具返回错误和派发异常均标明具体工具；流程错误不�
       return { reply: '不得伪报成功' }
     })
     if (throws) {
-      const execute = f.ctx.tools.execute.bind(f.ctx.tools)
-      f.ctx.tools.execute = input => {
-        if (input.name === 'inspection_service') throw Object.assign(new Error('private-endpoint'), { code: 'TOOL_TRANSPORT_FAILED' })
-        return execute(input)
+      const executable = f.ctx.tools.executable.bind(f.ctx.tools)
+      f.ctx.tools.executable = (name, ...args) => {
+        if (name === 'inspection_service') throw Object.assign(new Error('private-endpoint'), { code: 'TOOL_TRANSPORT_FAILED' })
+        return executable(name, ...args)
       }
     }
     f.register('inspection_service', () => { calls++; return { isError: true, error: { code: 'INSPECTION_UNAVAILABLE' } } })
@@ -908,7 +926,7 @@ test('混合infer只向原生stream传递exec真实Session，自报身份不能�
   assert.equal(requests[0].sessionId, f.agent.session.id)
   assert.equal(actual.value.graph_execution.model_attempts.at(-1).session_id, f.agent.session.id)
 
-  const noAgent = await f.ctx.tools.execute({ name: 'trusted_session_infer', arguments: {}, callId: 'standalone-infer', signal: new AbortController().signal })
+  const noAgent = (await f.ctx.tools.execute({ calls: [{ id: 'standalone-infer', name: 'trusted_session_infer', arguments: '{}' }], signal: new AbortController().signal })).results[0].result
   assert.equal(noAgent.value.ok, true, JSON.stringify(noAgent))
   assert.equal(requests[1].sessionId, undefined, '没有exec Session时不得采用config或payload自报身份')
   assert.equal(Object.hasOwn(noAgent.value.graph_execution, 'session_id'), false)

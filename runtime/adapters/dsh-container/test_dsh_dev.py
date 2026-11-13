@@ -2934,6 +2934,18 @@ class BindHomeMigrationTests(unittest.TestCase):
     def setUp(self):
         isolate_registration_guard(self)
 
+    def test_runtime_user_follows_bind_home_owner_and_defaults_for_root_volume(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owner = Path(temporary).stat()
+            self.assertEqual(dev.runtime_user(temporary), {
+                "DSH_RUNTIME_UID": str(owner.st_uid or 1000),
+                "DSH_RUNTIME_GID": str(owner.st_gid if owner.st_uid else 1000),
+            })
+        with mock.patch.object(os, "geteuid", return_value=0), mock.patch.object(os, "getegid", return_value=0):
+            self.assertEqual(dev.runtime_user(), {"DSH_RUNTIME_UID": "1000", "DSH_RUNTIME_GID": "1000"})
+        with mock.patch.object(os, "geteuid", return_value=1006), mock.patch.object(os, "getegid", return_value=1011):
+            self.assertEqual(dev.runtime_user(), {"DSH_RUNTIME_UID": "1006", "DSH_RUNTIME_GID": "1011"})
+
     def test_root_business_patch_is_private_and_owned_by_container_user(self):
         with tempfile.TemporaryDirectory() as temporary, mock.patch.object(dev, "STATE_ROOT", Path(temporary)):
             contract = {

@@ -1,0 +1,22 @@
+{
+  "instanceId": "policy-response-acceptance-027-r5efdc136f237",
+  "sourceDigest": "sha256:ed634f69b09ca86b328a1e052ad53e691a54c0b983299dc791728f1f6252f63c",
+  "compositions": [
+    {
+      "id": "xx-device-policy",
+      "config": {
+        "toolName": "xx_device_policy",
+        "title": "XX设备策略模板（真实接口接入骨架）",
+        "description": "XX模板真实接口接入骨架：读取设备控制/login/net，校验真实字段并装配五字段实体；未配置真实连接时明确停止，不回退本地Mock。",
+        "connectionId": "platform-compositions",
+        "readonly": false,
+        "workflow": "xx-device-policy",
+        "connections": {},
+        "kind": "workflow",
+        "engine": "lfx",
+        "flowDigest": "6398f7d32c7ff4d7ce6ef71003243170727176d3df76c653cec9965b635e9a2b"
+      },
+      "implementationDigest": "e9795bd715a6a2ef6d49dd0a6046fd1c336874cbaaa32b6f530358eda1824965"
+    }
+  ]
+}

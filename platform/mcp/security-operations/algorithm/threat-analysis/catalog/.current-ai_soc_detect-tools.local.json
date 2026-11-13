@@ -1,0 +1,75 @@
+{
+  "items": [
+    {
+      "name": "ai_soc_detect__create_detect_alert_by_ids",
+      "resource_id": "92a84e41-d340-4fb9-af8a-f7c7d41b0b54",
+      "http_method": "POST",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "body": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "application/json request body"
+            }
+          },
+          "required": [
+            "body"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_detect__get_detect_alert_by_alert_id",
+      "resource_id": "92a84e41-d340-4fb9-af8a-f7c7d41b0b54",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "alertId": {
+              "type": "string",
+              "description": "告警 ID"
+            }
+          },
+          "required": [
+            "alertId"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_detect__get_detect_rule_by_rule_id",
+      "resource_id": "92a84e41-d340-4fb9-af8a-f7c7d41b0b54",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ruleId": {
+              "type": "string",
+              "description": "规则 ID"
+            }
+          },
+          "required": [
+            "ruleId"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_detect__list_detect_whitelist",
+      "resource_id": "92a84e41-d340-4fb9-af8a-f7c7d41b0b54",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    }
+  ]
+}

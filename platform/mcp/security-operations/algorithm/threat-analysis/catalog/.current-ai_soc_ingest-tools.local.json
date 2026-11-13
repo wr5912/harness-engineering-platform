@@ -1,0 +1,24 @@
+{
+  "items": [
+    {
+      "name": "ai_soc_ingest__get_ingest_devices_by_asset_by_asset_id",
+      "resource_id": "84183787-6570-42af-80d2-a33f70536dac",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "assetId": {
+              "type": "integer",
+              "format": "int64",
+              "description": "资产 ID"
+            }
+          },
+          "required": [
+            "assetId"
+          ]
+        }
+      }
+    }
+  ]
+}

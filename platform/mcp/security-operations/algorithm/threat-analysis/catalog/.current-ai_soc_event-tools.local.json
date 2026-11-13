@@ -1,0 +1,234 @@
+{
+  "items": [
+    {
+      "name": "ai_soc_event__count_event",
+      "resource_id": "763bd53e-f72b-4fbf-ab39-1245ae15dd14",
+      "http_method": "POST",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "body": {
+              "type": "object",
+              "description": "事件检索请求",
+              "properties": {
+                "indices": {
+                  "type": "array",
+                  "description": "索引名列表",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "timeRange": {
+                  "type": "object",
+                  "description": "时间范围",
+                  "properties": {
+                    "from": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "起始时间"
+                    },
+                    "to": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "结束时间"
+                    }
+                  }
+                },
+                "filters": {
+                  "type": "array",
+                  "description": "过滤条件列表",
+                  "items": {
+                    "type": "object",
+                    "description": "过滤条件",
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "description": "过滤字段名"
+                      },
+                      "op": {
+                        "type": "string",
+                        "description": "操作符（eq/ne/in/not_in/exists/not_exists）"
+                      },
+                      "value": {
+                        "description": "单值过滤值"
+                      },
+                      "values": {
+                        "type": "array",
+                        "description": "多值过滤值列表",
+                        "items": {}
+                      }
+                    }
+                  }
+                },
+                "luceneQuery": {
+                  "type": "string",
+                  "description": "Lucene 查询串"
+                },
+                "timeField": {
+                  "type": "string",
+                  "description": "时间字段名（留空默认 @timestamp）"
+                },
+                "histogramInterval": {
+                  "type": "string",
+                  "description": "直方图区间（1m/30m/3h/12h），留空由系统推断"
+                },
+                "size": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "返回条数"
+                },
+                "from": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "起始偏移"
+                },
+                "searchAfter": {
+                  "type": "array",
+                  "description": "深翻页 search_after 游标",
+                  "items": {}
+                },
+                "sort": {
+                  "type": "array",
+                  "description": "排序条件列表",
+                  "items": {
+                    "type": "object",
+                    "description": "排序条件",
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "description": "排序字段名"
+                      },
+                      "order": {
+                        "type": "string",
+                        "description": "排序方向（asc/desc）"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "body"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_event__search_event",
+      "resource_id": "763bd53e-f72b-4fbf-ab39-1245ae15dd14",
+      "http_method": "POST",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "body": {
+              "type": "object",
+              "description": "事件检索请求",
+              "properties": {
+                "indices": {
+                  "type": "array",
+                  "description": "索引名列表",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "timeRange": {
+                  "type": "object",
+                  "description": "时间范围",
+                  "properties": {
+                    "from": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "起始时间"
+                    },
+                    "to": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "结束时间"
+                    }
+                  }
+                },
+                "filters": {
+                  "type": "array",
+                  "description": "过滤条件列表",
+                  "items": {
+                    "type": "object",
+                    "description": "过滤条件",
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "description": "过滤字段名"
+                      },
+                      "op": {
+                        "type": "string",
+                        "description": "操作符（eq/ne/in/not_in/exists/not_exists）"
+                      },
+                      "value": {
+                        "description": "单值过滤值"
+                      },
+                      "values": {
+                        "type": "array",
+                        "description": "多值过滤值列表",
+                        "items": {}
+                      }
+                    }
+                  }
+                },
+                "luceneQuery": {
+                  "type": "string",
+                  "description": "Lucene 查询串"
+                },
+                "timeField": {
+                  "type": "string",
+                  "description": "时间字段名（留空默认 @timestamp）"
+                },
+                "histogramInterval": {
+                  "type": "string",
+                  "description": "直方图区间（1m/30m/3h/12h），留空由系统推断"
+                },
+                "size": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "返回条数"
+                },
+                "from": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "起始偏移"
+                },
+                "searchAfter": {
+                  "type": "array",
+                  "description": "深翻页 search_after 游标",
+                  "items": {}
+                },
+                "sort": {
+                  "type": "array",
+                  "description": "排序条件列表",
+                  "items": {
+                    "type": "object",
+                    "description": "排序条件",
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "description": "排序字段名"
+                      },
+                      "order": {
+                        "type": "string",
+                        "description": "排序方向（asc/desc）"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "body"
+          ]
+        }
+      }
+    }
+  ]
+}

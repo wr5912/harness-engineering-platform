@@ -1,0 +1,331 @@
+{
+  "items": [
+    {
+      "name": "ai_soc_correlate__get_correlate_incident_by_incident_id",
+      "resource_id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "incidentId": {
+              "type": "string",
+              "description": "事件 ID"
+            }
+          },
+          "required": [
+            "incidentId"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_correlate__get_correlate_incident_reasoning_chain",
+      "resource_id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "incidentId": {
+              "type": "string",
+              "description": "事件 ID"
+            }
+          },
+          "required": [
+            "incidentId"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_correlate__get_correlate_intel_check",
+      "resource_id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "待判定值"
+            },
+            "disposition": {
+              "type": "string",
+              "description": "处置类型"
+            }
+          },
+          "required": [
+            "disposition",
+            "value"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_correlate__get_correlate_intel_check_list",
+      "resource_id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "待判定值"
+            },
+            "source": {
+              "type": "string",
+              "description": "情报集代号"
+            }
+          },
+          "required": [
+            "source",
+            "value"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_correlate__get_correlate_reasoning_rules_by_rule_id",
+      "resource_id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ruleId": {
+              "type": "integer",
+              "format": "int64",
+              "description": "规则 ID"
+            }
+          },
+          "required": [
+            "ruleId"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_correlate__get_correlate_threat_intel",
+      "resource_id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "iocType": {
+              "type": "string",
+              "description": "IOC 类型"
+            },
+            "disposition": {
+              "type": "string",
+              "description": "处置方式"
+            },
+            "iocValueLike": {
+              "type": "string",
+              "description": "IOC 值模糊匹配"
+            },
+            "pageNum": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1,
+              "description": "页码"
+            },
+            "pageSize": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "description": "每页条数"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "ai_soc_correlate__create_correlate_incident_judgement_fail",
+      "resource_id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "http_method": "POST",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "judgementId": {
+              "type": "string",
+              "description": "研判标识"
+            },
+            "body": {
+              "type": "object",
+              "description": "研判失败回写",
+              "properties": {
+                "runId": {
+                  "type": "string",
+                  "description": "智能体本次研判标识(有则传; 幂等键)"
+                },
+                "errorType": {
+                  "type": "string",
+                  "description": "错误类型, 如 ValueError / request_failed"
+                },
+                "error": {
+                  "type": "string",
+                  "description": "失败原因, 原样保存"
+                },
+                "resultJson": {},
+                "agentName": {
+                  "type": "string",
+                  "description": "研判方标识"
+                },
+                "agentVersion": {
+                  "type": "string",
+                  "description": "研判方版本"
+                },
+                "model": {
+                  "type": "string",
+                  "description": "研判模型"
+                }
+              },
+              "required": [
+                "error"
+              ]
+            }
+          },
+          "required": [
+            "body",
+            "judgementId"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_correlate__get_correlate_incident_judge_pending",
+      "resource_id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "http_method": "GET",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "pageNum": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1,
+              "description": "页码"
+            },
+            "pageSize": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "description": "每页条数, 最大100"
+            },
+            "previewPriority": {
+              "type": "boolean",
+              "default": false,
+              "description": "仅预览新优先级策略，不改变领取模式"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "ai_soc_correlate__create_incident_judgement_claim",
+      "resource_id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "http_method": "POST",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "incidentId": {
+              "type": "string",
+              "description": "威胁 ID"
+            }
+          },
+          "required": [
+            "incidentId"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ai_soc_correlate__update_incident_judgement_result",
+      "resource_id": "cb220340-41b9-4b04-a521-c6f687095016",
+      "http_method": "PUT",
+      "schema_json": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "judgementId": {
+              "type": "string",
+              "description": "研判标识"
+            },
+            "body": {
+              "type": "object",
+              "description": "研判结果回写",
+              "properties": {
+                "runId": {
+                  "type": "string",
+                  "description": "智能体本次研判标识; 幂等键, 重复提交返回首次结果"
+                },
+                "route": {
+                  "type": "string",
+                  "description": "研判路径: fast_classification | five_source"
+                },
+                "llmInvoked": {
+                  "type": "boolean",
+                  "description": "是否调用了研判模型"
+                },
+                "verdict": {
+                  "type": "string",
+                  "description": "研判结论: 误报 | 真实告警 | 可疑"
+                },
+                "confidence": {
+                  "type": "number",
+                  "description": "置信度 0~1; 快速研判可不传"
+                },
+                "validationStatus": {
+                  "type": "string",
+                  "description": "输出契约校验: passed | passed_with_warnings | failed | not_applicable_fast_classification"
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "用户可读摘要, 纯文本, ≤500 个 Unicode 码点, 超长拒绝不截断"
+                },
+                "reportHtml": {
+                  "type": "string",
+                  "description": "用户可读的完整报告(自包含 HTML 字符串, 不做 Base64), UTF-8 ≤1048576 字节"
+                },
+                "resultJson": {},
+                "schemaVersion": {
+                  "type": "string",
+                  "description": "结果对象结构版本, 如 1.0"
+                },
+                "agentName": {
+                  "type": "string",
+                  "description": "研判方标识"
+                },
+                "agentVersion": {
+                  "type": "string",
+                  "description": "研判方版本"
+                },
+                "model": {
+                  "type": "string",
+                  "description": "研判模型"
+                }
+              },
+              "required": [
+                "resultJson",
+                "route",
+                "runId",
+                "summary",
+                "validationStatus",
+                "verdict"
+              ]
+            }
+          },
+          "required": [
+            "body",
+            "judgementId"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import { platformEntryUrl, validatePlatformEntryUrl } from './plugin/src/busines
 import { initializeBusinessGateway } from './plugin/src/business-control/configuration.ts'
 import { prepareBusinessRuntimeFile } from './plugin/src/business-control/secret-file.ts'
 import { reportBusinessReadiness } from './business-readiness.mts'
+import { managerHome } from './manager-home.mts'
 
 const programRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const autostartService = 'harness-engineering-platform.service'
@@ -301,9 +302,9 @@ async function stop(dataRoot: string) {
 /** 恢复更新前已验证的运行命令；旧制品可能与当前源码的缓存路径不同，不能重新渲染Profile。 */
 export async function restoreManagedProcess(original: State, command: string[], environment: NodeJS.ProcessEnv): Promise<State> {
   if (!original.detached || !isAbsolute(command[0] ?? '') || command[command.indexOf('--profile') + 1] !== 'harness-platform'
-    || command[command.indexOf('--patch') + 1] !== join(original.dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
+    || command[command.indexOf('--patch') + 1] !== join(managerHome(original.dataRoot, environment), 'profiles/harness-platform/harness-platform.patch.yml')
     || environment.HARNESS_PROGRAM_ROOT !== original.programRoot || environment.HARNESS_ASSET_ROOT !== original.dataRoot
-    || environment.DSH_HOME !== join(original.dataRoot, '.local/platform-home') || !isAbsolute(environment.HOME ?? '')) throw new Error('原平台启动身份不完整，未执行恢复')
+    || environment.DSH_HOME !== managerHome(original.dataRoot, environment) || !isAbsolute(environment.HOME ?? '')) throw new Error('原平台启动身份不完整，未执行恢复')
   if (serviceOwner(original.dataRoot) && !insideService()) {
     atomic(join(original.dataRoot, '.local/platform-service/state.json'), original)
     systemctl(['reset-failed', autostartService]); systemctl(['start', autostartService])

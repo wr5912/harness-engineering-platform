@@ -1,3 +1,4 @@
+import { executeNative } from './fixtures/native-tool.mjs'
 import assert from 'node:assert/strict'
 import { createHash, randomBytes } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
@@ -13,13 +14,7 @@ async function sourceManager(t) {
   const directory = mkdtempSync(join(tmpdir(), 'business-manager-source-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   symlinkSync(join(process.cwd(), 'node_modules'), join(directory, 'node_modules'), 'dir')
-  const source = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8')
-  const start = source.indexOf('export const managerSource ='), end = source.indexOf('\nasync function main()', start)
-  assert.ok(start >= 0 && end > start)
-  const adapter = join(directory, 'adapter.mjs')
-  writeFileSync(adapter, "import { readFile } from 'node:fs/promises'; import { resolve } from 'node:path';\n" + source.slice(start, end)
-    .replace(/fileURLToPath\(new URL\('..\/..\/plugins\/mcp-manager', import.meta.url\)\)/, JSON.stringify(new URL('../../../plugins/mcp-manager', import.meta.url).pathname)))
-  const { managerSources } = await import(pathToFileURL(adapter).href)
+  const { managerSources } = await import('../build.mjs')
   const output = join(directory, 'manager.mjs')
   await build({ entryPoints: [new URL('../src/mcp/manager.ts', import.meta.url).pathname], outfile: output,
     bundle: true, platform: 'node', format: 'esm', packages: 'external', plugins: [managerSources],
@@ -279,7 +274,7 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
   view = store.mutate([{ op: 'set', path: ['servers', '0', 'specUrl'], value: `${origin}/b/openapi.json` },
     { op: 'set', path: ['servers', '0', 'apiKey'], value: 'fixture-current-private' }], view.revision)
   heartbeat()
-  const oldCall = await ctx.tools.execute({ name, arguments: {}, callId: 'old-call', agent: first,
+  const oldCall = await executeNative(ctx, { name, arguments: {}, callId: 'old-call', agent: first,
     signal: new AbortController().signal })
   assert.equal(oldCall.isError, true)
   assert.match(JSON.stringify(oldCall), /目标已变化|已停用|连接或工具范围已变化/)
@@ -288,7 +283,7 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
   await waitForTool(second, previousTool)
   assert.ok(ctx.tools.get(name, second), '保存后新 Session 保留 Candidate 工具名并装载新目标')
   heartbeat()
-  const currentCall = await ctx.tools.execute({ name, arguments: {}, callId: 'current-call', agent: second,
+  const currentCall = await executeNative(ctx, { name, arguments: {}, callId: 'current-call', agent: second,
     signal: new AbortController().signal })
   assert.equal(currentCall.isError, false, JSON.stringify(currentCall))
   assert.deepEqual(calls, [{ path: '/b/echo', hasCurrentCredential: true }])
@@ -296,7 +291,7 @@ test('平台保存后的新业务 Session 装载当前连接，旧 Session 在�
   assert.equal(statSync(secretFile).mode & 0o777, 0o600)
   view = store.mutate([{ op: 'set', path: ['servers', '0', 'enabled'], value: false }], view.revision)
   heartbeat()
-  const disabledCall = await ctx.tools.execute({ name, arguments: {}, callId: 'disabled-call', agent: second,
+  const disabledCall = await executeNative(ctx, { name, arguments: {}, callId: 'disabled-call', agent: second,
     signal: new AbortController().signal })
   assert.equal(disabledCall.isError, true)
   assert.match(JSON.stringify(disabledCall), /目标已变化|已停用|连接或工具范围已变化/)

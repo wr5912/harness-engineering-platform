@@ -28,7 +28,7 @@ ${client}
 export { Manager };`
       } else if (path.endsWith('openapi')) {
         const original = await readFile(resolve(managerSource, 'openapi.ts'), 'utf8')
-        contents = `import { appendQueryParameter } from ${JSON.stringify(resolve('src/mcp/openapi.ts'))};\nfunction platformTimeout(server: any) { const timeout = AbortSignal.timeout(server.platformTimeoutMs ?? 20_000); return server.platformSignal ? AbortSignal.any([server.platformSignal, timeout]) : timeout }\n${original.replaceAll('AbortSignal.timeout(20_000)', 'platformTimeout(server)').replace('const { response, credential } = await authorizedFetch(source.server', 'const server = source.server\n  const { response, credential } = await authorizedFetch(source.server').replace("if (parameter.in === 'query') for (const entry of Array.isArray(value) ? value : [value]) url.searchParams.append(parameter.name, String(entry))", "if (parameter.in === 'query') appendQueryParameter(url.searchParams, parameter, value)")}\nexport { execute };`
+        contents = `import { appendQueryParameter } from ${JSON.stringify(fileURLToPath(new URL('./src/mcp/openapi.ts', import.meta.url)))};\nfunction platformTimeout(server: any) { const timeout = AbortSignal.timeout(server.platformTimeoutMs ?? 20_000); return server.platformSignal ? AbortSignal.any([server.platformSignal, timeout]) : timeout }\n${original.replaceAll('AbortSignal.timeout(20_000)', 'platformTimeout(server)').replace('const { response, credential } = await authorizedFetch(source.server', 'const server = source.server\n  const { response, credential } = await authorizedFetch(source.server').replace("if (parameter.in === 'query') for (const entry of Array.isArray(value) ? value : [value]) url.searchParams.append(parameter.name, String(entry))", "if (parameter.in === 'query') appendQueryParameter(url.searchParams, parameter, value)")}\nexport { execute };`
       } else {
         contents = (await readFile(resolve(managerSource, 'index.ts'), 'utf8'))
           .replace("createRequire('/opt/dsh/packages/mcp/mcp-client/package.json')", "createRequire(resolveRuntimeRequire('@deepseek-ai/dsh-mcp-client').resolve('@deepseek-ai/dsh-mcp-client'))")
@@ -70,7 +70,7 @@ export { Manager };`
       if (!signal.aborted && !res.destroyed) return send(res, outcome.status, outcome.value)
 ` + contents.slice(dispatchEnd)
         contents = contents.slice(0, adminStart) + dispatcher + contents.slice(adminStart)
-        contents = `import { runtimeRequire as resolveRuntimeRequire } from ${JSON.stringify(resolve('../../runtime/adapters/dsh-web/src/resolve-runtime.ts'))};\n${contents}`
+        contents = `import { runtimeRequire as resolveRuntimeRequire } from ${JSON.stringify(fileURLToPath(new URL('../../runtime/adapters/dsh-web/src/resolve-runtime.ts', import.meta.url)))};\n${contents}`
       }
       return { contents, loader: path.endsWith('client') ? 'tsx' : 'ts', resolveDir: managerSource }
     })

@@ -8,6 +8,8 @@ import { expectedImage, inspectImage, inspectImageArchive, saveImage, verifyImag
 import { assertRealWorkspace, copyDataDependencies } from './data.mts'
 import { snapshotRepository } from './repository.mts'
 import { collectPlatformKnowledge } from './knowledge/platform.mts'
+import { copyDataState } from './state.mts'
+import { managerHome } from '../manager-home.mts'
 
 export interface PackOptions {
   programRoot: string
@@ -73,18 +75,16 @@ function copyData(dataRoot: string, staging: string, assets: string, workingTree
   const target = join(staging, 'data')
   const repository = snapshotRepository(dataRoot, target, join(staging, 'repositories/data.bundle'), workingTree)
   removeTree(join(target, '.git'))
-  const credentials = join(dataRoot, '.local/credentials')
-  if (existsSync(credentials)) copyTree(credentials, join(target, '.local/credentials'))
-  const userPatch = '.local/platform-home/profiles/harness-platform/cordis.patch.yml'
-  if (existsSync(join(dataRoot, userPatch))) copyTree(join(dataRoot, userPatch), join(target, userPatch))
+  copyDataState(dataRoot, target)
   const profile = '.local/platform-home/profiles/harness-platform'
-  const manifest = join(dataRoot, profile, 'package.json')
+  const sourceProfile = join(managerHome(dataRoot), 'profiles/harness-platform')
+  const manifest = join(sourceProfile, 'package.json')
   if (existsSync(manifest)) {
     const dependencies = Object.keys(JSON.parse(readFileSync(manifest, 'utf8')).dependencies || {})
     if (dependencies.length) {
       const prepared = join(assets, 'data', profile)
       for (const name of ['package.json', 'pnpm-lock.yaml']) {
-        const source = join(dataRoot, profile, name), resource = join(prepared, name)
+        const source = join(sourceProfile, name), resource = join(prepared, name)
         if (!existsSync(source) || !existsSync(resource) || !readFileSync(source).equals(readFileSync(resource))) {
           throw new Error(`管理助手插件离线资源与当前配置不一致：${resource}`)
         }
@@ -96,10 +96,10 @@ function copyData(dataRoot: string, staging: string, assets: string, workingTree
         }
       }
       copyAsset(join(prepared, 'node_modules'), join(target, profile, 'node_modules'))
-      // prepare 在目标机重建平台链接，不能携带准备机的绝对源码路径。
-      removeTree(join(target, profile, 'node_modules/@ai-agent-harness/harness-platform'))
     }
   }
+  // prepare 在目标机重建平台链接。
+  removeTree(join(target, profile, 'node_modules/@ai-agent-harness/harness-platform'))
   return repository
 }
 
@@ -229,6 +229,7 @@ export function pack(options: PackOptions): { archive: string; size: number } {
       home: homedir(),
       programRoot,
       dataRoot,
+      managerDshHome: dataRoot ? managerHome(dataRoot) : undefined,
       programOrigin: run('git', ['-C', programRoot, 'remote', 'get-url', 'origin']).trim(),
       dataOrigin: dataRepository?.origin,
     },
@@ -236,7 +237,7 @@ export function pack(options: PackOptions): { archive: string; size: number } {
     runtime,
     image,
     data: dataRoot && dataCheck ? { commit: dataRepository?.commit, dirty: dataRepository?.dirty, sensitive: true, kind: dataCheck.kind, workspaceId: dataCheck.workspaceId, skills: dataCheck.skills } : undefined,
-    sensitivePaths: options.includeData ? ['data/.local'] : undefined,
+    sensitivePaths: options.includeData ? ['data/.local', 'data/mcp/.local'] : undefined,
   }
   writeManifest(join(staging, 'manifest.json'), manifest)
   const archive = join(out, `${packageName}.tar.gz`)

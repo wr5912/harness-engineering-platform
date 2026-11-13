@@ -20,12 +20,7 @@ test('MCP 从当前 Runtime 原生客户端闭包加载作用域，保留父作�
   const parentDirectory = resolve('.local/mcp-runtime-anchor-tests'); mkdirSync(parentDirectory, { recursive: true })
   const directory = mkdtempSync(join(parentDirectory, 'build-')); t.after(() => rmSync(directory, { recursive: true, force: true }))
   symlinkSync(resolve('node_modules'), join(directory, 'node_modules'), 'dir')
-  const source = readFileSync('build.mjs', 'utf8'), start = source.indexOf('export const managerSource ='), end = source.indexOf('\nasync function main()', start)
-  assert.ok(start >= 0 && end > start)
-  const adapter = join(directory, 'adapter.mjs')
-  writeFileSync(adapter, "import { readFile } from 'node:fs/promises'; import { resolve } from 'node:path';\n"
-    + source.slice(start, end).replace(/fileURLToPath\(new URL\('..\/..\/plugins\/mcp-manager', import.meta.url\)\)/, JSON.stringify(resolve('../../plugins/mcp-manager'))))
-  const { managerSources } = await import(pathToFileURL(adapter).href)
+  const { managerSources } = await import('../build.mjs')
   const output = join(directory, 'manager.mjs')
   await build({ stdin: { contents: "export * from 'harness-mcp-manager-server'", resolveDir: process.cwd(), loader: 'ts' }, outfile: output,
     bundle: true, platform: 'node', format: 'esm', packages: 'external', plugins: [managerSources], logLevel: 'silent' })

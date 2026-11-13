@@ -26,18 +26,8 @@ async function fixture(t) {
   return { root, input, origin, requests, options: { roots: [{ root: input, label: 'business' }], outDir: join(root, 'offline'), mode: 'offline' } }
 }
 
-function localResolverBoundary(t) {
-  const original = HttpFetchProvider.prototype.fetch, resolved = []
-  // 仅替换每个真实原生实例的地址 resolver；HTTP、重定向、正文读取和错误路径仍执行原实现。
-  t.mock.method(HttpFetchProvider.prototype, 'fetch', function (request, signal) {
-    this.resolveAddresses = async (hostname, callSignal) => { callSignal.throwIfAborted(); resolved.push(hostname); assert.equal(hostname, '127.0.0.1'); return [{ address: '127.0.0.1', family: 4 }] }
-    return original.call(this, request, signal)
-  })
-  return resolved
-}
-
 test('CLI 默认采集路径静态装载真实原生 HTTP 提供方，无 DSH 入口也可归档并跟随相对重定向', async t => {
-  const f = await fixture(t), resolved = localResolverBoundary(t), previous = process.env.HARNESS_DSH_ENTRY
+  const f = await fixture(t), previous = process.env.HARNESS_DSH_ENTRY
   process.env.HARNESS_DSH_ENTRY = '/missing/source-wrapper/dsh'
   t.after(() => { if (previous === undefined) delete process.env.HARNESS_DSH_ENTRY; else process.env.HARNESS_DSH_ENTRY = previous })
   const skill = `[参考](${f.origin}/docs/redirect.html)\n`
@@ -49,22 +39,22 @@ test('CLI 默认采集路径静态装载真实原生 HTTP 提供方，无 DSH �
   assert.match(await readFile(join(f.options.outDir, result.sources[0].path), 'utf8'), /原生默认采集[\s\S]*<script>/)
   assert.equal(await readFile(join(f.input, 'SKILL.md'), 'utf8'), skill)
   assert.deepEqual(f.requests, ['/docs/redirect.html', '/docs/page.html'])
-  assert.equal(resolved.length, 2); assert.equal(globalThis.__nativeCollectExecuted, undefined)
+  assert.equal(globalThis.__nativeCollectExecuted, undefined)
 })
 
-test('默认采集保留原生公开网络限制，在线模式不调用原生 HTTP', async t => {
+test('原生采集支持本机和内网资料，在线模式不调用原生 HTTP', async t => {
   const f = await fixture(t)
   await writeFile(join(f.input, 'SKILL.md'), `[参考](${f.origin}/docs/page.html)\n`)
   const online = await collectKnowledge({ ...f.options, mode: 'online' })
   assert.deepEqual(online.missing, []); assert.deepEqual(f.requests, [])
   const offline = await collectKnowledge(f.options)
-  assert.equal(offline.sources.length, 0)
-  assert.equal(offline.missing.length, 1); assert.match(offline.missing[0].message, /原生网页读取不支持此目标地址/)
-  assert.deepEqual(f.requests, [])
+  assert.equal(offline.sources.length, 1)
+  assert.deepEqual(offline.missing, [])
+  assert.deepEqual(f.requests, ['/docs/page.html'])
 })
 
 test('默认原生 HTTP 的错误状态与取消不会生成成功资料', async t => {
-  const f = await fixture(t); localResolverBoundary(t)
+  const f = await fixture(t)
   await writeFile(join(f.input, 'SKILL.md'), `[参考](${f.origin}/docs/missing.html)\n`)
   const missing = await collectKnowledge(f.options)
   assert.equal(missing.sources.length, 0); assert.equal(missing.missing.length, 1); assert.match(missing.missing[0].message, /HTTP 404/)

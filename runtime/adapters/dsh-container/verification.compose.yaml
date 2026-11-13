@@ -4,14 +4,17 @@ services:
   home-init:
     image: ${DSH_IMAGE_TAG:?镜像标签由 source.lock.json 解析结果注入}
     pull_policy: never
-    user: "1000:1000"
+    user: "0:0"
     network_mode: none
     read_only: true
     cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE]
     security_opt: ["no-new-privileges:true"]
     environment:
       - DSH_HOME=/var/lib/dsh
       - DSH_HARNESS_MODE=verification
+      - DSH_RUNTIME_UID=${DSH_RUNTIME_UID:-1000}
+      - DSH_RUNTIME_GID=${DSH_RUNTIME_GID:-1000}
     entrypoint: [node, /opt/dsh-adapter/prepare-verification-home.mjs]
     volumes:
       - type: bind
@@ -46,7 +49,7 @@ services:
     depends_on:
       home-init:
         condition: service_completed_successfully
-    user: "1000:1000"
+    user: "${DSH_RUNTIME_UID:-1000}:${DSH_RUNTIME_GID:-1000}"
     working_dir: /work/harness/workspace
     read_only: true
     cap_drop: [ALL]

@@ -117,8 +117,12 @@ export async function applyAuthentication(ctx: Context, assetRoot: string, brand
       if (new URL(req.url ?? '/', 'http://platform.invalid').searchParams.has('token')) {
         redirect(res, ctx.webServer.publicPath('/')); return false
       }
-      migrateCookie(req, res)
-      res.setHeader('cache-control', 'no-store')
+      const session = sessionOf(req)
+      if (session && !(header(req, 'cookie') ?? '').includes(`${cookieName(req)}=`)) {
+        redirect(res, ctx.webServer.publicPath('/'), [cookieHeader(req, sessionValue(req)!, Math.max(0, Math.floor((session.expires - Date.now()) / 1000))), cookieHeader(req, '', 0, LEGACY_COOKIE)])
+        return false
+      }
+      res.setHeader?.('cache-control', 'no-store')
       return true
     } },
     authenticatedUrl: { configurable: true, value: (base: string) => {

@@ -4,19 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { run } from '../fsutil.mts'
 import type { RuntimeEntry } from '../manifest.mts'
 import { inspectKnowledge, type KnowledgeRoot } from './index.mts'
+import { managerHome } from '../../manager-home.mts'
 
 /** 完整平台只收集冻结快照中的管理身份与已声明扩展，不另扫业务 Candidate。 */
 export function managementKnowledgeRoots(dataRoot: string): KnowledgeRoot[] {
-  const root = resolve(dataRoot)
-  const include = ['AGENTS.md', '.agents/skills'].filter(path => existsSync(join(root, path)))
-  try {
-    const workspace = JSON.parse(readFileSync(join(root, 'workspace.json'), 'utf8'))
-    for (const extension of workspace.extensions ?? []) {
-      if (typeof extension.path !== 'string') continue
-      const path = resolve(root, extension.path, 'skills')
-      if (path.startsWith(root + sep) && existsSync(path)) include.push(path.slice(root.length + 1))
-    }
-  } catch { /* 真实工作区格式由既有数据根校验处理。 */ }
+  const root = managerHome(resolve(dataRoot))
+  const include = ['AGENTS.md', '.agents/skills', 'docs'].filter(path => existsSync(join(root, path)))
   return include.length ? [{ root, label: 'management', include }] : []
 }
 
@@ -28,7 +21,7 @@ export function collectPlatformKnowledge(staging: string, cacheDir?: string): Ru
   const localSources = inspectKnowledge({ roots, mode: 'offline' }).references.flatMap(reference => {
     const url = new URL(reference.url)
     if (url.hostname !== 'github.com') return []
-    for (const [repository, root] of [['harness-engineering-platform', program], ['harness-engineering-platform-data', data]]) {
+    for (const [repository, root] of [['harness-engineering-platform', program], ['harness-engineering-platform-data', data], ['platform-manager-dsh-home', managerHome(data)]]) {
       const prefix = `/wr5912/${repository}/blob/main/`
       if (!url.pathname.startsWith(prefix)) continue
       const path = resolve(root, decodeURIComponent(url.pathname.slice(prefix.length)))

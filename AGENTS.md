@@ -176,7 +176,7 @@ Memory 位于仓库外的 `$CODEX_HOME/memories`，不得复制进仓库、Resea
 | 对象标识 | 按任务目标判断的范围 | 工作流入口 |
 |---|---|---|
 | `PLATFORM` | 平台页面、研究管理工具、通用 CLI、Runtime 适配器及仓库研发协作配置 | 实现使用 [`dsh-platform-development`](.agents/skills/dsh-platform-development/SKILL.md)；仅编写页面开发任务清单使用 `dsh-platform-task-list` |
-| `AGENT` | 某个业务智能体的 Harness 资产、需求、评估标准及研究结果 | 语义性 Harness 变化使用 数据工作区的 [`workspace-management`](https://github.com/wr5912/harness-engineering-platform-data/blob/main/.agents/skills/workspace-management/SKILL.md)；仅维护文档或整理既有证据不因此新建 Experiment |
+| `AGENT` | 某个业务智能体的 Harness 资产、需求、评估标准及研究结果 | 语义性 Harness 变化使用 数据工作区的 [`workspace-management`](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/workspace-management/SKILL.md)；仅维护文档或整理既有证据不因此新建 Experiment |
 
 AI 开发工具在创建分支前必须读取本节，根据**任务名称、任务描述与仓库上下文**选择操作类型、对象标识和主题，而不是只按文件目录、出现的关键词或工具默认分支名推断。业务智能体已知时，`AGENT` 主题包含其 Agent ID。上下文不足先检查目标资产、调用关系和已有实现，仍无法判断主要目标时再澄清。
 

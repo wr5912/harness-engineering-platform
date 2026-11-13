@@ -83,14 +83,14 @@ clone_fixed() {
     [ -z "$(git -C "$target" status --porcelain --untracked-files=all)" ] || fail "缓存仓库存在未提交修改：$target"
   else
     mkdir -p "$(dirname -- "$target")"
-    git -c core.hooksPath=/dev/null clone --no-checkout -- "$url" "$target" >/dev/null
+    git -c core.hooksPath=/dev/null init "$target" >/dev/null
+    git -C "$target" remote add origin "$url"
   fi
   if ! git -C "$target" cat-file -e "$commit^{commit}" >/dev/null 2>&1; then
-    git -c core.hooksPath=/dev/null -C "$target" fetch --no-tags origin "$commit" >/dev/null
+    git -c core.hooksPath=/dev/null -C "$target" fetch --depth=1 --no-tags origin "$commit" >/dev/null
   fi
   git -C "$target" cat-file -e "$commit^{commit}" >/dev/null 2>&1 || fail "仓库没有固定提交：$commit"
-  current=$(git -C "$target" rev-parse HEAD 2>/dev/null || true)
-  [ "$current" = "$commit" ] || git -C "$target" checkout --detach "$commit" >/dev/null
+  git -c core.hooksPath=/dev/null -C "$target" checkout --detach "$commit" >/dev/null
 }
 
 lock_value() {

@@ -4,6 +4,7 @@ import { existsSync, lstatSync, readFileSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { programRoot } from '../workspace.ts'
+import { managerHome } from '../manager-home.ts'
 import { RunFileError, redactRunText } from './run-files.ts'
 
 const TOPICS = new Set(['controlled-improvement', 'evaluation-and-evidence', 'inheritance-and-fusion', 'compute-variants', 'decision-samples'])
@@ -24,7 +25,7 @@ function containedPath(root: string, path: string) {
 export function readResearchReference(root: string, topic: unknown) {
   if (typeof topic !== 'string' || !TOPICS.has(topic)) throw new RunFileError('invalid_request', '请选择已有的研究主题')
   const path = `docs/harness-research/${topic}.md`
-  const target = containedPath(root, path)
+  const target = containedPath(managerHome(root), path)
   if (!lstatSync(target).isFile() || lstatSync(target).size > 128 * 1024) throw new RunFileError('path_rejected', '研究资料必须是最多 128 KiB 的文本文件')
   const bytes = readFileSync(target)
   let content: string

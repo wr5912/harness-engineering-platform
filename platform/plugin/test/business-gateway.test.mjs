@@ -7,6 +7,7 @@ import { EventEmitter, once } from 'node:events'
 import { createServer, request as httpRequest } from 'node:http'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
+import SessionProjections from '@deepseek-ai/dsh-session-projection'
 import test from 'node:test'
 import { BUSINESS_TRANSPORT_HEADER, BUSINESS_TRANSPORT_VERSION } from '../src/business-control/contracts.ts'
 import { Context, Service } from '@deepseek-ai/cordis'
@@ -111,6 +112,7 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
     await ctx.plugin({ name: 'fixture-tools', apply(ctx) { ctx.provide('tools', { guard(check) { toolGuards.push(check) } }) } })
     await ctx.plugin({ name: 'fixture-agents', apply(ctx) { ctx.provide('agents', { get: id => agents.get(id) }) } })
     await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjections)
   }
   await ctx.plugin(ApprovalService, { policy: 'ask' })
   const workspacePath = join(fixtureRoot, 'workspace'); mkdirSync(workspacePath)
@@ -146,6 +148,16 @@ async function setup(t, { localTools = [], emptyWorkspace = false, registrationF
   const rpc = async (id, endpoint, request) => { const path = `/api/${endpoint}`; return fetch(`http://127.0.0.1:${ctx.webServer.port}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers(id, path) }, body: JSON.stringify({ type: 'client-request', rpcId: randomBytes(8).toString('hex'), method: endpoint, payload: { args: { request } } }) }) }
   return { ctx, control, fixture, headers, rpc, context, secret, coordinator, gateway, workspacePath, workspaceRows, workspaceRegistry, registrationConnections, toolGuards, agents, trustCalls, riskCalls: riskProvider.calls, delayTrust: (id, delay) => trustDelays.set(id, delay), revoke: id => revokedSubjects.add(id) }
 }
+test('原生 Fetch 首页与业务 Connection 共用简化响应合同，版本随原生页面输出', async t => {
+  const { ctx, workspacePath, headers } = await setup(t, { sharedDevelopment: true })
+  const index = join(workspacePath, 'index.html')
+  writeFileSync(index, '<html><head></head><body>业务对话</body></html>')
+  await ctx.plugin(await runtimeModule('@deepseek-ai/dsh-host-frontend-static'), { distIndex: index })
+  const response = await fetch(`http://127.0.0.1:${ctx.webServer.port}/`, { headers: headers('shared', '/', 'GET') })
+  assert.equal(response.status, 200)
+  assert.match(await response.text(), new RegExp(`<meta name="${BUSINESS_TRANSPORT_HEADER}" content="${BUSINESS_TRANSPORT_VERSION}">`))
+})
+
 test('仅配置与 MCP 专用目录可装载真实 Runtime 和 manager，分组与直连保留凭据原子热更新', async t => {
   const { ctx, control, context } = await setup(t, { sharedDevelopment: true, noSecret: true, runtimeInputsOnly: true })
   const root = control.assetRoot, paths = mcpCredentialPaths(root), calls = []
@@ -245,7 +257,7 @@ for (const sharedDevelopment of [true, false]) test(`原生二进制上传保留
   const receipt = await result.json()
   assert.equal(receipt.ok, true, JSON.stringify(receipt))
   assert.deepEqual(stored, [{ bytes, name }])
-  assert.deepEqual(ctx.get('fileUploads').resolve(agent, receipt.value.receiptId), receipt.value.file)
+  assert.deepEqual(ctx.get('fileUploads').resolve(agent, receipt.value.receiptId), { type: 'file', attachment: receipt.value.file })
   assert.equal(ctx.get('fileUploads').resolve({ session: {} }, receipt.value.receiptId), undefined)
   assert.equal((await upload('A', { sessionId, name }, Buffer.alloc(0), 'text/plain')).status, 415)
   assert.equal((await upload('A', { name }, Buffer.alloc(0))).status, 400)
@@ -586,7 +598,7 @@ test('共享 Peer 不共享请求上下文，连接释放保留 Peer，配置撤
   assert.deepEqual(connection.admit(request()), { rejection: 401 })
 })
 test('空 HOME 启动前预登记固定工作区，浏览器无需目录选择即可创建业务 Session', async t => {
-  const { ctx, rpc, fixture, workspacePath, workspaceRows, workspaceRegistry, registrationConnections } = await setup(t, { emptyWorkspace: true })
+  const { ctx, rpc, headers, fixture, workspacePath, workspaceRows, workspaceRegistry, registrationConnections } = await setup(t, { emptyWorkspace: true })
   assert.deepEqual(workspaceRows.map(row => row.path), [workspacePath])
   assert.deepEqual(registrationConnections, [false])
   const first = workspaceRows[0]
@@ -598,7 +610,9 @@ test('空 HOME 启动前预登记固定工作区，浏览器无需目录选择�
   assert.ok([403, 404].includes((await rpc('A', 'directoryPicker/list', { path: workspacePath })).status))
   const defaultAttempt = await (await rpc('A', 'workspace/initializeDefault', {})).json()
   assert.equal(defaultAttempt.result.ok, false, JSON.stringify(defaultAttempt))
-  const injections = ctx.webServer.collectIndexInjections()
+  const admitted = ctx.get('connection').admit({ method: 'GET', url: '/', headers: headers('A', '/', 'GET') })
+  assert.ok('peer' in admitted)
+  const injections = ctx.webServer.collectIndexInjections(admitted.peer)
   assert.ok(injections.some(row => row.kind === 'style' && row.text.includes('[data-conversation-content]')
     && row.text.includes('aria-label="选择工作区"') && !row.text.includes('heroWorkspaceRow')))
 })
@@ -733,7 +747,10 @@ for (const mode of ['operation', 'condition', 'external']) test({
     } }), 'late business confirmation HTTP fixture')
   } })
   const injected = []
-  await ctx.serial('webserver/index-inject', injected)
+  const admitted = ctx.get('connection').admit({ headers: headers('A', '/hep/', 'GET'), method: 'GET', url: '/hep/' })
+  assert.ok('peer' in admitted)
+  await ctx.serial('webserver/index-inject', injected, admitted.peer)
+  await admitted.release()
   assert.ok(injected.some(item => item.kind === 'script' && item.text.includes('const base="/agents/soc/instances/soc-business/"')))
   const created = await (await rpc('A', 'session/create', {})).json(); const sessionId = created.result.value.sessionId
   const session = ctx.get('sessions').create(SessionId(sessionId)); session.append('turn/start', { turn: 1 }); const agent = { id: sessionId, session, ctx }
@@ -812,6 +829,8 @@ for (const mode of ['allow', 'queued', 'deny-after', 'reject', 'cancel', 'versio
   t.after(() => new Promise(resolve => provider.close(resolve)))
   const origin = `http://127.0.0.1:${provider.address().port}`, sessionId = SessionId('cold-report-session')
   const prepared = ctx.sessions.prepare(sessionId, { meta: { cwd: workspacePath } })
+  const detach = ctx.sessions.enter(prepared)
+  ctx.sessions.announce(prepared)
   if (mode === 'queued') {
     const { createUserMessage } = await runtimeModule('@deepseek-ai/dsh-llm')
     prepared.append('agent/inbox/spliced', { target: 'next-turn', start: 0, removedCount: 0,
@@ -820,6 +839,7 @@ for (const mode of ['allow', 'queued', 'deny-after', 'reject', 'cancel', 'versio
   const originalEvents = prepared.snapshotEvents()
   const stored = await ctx.sessionPersistence.create(prepared.header)
   await stored.append(prepared.snapshotEvents()); await stored.flush(); await stored.close()
+  detach()
   const owner = control.bindSession(context('A'), sessionId)
   const configPath = join(control.assetRoot, 'config/business-access.json'), config = JSON.parse(readFileSync(configPath, 'utf8'))
   delete config.riskAssessment
@@ -871,7 +891,9 @@ for (const mode of ['allow', 'queued', 'deny-after', 'reject', 'cancel', 'versio
   if (accessRequests[1]) assert.notEqual(accessRequests[0].requestId, accessRequests[1].requestId)
   assert.equal(ctx.agents.get(sessionId), undefined); assert.equal(ctx.sessions.get(sessionId), undefined)
   assert.equal(modelRequests, 0); assert.equal(toolRequests, 0); assert.equal(agentCreations, 0)
-  const after = await ctx.sessionController.inspect(sessionId)
+  const reader = await ctx.sessionPersistence.open(sessionId, 'read')
+  const after = await reader.read()
+  await reader.close()
   assert.deepEqual(after.events, originalEvents, '下载不修改待办、不创建回合或伪造原生approval事件')
   const receipt = control.status().events.findLast(event => event.operationId === 'download-report')
   assert.equal(receipt.authorization.source, 'third-party')
