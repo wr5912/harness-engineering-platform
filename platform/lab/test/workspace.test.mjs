@@ -148,6 +148,18 @@ test('拒绝已移除的元数据目录', t => {
   mkdirSync(join(f.destination, '.hep-lab'), { recursive: true })
   assert.throws(() => initializeLab(f), /已移除的 \.hep-lab 元数据目录/)
 })
+test('控制仓上下文与运行清单共存，旧入口不删除工作区文件', t => {
+  const f = fixture(t)
+  mkdirSync(join(f.destination, '.hep-lab'), { recursive: true })
+  writeFileSync(join(f.destination, '.hep-lab/sources.json'), '{"schema_version":1}\n')
+  writeFileSync(join(f.destination, 'AGENTS.md'), 'workspace context\n')
+  git(f.root, 'init', '-b', 'main')
+  const result = initializeLab(f)
+  assert.equal(result.validation.valid, true)
+  assert.equal(readLab(f.destination).repositories.platform.commit, f.repositories.platform.commit)
+  assert.equal(readFileSync(join(f.destination, 'AGENTS.md'), 'utf8'), 'workspace context\n')
+  assert.equal(doctorLab(f.destination).valid, true)
+})
 test('doctor拒绝tracked凭据、嵌套repo和Registry错绑', t => {
   const f = fixture(t); initializeLab(f)
   const business = join(f.destination, 'business-agents')

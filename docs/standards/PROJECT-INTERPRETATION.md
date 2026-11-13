@@ -1,6 +1,6 @@
 # 项目规范解释
 
-本文说明受控来源在 `harness-engineering-platform` 平台开发与研究工具实现中的适用范围，区分当前合同、设计输入与后续能力。管理助手的业务方法与原则由数据工作区独立维护；本文保留程序需要兼容的资产与证据合同。来源版本和本地术语修订身份由 `SOURCES.md` 维护。
+本文说明受控来源在 `harness-engineering-platform` 平台开发与研究工具实现中的适用范围，区分当前合同、设计输入与后续能力。管理助手的业务方法与原则由独立 DSH HOME 维护；本文保留程序需要兼容的资产与证据合同。来源版本和本地术语修订身份由 `SOURCES.md` 维护。
 
 ## 1. 当前权威顺序
 
@@ -13,7 +13,7 @@
 
 受控来源中的稳定 Baseline、生产 R1/R2/R3、审批、安全控制映射和部署流程不自动成为当前要求。只有实际使用需求涉及这些能力时才明确范围与合同，并复用已有资产、来源和证据，不因项目定位变化重做已验证能力。
 
-数据工作区 `.agents/skills/workspace-management/` 是新建、迁移、修改和优化 Harness 的对话入口。它按需求清晰程度组织澄清、计划、执行与验证，并复用资产清点、Experiment 演进和研究评估技能；已授权且必要信息齐全时连续执行，研究事实写回现有 Agent、Experiment 与 Run。
+管理助手 HOME 的 `.agents/skills/workspace-management/` 是新建、迁移、修改和优化 Harness 的对话入口。它按需求清晰程度组织澄清、计划、执行与验证，并复用资产清点、Experiment 演进和研究评估技能；已授权且必要信息齐全时连续执行，研究事实写回现有 Agent、Experiment 与 Run。
 
 ### 平台设计输入的适用关系
 
@@ -45,7 +45,7 @@ Evaluation 的规模由假设和拟得出的结论决定，不设固定 Case 数
 - 要扩大结论范围时，补充覆盖、反例和必要回归。
 - 同一次比较运行期间保持 Harness、输入和判断口径稳定；口径变化后重新运行受影响部分。
 - 每个 Agent 的当前业务测试只在 `evaluation.md` 维护；同一 Case 的名称、用户输入和预期结果聚合在一起。Experiment 不保存本地评测计划；Run 锁定所选 Case 的完整快照，作为不可编辑的执行事实而不是维护投影。
-- 版本与变体共用的业务预期、稳定 API 能力命名及环境适配，统一遵循数据工作区的[评测口径与输入](https://github.com/wr5912/harness-engineering-platform-data/blob/main/docs/harness-research/evaluation-and-evidence.md#口径与输入)；平台用例工具与生成说明引用该口径。
+- 版本与变体共用的业务预期、稳定 API 能力命名及环境适配，统一遵循管理助手 HOME 的[评测口径与输入](https://github.com/wr5912/platform-manager-dsh-home/blob/main/docs/harness-research/evaluation-and-evidence.md#口径与输入)；平台用例工具与生成说明引用该口径。
 - 原始观察不得为了形成漂亮结论而静默改写；重新执行使用新的 `run_id`。
 
 运行记录位于：

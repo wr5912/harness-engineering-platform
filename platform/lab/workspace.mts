@@ -157,10 +157,17 @@ function completeInputs(root: string, provided: Partial<Record<RepositoryKey, Re
 }
 function manifestPath(lab: string) { return join(resolve(lab), 'hep-lab.yaml') }
 function legacyMetadataPath(lab: string) { return join(resolve(lab), '.hep-lab') }
+function checkWorkspaceMetadata(lab: string) {
+  if (!existsSync(legacyMetadataPath(lab))) return
+  // 工作区控制仓维护开发上下文；与 hep-lab.yaml 的运行清单独立。
+  const source = join(legacyMetadataPath(lab), 'sources.json')
+  try { if (JSON.parse(readFileSync(source, 'utf8')).schema_version === 1) return } catch {}
+  fail('检测到已移除的 .hep-lab 元数据目录，或缺少工作区 sources.json；请核对来源后迁移')
+}
 export function readLab(lab: string): LabManifest {
   const root = resolve(lab)
   safeDirectory(root)
-  if (existsSync(legacyMetadataPath(root))) fail('检测到已移除的 .hep-lab 元数据目录，请清理后重新初始化')
+  checkWorkspaceMetadata(root)
   const manifest = readYaml(manifestPath(root)) as LabManifest
   if (manifest?.schema_version !== 1 || manifest.initializer_version !== 2 || !manifest.repositories) fail('hep-lab 清单版本不受支持，请重新初始化')
   for (const key of keys) {
@@ -301,9 +308,9 @@ export function doctorLab(lab: string) { return inspectLab(readLab(lab)) }
 export function initializeLab(options: InitOptions) {
   const root = resolve(options.destination)
   safeDirectory(root)
-  if (existsSync(legacyMetadataPath(root))) fail('目标目录包含已移除的 .hep-lab 元数据目录，请清理后重新初始化')
+  checkWorkspaceMetadata(root)
   const existingManifest = existsSync(manifestPath(root)) ? readLab(root) : undefined
-  const allowed = new Set([...Object.values(repositoryNames), 'hep-lab.yaml'])
+  const allowed = new Set([...Object.values(repositoryNames), 'hep-lab.yaml', '.hep-lab', '.git', '.gitignore', '.agents', 'AGENTS.md', 'README.md', 'tools', 'skills'])
   if (existsSync(root) && readdirSync(root).some(name => !allowed.has(name))) fail('目标目录含非 hep-lab 内容，请使用空目录')
   const inputs = completeInputs(root, options.repositories, Boolean(options.allowFloatingRef), Boolean(options.checkOnly))
   let locks = existsSync(join(root, repositoryNames.data, '.git')) ? repositoryLocks(join(root, repositoryNames.data)) : {}

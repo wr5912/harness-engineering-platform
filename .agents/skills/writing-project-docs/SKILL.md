@@ -13,4 +13,4 @@ description: 编写或修订本项目的 README、设计、使用说明和开发
 4. 移动或替换前迁移仍有效的独有内容，核对上级入口、入站引用、相对链接与锚点。来源材料和冻结记录按其合同保留，不为统一文风改写。
 5. 从读者入口走一次最短任务路径，核对输入、命令、预期信号及失败后的去向；检查涉及的模板、生成器和直接消费者。只读、只出方案的任务不扩大为实施。
 
-审查项目文档交给 [reviewing-project-docs](../reviewing-project-docs/SKILL.md)；审查 Skill 交给 [reviewing-agent-skills](../reviewing-agent-skills/SKILL.md)。业务 Case 的口径维护交给数据工作区管理入口。
+审查项目文档交给 [reviewing-project-docs](../reviewing-project-docs/SKILL.md)；审查 Skill 交给 [reviewing-agent-skills](../reviewing-agent-skills/SKILL.md)。业务 Case 的口径维护交给管理助手 HOME 的管理入口。

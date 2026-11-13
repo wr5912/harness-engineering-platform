@@ -37,7 +37,9 @@ cd harness-engineering-platform
 ./platform/dsh-platform start
 ```
 
-需要从零建立可复现的四仓库工作区时，使用 Bootstrap 入口；它会按数据仓库锁定文件下载平台、数据、DSH Home 和业务智能体仓库：
+开发四仓时，优先使用独立的[工作区控制仓](https://github.com/wr5912/hep-lab)。其 `tools/hep-lab-space init` 按固定提交准备四仓与开发 Skill，不需要先安装平台依赖；控制仓忽略四个独立子仓，不使用 submodule。已有工作区用 `sync` 同步开发上下文，用 `status` 查看五仓状态。
+
+只需要平台运行环境时，仍可使用 Bootstrap 入口；它按数据仓库锁定文件下载平台、数据、DSH Home 和业务智能体仓库：
 
 ```bash
 ./platform/hep-lab bootstrap --destination "$HOME/hep-lab"

@@ -1,12 +1,9 @@
 ---
 name: reviewing-agent-skills
 description: >-
-  Adversarially reviews an existing Agent Skill (SKILL.md, references, scripts, and assets)
-  for necessity, activation accuracy, instruction quality, MCP/tool coupling, excessive
-  agent-side orchestration, reliability, and maintainability. Use when asked to audit,
-  challenge, troubleshoot, improve, simplify, or propose precise revisions to a skill.
-  Produces evidence-based findings, minimal changes, and validation cases. Not for
-  creating a new skill from scratch, deploying MCP servers, or silently rewriting files.
+  审查平台程序仓的研发 Skill，包括触发范围、指令、包内依赖、工具耦合和维护成本。
+  适用于研发技能的对抗审查、精简和改进；工作区投影治理使用 hep-skill-governance，
+  管理助手及业务 Harness 的运行技能审查使用管理助手 HOME 的入口。
 compatibility: Requires only file-reading capability; optional static inspector uses Python 3.9+ offline.
 metadata:
   version: "1.0.0"
@@ -20,6 +17,7 @@ metadata:
 
 ## 输入与边界
 
+- 本入口负责程序研发 Skill。管理助手及业务运行 Skill 交接到 [HOME 审查入口](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/reviewing-agent-skills/SKILL.md)；共享投影由工作区 `hep-skill-governance` 管理，不复制运行技能包到程序仓。
 - 优先读取目标 `SKILL.md`，再只读取审查所需的 `references/`、`scripts/`、`assets/`、测试和相关 MCP 接口定义。
 - 缺少真实运行轨迹时，明确区分**已证实缺陷 / 静态风险 / 待实验假设**；不得声称验证过触发率、成功率或 Token 收益。
 - 默认**只审查不修改**。用户明确要求整改时，先给最小差异方案；在有编辑能力的环境内才修改指定文件，通过 Git 保留可追溯版本并报告变更。
@@ -38,11 +36,11 @@ metadata:
 
 ## 判断规则
 
-- **清除失效资料**：按[失效文档及时清除原则](https://github.com/wr5912/harness-engineering-platform-data/blob/main/AGENTS.md#失效文档及时清除硬性原则)核对技能正文、引用和导出件；有效方法归入当前唯一来源，失效文件直接删除并修复引用，无需另存归档。
+- **清除失效资料**：按[失效文档及时清除原则](https://github.com/wr5912/platform-manager-dsh-home/blob/main/AGENTS.md#失效文档及时清除硬性原则)核对技能正文、引用和导出件；有效方法归入当前唯一来源，失效文件直接删除并修复引用，无需另存归档。
 
 - **事实优先**：不存在的路径、工具、测试结果不得编造；无法访问文件则陈述审查范围。
 - **误报克制**：静态出现 `mcp__<server>__<tool>`、长脚本或多个步骤不自动等于缺陷。只有当接口不稳定、编排可确定性下沉、或存在实际运行证据时才升级严重度。
-- **职责优先**：Agent 做意图/策略/判断；Skill 描述任务方法；脚本处理局部确定性操作；原 MCP 服务封装同域操作；涉及 MCP 时按数据工作区 [mcp-composition 的公开开发入口](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/mcp-composition/SKILL.md#开发方法) 比较原始工具 + Skill 和组合的必要性，跨服务本身不构成新增组合的理由。拒绝不必要的基础设施迁移。
+- **职责优先**：Agent 做意图/策略/判断；Skill 描述任务方法；脚本处理局部确定性操作；原 MCP 服务封装同域操作；涉及 MCP 时按管理助手 HOME 的 [mcp-composition 的公开开发入口](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/mcp-composition/SKILL.md#开发方法) 比较原始工具 + Skill 和组合的必要性，跨服务本身不构成新增组合的理由。拒绝不必要的基础设施迁移。
 - **审查应公平**：安全检查适度且有明确风险；不因“更安全”而要求复杂多余的审批、鉴权和治理。
 - **先验证收益**：声称“减少 Token、改善成功率”必须有可比较的运行数据；否则只称预期改善。
 - **终止条件**：核心问题有证据、建议可执行、验收标准明确即完成。不要以无限自检替代交付。
@@ -66,6 +64,6 @@ metadata:
 
 ## Skill 自包含专项（每个目标必查）
 
-严格执行 [Skill 资产自包含原则](https://github.com/wr5912/harness-engineering-platform-data/blob/main/AGENTS.md#skill-资产自包含硬性原则)。审查整个包及必要依赖闭包，按包内资源、公开规范/工具合同、公开 Skill 交接、未声明或缺失依赖分类。核对详情是否归包内 references、脚本与资产是否真实存在、跨包是否只走公开入口，以及上游快照的来源和版本。将自身审查 Skill 纳入同样核验。
+严格执行 [Skill 资产自包含原则](https://github.com/wr5912/platform-manager-dsh-home/blob/main/AGENTS.md#skill-资产自包含硬性原则)。审查整个包及必要依赖闭包，按包内资源、公开规范/工具合同、公开 Skill 交接、未声明或缺失依赖分类。核对详情是否归包内 references、脚本与资产是否真实存在、跨包是否只走公开入口，以及上游快照的来源和版本。将自身审查 Skill 纳入同样核验。
 
 包外引用不自动违规：规范、业务事实和 Run 应保持原来源。必要方法借放包外、兄弟私有引用、绝对开发路径和越界软链接是硬性不符合；未解决不得写通过。无必要支持文件的短 Skill 可直接自包含。逐路径记录覆盖，重复内容可按摘要复用分析；冻结历史只读标记，当前整改不改写历史。检查器只做离线资产检查，不接入原生对话。

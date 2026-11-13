@@ -22,11 +22,11 @@ description: 实施已授权的 DSH Harness 工程平台、通用 CLI 和 Runtim
 
 涉及打包、部署、增量更新或安装目录迁移时，遵守[根级“打包部署更新必须经过工具”原则](../../../AGENTS.md#项目定位与工作方式)，使用 `platform/dsh-deploy`；缺少能力或执行失败时，先整改并验证工具，再通过工具继续任务。
 
-涉及 MCP 组合编排资产开发时，通过已选数据工作区的 [mcp-composition 公开入口](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/mcp-composition/SKILL.md)交接业务目标、允许范围及当前编排身份，由其返回资产变更与分层验证回执。通用执行器、装载或接口缺口由研发处理，再回到管理助手复验；未知回执先查询原结果，不重放调用。接口、组件及执行事实以源码和实际回执为准，不读取业务 Skill 的私有方法或另存一套。
+涉及 MCP 组合编排资产开发时，通过管理助手 HOME 的 [mcp-composition 公开入口](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/mcp-composition/SKILL.md)交接业务目标、允许范围及当前编排身份，由其返回资产变更与分层验证回执。通用执行器、装载或接口缺口由研发处理，再回到管理助手复验；未知回执先查询原结果，不重放调用。接口、组件及执行事实以源码和实际回执为准，不读取业务 Skill 的私有方法或另存一套。
 
 全局 DSH 平台的启动入口、Profile 与插件集中在 `platform/`；容器内业务 Agent 的 Harness 仍由对应 Experiment 的 Candidate 装载。修改平台接入时核对这两条来源链，避免把开发身份、平台 Profile 和业务 Preset 混用。
 
-平台页面、启动器和通用工具按项目路径验证，不为普通平台修改建立业务 Experiment；技术研究依据按需保存在既有任务或设计记录中。若同时改变业务 Harness 语义，对该部分使用 数据工作区的 [`workspace-management`](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/workspace-management/SKILL.md)，分别保留功能验证与研究比较的结论。仅编写页面开发任务清单时改用 [`dsh-platform-task-list`](../dsh-platform-task-list/SKILL.md)。
+平台页面、启动器和通用工具按项目路径验证，不为普通平台修改建立业务 Experiment；技术研究依据按需保存在既有任务或设计记录中。若同时改变业务 Harness 语义，对该部分使用管理助手 HOME 的 [`workspace-management`](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/workspace-management/SKILL.md)，分别保留功能验证与研究比较的结论。仅编写页面开发任务清单时改用 [`dsh-platform-task-list`](../dsh-platform-task-list/SKILL.md)。
 
 ## 验证与交付
 

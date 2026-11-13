@@ -55,7 +55,7 @@
 - 平台默认监听端口为 `18120`；新业务智能体实例未指定端口时，在 `18500–28999` 中按实际占用自动分配空闲端口。同名实例重启复用原端口，显式指定端口按现有校验执行。
 - 凡与 DSH 相关的功能、配置、运行或界面，先核对并优先复用锁定版 DSH 的原生能力、插件和公开扩展点。原生能力可用但不能完整满足当前需求时，可通过本项目维护的插件或扩展补齐差异，不为此修改 DSH 源码；无法补齐时先使用可用部分，明确记录未满足的行为及其影响，并纳入后续计划，不将局部可用写成完整交付。确无可复用能力时，按当前明确需求实现最小扩展。DSH Runtime 源码不混入本仓库。
 - 不复制 Runtime 内部目录，不把 Session、缓存、附件或整个 `$DSH_HOME` 作为 Harness 资产；需入仓的平台和实例凭据只保存为专用文件，不通过复制 Runtime HOME 回流。
-- 独立数据根（`HARNESS_ASSET_ROOT`，默认 `~/harness-engineering-platform-data`）中的 `agents/` 保存业务 Agent 的研究资料，`.agents/skills/` 保存管理助手的业务技能；本程序仓库的 `.agents/skills/` 只保存研发技能。按所属工作区区分，不因目录名相同混用身份。
+- 独立数据根（`HARNESS_ASSET_ROOT`，默认 `~/harness-engineering-platform-data`）中的 `agents/` 保存业务 Agent 的研究资料；管理助手业务技能位于独立 DSH HOME 的 `.agents/skills/`，本程序仓库的 `.agents/skills/` 只保存研发技能。按所属工作区区分，不因目录名相同混用身份。
 - `.codex/` 和根级 `AGENTS.md` 只约束仓库研发协作，不是 DSH Runtime 策略或业务 Harness 资产。
 - 平台使用本地 CLI，以及基于系统全局 DSH-Cordis 的界面，当前提供首页、管理对话、智能体管理、评测中心、实例管理及 MCP 管理，复用现有资产与运行记录，不另建事实副本。平台启动入口、Profile 与插件源码集中在 `platform/`，其中 `platform/plugin/` 是独立 DSH 插件包；接入合同集中维护在[平台设计方案](docs/platform-design/02_系统架构与部署设计.md#当前最小平台接入合同)。后续能力按实际使用需求扩展，实际验证状态以项目验收矩阵为准。
 
@@ -176,7 +176,7 @@ Memory 位于仓库外的 `$CODEX_HOME/memories`，不得复制进仓库、Resea
 | 对象标识 | 按任务目标判断的范围 | 工作流入口 |
 |---|---|---|
 | `PLATFORM` | 平台页面、研究管理工具、通用 CLI、Runtime 适配器及仓库研发协作配置 | 实现使用 [`dsh-platform-development`](.agents/skills/dsh-platform-development/SKILL.md)；仅编写页面开发任务清单使用 `dsh-platform-task-list` |
-| `AGENT` | 某个业务智能体的 Harness 资产、需求、评估标准及研究结果 | 语义性 Harness 变化使用 数据工作区的 [`workspace-management`](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/workspace-management/SKILL.md)；仅维护文档或整理既有证据不因此新建 Experiment |
+| `AGENT` | 某个业务智能体的 Harness 资产、需求、评估标准及研究结果 | 语义性 Harness 变化使用管理助手 HOME 的 [`workspace-management`](https://github.com/wr5912/platform-manager-dsh-home/blob/main/.agents/skills/workspace-management/SKILL.md)；仅维护文档或整理既有证据不因此新建 Experiment |
 
 AI 开发工具在创建分支前必须读取本节，根据**任务名称、任务描述与仓库上下文**选择操作类型、对象标识和主题，而不是只按文件目录、出现的关键词或工具默认分支名推断。业务智能体已知时，`AGENT` 主题包含其 Agent ID。上下文不足先检查目标资产、调用关系和已有实现，仍无法判断主要目标时再澄清。
 
@@ -215,3 +215,5 @@ AI 开发工具在创建分支前必须读取本节，根据**任务名称、任
 - 需要证明 DSH 行为时，核对实际来源、装载结果和用户可见行为；需要证明 Research Release 可复现时，核对清单、摘要和重新装载结果。
 - 完成前检查文档链接、配置解析、敏感信息、Git diff 和测试结果；逐项报告已验证内容、未验证内容和适用边界。
 - 最后审查每个改动文件和主要代码块能否直接对应用户要求；移除本次改动产生的无用内容，不处理无关旧问题。
+
+跨仓研发上下文与共享开发 Skill 由 [hep-lab 工作区](https://github.com/wr5912/hep-lab)维护；从本仓启动时以本文件和本仓技能为入口，不假设继承父仓 AGENTS.md。
