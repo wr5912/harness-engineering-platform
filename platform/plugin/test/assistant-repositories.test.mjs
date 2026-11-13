@@ -95,6 +95,9 @@ test('目标仓库预备会话只创建不投递，续接固定来源且冷恢�
   const prepared = await call('prepare-session', { repository_id: 'business-agents' })
   assert.equal(prepared.ok, true, JSON.stringify(prepared)); const id = prepared.value.session_id
   assert.equal(sessions.get(id).header.cwd, f.repository); assert.equal(prompts.length, 0)
+  const status = await call('status', { session_id: id })
+  assert.equal(status.ok, true, JSON.stringify(status)); assert.deepEqual(status.value.business_workspace.allowed_repository_ids, ['data', 'business-agents'])
+  assert.deepEqual(status.value.business_workspace.excluded_repository_ids, ['harness-engineering-platform', 'platform-manager-dsh-home'])
   const task = { session_id: id, request_id: 'fixed-request', task: '读取仓库项目规则' }
   assert.equal((await call('session', task)).ok, true)
   assert.equal((await call('session', task)).ok, true); assert.equal(prompts.length, 1)
