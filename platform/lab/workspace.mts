@@ -228,6 +228,20 @@ export function inspectLab(manifest: LabManifest) {
     } catch (error) { issues.push({ code: 'repository_state', path: item.path, message: error instanceof Error ? error.message : '仓库无法核对' }) }
   }
   const data = manifest.repositories.data.path, business = manifest.repositories.business_agents
+  const assistantWorkspace = join(data, 'config/assistant-workspace.json')
+  if (existsSync(assistantWorkspace)) try {
+    const value = JSON.parse(readFileSync(assistantWorkspace, 'utf8'))
+    const allowed = Array.isArray(value?.allowedRepositoryIds) ? new Set(value.allowedRepositoryIds) : new Set()
+    const excluded = Array.isArray(value?.excludedRepositoryIds) ? new Set(value.excludedRepositoryIds) : new Set()
+    const roles = value?.roles
+    if (value?.schemaVersion !== 1 || value.kind !== 'platform-assistant-business-workspace'
+      || value.defaultRepositoryId !== 'data' || value.businessRepositoryId !== 'business-agents'
+      || allowed.size !== 2 || !allowed.has('data') || !allowed.has('business-agents')
+      || !excluded.has('harness-engineering-platform') || !excluded.has('platform-manager-dsh-home')
+      || [...allowed].some(item => excluded.has(item))
+      || !roles || typeof roles !== 'object'
+      || ['data', 'business-agents', 'harness-engineering-platform', 'platform-manager-dsh-home'].some(item => typeof roles[item] !== 'string' || !roles[item].trim())) fail('管理助手业务工作区契约无效')
+  } catch (error) { issues.push({ code: 'assistant_workspace', path: assistantWorkspace, message: error instanceof Error ? error.message : '管理助手业务工作区契约无法读取' }) }
   try {
     const locks = repositoryLocks(data)
     for (const key of keys) withLock(manifest.repositories[key], locks[key])

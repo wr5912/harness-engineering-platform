@@ -1,6 +1,6 @@
 import { assetText } from '../agents/asset-text.ts'
 import { createHash, randomUUID } from 'node:crypto'
-import { workspaceIdentity } from '../workspace.ts'
+import { assistantWorkspaceScope, workspaceIdentity } from '../workspace.ts'
 import { listRepositories, resolveRepository } from './repositories.ts'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
@@ -718,7 +718,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
           if (accepted) submission = { ...submission, state: 'accepted' }
           else if (submission.state === 'pending') submission = { ...submission, state: 'unknown' }
         }
-        return result(true, { ...state, ...(submission ? { submission } : {}), workspace: { ...workspaceIdentity(root), session_cwd: session.header.cwd },
+        return result(true, { ...state, ...(submission ? { submission } : {}), workspace: { ...workspaceIdentity(root), session_cwd: session.header.cwd }, business_workspace: assistantWorkspaceScope(root),
           proposals: state.proposals.map(proposal => proposal.state === 'running' && !busy.has(proposal.id)
             ? { ...proposal, state: 'unknown', error: '原进程已中断，未收到完整回执，请核对实际状态。' } : proposal),
           running: services.running ? services.running(id) : state.running }) as any
@@ -768,7 +768,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         if (args.action === 'context') {
           const modelCatalog = domain === 'agents'
             ? await assistantModelCatalog(() => platform('models/list', {}, exec.signal, managementPeer), exec.signal) : undefined
-          return wireValue({ ok: true, value: { workspace: workspaceIdentity(root), ...(state.repository ? { repository: state.repository } : {}), assistant: { session_id: id, model: state.model ?? null }, context: state.context, task_context: state.task_context,
+          return wireValue({ ok: true, value: { workspace: workspaceIdentity(root), business_workspace: assistantWorkspaceScope(root), ...(state.repository ? { repository: state.repository } : {}), assistant: { session_id: id, model: state.model ?? null }, context: state.context, task_context: state.task_context,
             ...(modelCatalog ? { model_catalog: modelCatalog } : {}), available_actions: actions[domain], next: state.task_context.skill === 'decision-sample-extraction' ? 'datasets/source 读取固定 Run 的来源目录与 extraction_contract' : 'describe(input.action=操作名)可读取单个动作的参数合同' } })
         }
         if (!actions[domain].includes(args.action)) throw new Error('未知的领域操作')

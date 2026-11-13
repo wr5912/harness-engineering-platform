@@ -89,6 +89,69 @@ export function businessAgentPath(assetRoot: string, agentId: string, relative =
   return join(businessAgentsRoot(assetRoot), 'agents', agentId, relative)
 }
 
+export interface AssistantWorkspaceScope {
+  schema_version: 1
+  kind: 'platform-assistant-business-workspace'
+  default_repository_id: 'data'
+  allowed_repository_ids: string[]
+  business_repository_id: 'business-agents'
+  excluded_repository_ids: string[]
+  roles: Record<string, string>
+  roots: { data: string; business_agents: string }
+}
+
+/**
+ * 管理助手的业务范围是逻辑双仓，不把 Git 工作树物理嵌套到另一个仓库。
+ * 契约放在数据仓库 config 中，缺少契约的旧/隔离 fixture 使用同一默认边界。
+ */
+export function assistantWorkspaceScope(assetRoot: string): AssistantWorkspaceScope {
+  const root = resolve(assetRoot)
+  const path = join(root, 'config/assistant-workspace.json')
+  const fallback = {
+    schemaVersion: 1,
+    kind: 'platform-assistant-business-workspace',
+    defaultRepositoryId: 'data',
+    allowedRepositoryIds: ['data', 'business-agents'],
+    businessRepositoryId: 'business-agents',
+    excludedRepositoryIds: ['harness-engineering-platform', 'platform-manager-dsh-home'],
+    roles: {
+      data: 'business-runtime-and-history',
+      'business-agents': 'business-definition-acceptance-and-harness',
+      'harness-engineering-platform': 'tool-source-only',
+      'platform-manager-dsh-home': 'runtime-identity-only',
+    },
+  }
+  let value: any = fallback
+  if (existsSync(path)) {
+    try { value = JSON.parse(readFileSync(path, 'utf8')) }
+    catch { throw new Error(`管理助手业务工作区契约不是有效 JSON：${path}`) }
+  }
+  const isIds = (input: unknown): input is string[] => Array.isArray(input)
+    && input.length > 0 && input.every(item => typeof item === 'string' && /^[a-z][a-z0-9-]*$/.test(item))
+  const allowed = new Set(isIds(value?.allowedRepositoryIds) ? value.allowedRepositoryIds : [])
+  const excluded = new Set(isIds(value?.excludedRepositoryIds) ? value.excludedRepositoryIds : [])
+  const requiredRoles = ['data', 'business-agents', 'harness-engineering-platform', 'platform-manager-dsh-home']
+  if (value?.schemaVersion !== 1 || value.kind !== fallback.kind || value.defaultRepositoryId !== 'data'
+    || value.businessRepositoryId !== 'business-agents' || !isIds(value.allowedRepositoryIds)
+    || value.allowedRepositoryIds.length !== 2 || !allowed.has('data') || !allowed.has('business-agents')
+    || !isIds(value.excludedRepositoryIds) || !excluded.has('harness-engineering-platform') || !excluded.has('platform-manager-dsh-home')
+    || value.excludedRepositoryIds.some((item: string) => allowed.has(item))
+    || !value.roles || typeof value.roles !== 'object' || Array.isArray(value.roles)
+    || requiredRoles.some(item => typeof value.roles[item] !== 'string' || !value.roles[item].trim())) {
+    throw new Error(`管理助手业务工作区契约无效：${path}`)
+  }
+  return {
+    schema_version: 1,
+    kind: value.kind,
+    default_repository_id: 'data',
+    allowed_repository_ids: [...value.allowedRepositoryIds],
+    business_repository_id: 'business-agents',
+    excluded_repository_ids: [...value.excludedRepositoryIds],
+    roles: { ...value.roles },
+    roots: { data: root, business_agents: businessAgentsRoot(root) },
+  }
+}
+
 export function workspaceLocalPath(assetRoot: string, ...parts: string[]): string {
   return join(resolve(assetRoot), '.local', ...parts)
 }

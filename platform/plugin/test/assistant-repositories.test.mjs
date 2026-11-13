@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { SessionStore, appendPluginRecord } from '@deepseek-ai/dsh-session'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
+import { assistantWorkspaceScope } from '../src/workspace.ts'
 import { resolveRepository, listRepositories } from '../src/assistant/repositories.ts'
 import { createAssistant } from '../src/assistant/index.ts'
 import { bindConversationWorkspace } from '../src/conversation-workspace.ts'
@@ -20,7 +21,17 @@ function fixture(t) {
   git('remote', 'add', 'origin', 'git@github.com:fixture/business.git')
   writeFileSync(join(repository, 'AGENTS.md'), '业务仓库项目规则。'); git('add', '.'); git('commit', '-m', 'fixture')
   const entry = { id: 'business-agents', url: 'git@github.com:fixture/business.git', ref: 'main', path: '../business', commit: git('rev-parse', 'HEAD') }
-  const save = () => writeFileSync(join(root, 'config/repositories.json'), JSON.stringify({ schemaVersion: 1, repositories: [entry] }))
+  const save = () => {
+    writeFileSync(join(root, 'config/repositories.json'), JSON.stringify({ schemaVersion: 1, repositories: [entry] }))
+    writeFileSync(join(root, 'config/assistant-workspace.json'), JSON.stringify({
+      schemaVersion: 1, kind: 'platform-assistant-business-workspace', defaultRepositoryId: 'data',
+      allowedRepositoryIds: ['data', 'business-agents'], businessRepositoryId: 'business-agents',
+      excludedRepositoryIds: ['harness-engineering-platform', 'platform-manager-dsh-home'], roles: {
+        data: 'business-runtime-and-history', 'business-agents': 'business-definition-acceptance-and-harness',
+        'harness-engineering-platform': 'tool-source-only', 'platform-manager-dsh-home': 'runtime-identity-only',
+      },
+    }))
+  }
   save()
   return { root, repository, entry, git, save }
 }
@@ -37,8 +48,33 @@ test('按真实 Git identity 解析目标，dirty 不伪装为提交来源，坏
   assert.equal(listed.repositories[0].id, 'data'); assert.equal(listed.repositories[0].available, true)
   assert.equal(listed.repositories[1].available, false)
   assert.throws(() => resolveRepository(f.root, '../business'), /未登记/)
+  assert.throws(() => resolveRepository(f.root, 'harness-engineering-platform'), /业务工作区/)
   f.entry.commit = before.commit; f.entry.agent_path = '../data'; f.save()
   assert.throws(() => resolveRepository(f.root, 'business-agents'), /相对路径/)
+})
+
+test('业务工作区只暴露 data 与 business-agents，程序仓和管理 HOME 保持运行时角色', t => {
+  const f = fixture(t), scope = assistantWorkspaceScope(f.root)
+  assert.deepEqual(scope.allowed_repository_ids, ['data', 'business-agents'])
+  assert.deepEqual(scope.excluded_repository_ids, ['harness-engineering-platform', 'platform-manager-dsh-home'])
+  assert.equal(scope.default_repository_id, 'data')
+  assert.equal(scope.business_repository_id, 'business-agents')
+  assert.equal(scope.roots.data, f.root)
+  assert.equal(scope.roots.business_agents, f.repository)
+  assert.equal(scope.roles['harness-engineering-platform'], 'tool-source-only')
+  assert.equal(scope.roles['platform-manager-dsh-home'], 'runtime-identity-only')
+  writeFileSync(join(f.root, 'config/assistant-workspace.json'), JSON.stringify({
+    schemaVersion: 1, kind: 'platform-assistant-business-workspace', defaultRepositoryId: 'data',
+    allowedRepositoryIds: ['data', 'business-agents', 'harness-engineering-platform'], businessRepositoryId: 'business-agents',
+    excludedRepositoryIds: ['platform-manager-dsh-home'], roles: scope.roles,
+  }))
+  assert.throws(() => assistantWorkspaceScope(f.root), /契约无效/)
+  writeFileSync(join(f.root, 'config/assistant-workspace.json'), JSON.stringify({
+    schemaVersion: 1, kind: 'platform-assistant-business-workspace', defaultRepositoryId: 'data',
+    allowedRepositoryIds: ['data', 'business-agents'], businessRepositoryId: 'business-agents',
+    excludedRepositoryIds: ['harness-engineering-platform'], roles: scope.roles,
+  }))
+  assert.throws(() => assistantWorkspaceScope(f.root), /契约无效/)
 })
 
 test('目标仓库预备会话只创建不投递，续接固定来源且冷恢复不随当前选择漂移', async t => {

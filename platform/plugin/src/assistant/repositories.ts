@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
+import { assistantWorkspaceScope } from '../workspace.ts'
 
 export interface RepositorySnapshot {
   id: string
@@ -51,6 +52,8 @@ function declarations(root: string): Declaration[] {
 }
 export function resolveRepository(root: string, id = 'data'): RepositorySnapshot {
   const data = realpathSync(root)
+  if (id !== 'data' && !/^[a-z][a-z0-9-]*$/.test(id)) throw new Error('目标仓库未登记')
+  if (!assistantWorkspaceScope(data).allowed_repository_ids.includes(id)) throw new Error('目标仓库不在管理助手业务工作区')
   if (id === 'data') {
     const repository = optionalGit(data, ['rev-parse', '--show-toplevel']) === data
     return { id, workspace: data,
