@@ -35,10 +35,15 @@ test('四仓固定SHA并列检出、重复执行幂等，check-only完全不落�
   const first = initializeLab(f)
   assert.equal(first.validation.valid, true, JSON.stringify(first.validation))
   assert.equal(first.validation.agent_count, 1)
+  assert.equal(first.manifest.initializer_version, 2)
   assert.equal(first.manifest.paths.dsh_home, join(f.destination, 'platform-manager-dsh-home'))
-  const before = readFileSync(join(f.destination, '.hep-lab/manifest.yaml'), 'utf8')
+  assert.equal(first.manifest.paths.business_agents_root, join(f.destination, 'business-agents'))
+  assert.equal('runtime' in first.manifest, false)
+  assert.equal(existsSync(join(f.destination, 'hep-lab.yaml')), true)
+  assert.equal(existsSync(join(f.destination, '.hep-lab')), false)
+  const before = readFileSync(join(f.destination, 'hep-lab.yaml'), 'utf8')
   initializeLab({ ...f, reuse: true })
-  assert.equal(readFileSync(join(f.destination, '.hep-lab/manifest.yaml'), 'utf8'), before)
+  assert.equal(readFileSync(join(f.destination, 'hep-lab.yaml'), 'utf8'), before)
   assert.equal(doctorLab(f.destination).valid, true)
   assert.equal(statusLab(f.destination).repositories.business_agents.matches_lock, true)
   assert.equal(planUpdate(f.destination).repositories.every(item => !item.changed), true)
@@ -73,19 +78,14 @@ test('lock不一致先拒绝，不写入目标仓库或用户文件', t => {
   git(data, 'add', '.'); git(data, 'commit', '-qm', 'bad lock'); f.repositories.data.commit = git(data, 'rev-parse', 'HEAD')
   assert.throws(() => initializeLab(f), /输入与仓库锁定/)
   assert.equal(existsSync(join(f.destination, 'business-agents')), false)
-  assert.equal(existsSync(join(f.destination, '.hep-lab/manifest.yaml')), false)
+  assert.equal(existsSync(join(f.destination, 'hep-lab.yaml')), false)
 })
-test('可选运行隔离使用真实git worktree并锁定来源', t => {
-  const f = fixture(t), result = initializeLab({ ...f, isolateRuntime: true })
-  assert.equal(result.validation.valid, true)
-  const manifest = readLab(f.destination)
-  assert.equal(manifest.paths.dsh_home, join(f.destination, '.hep-lab/runtime/dsh-home'))
-  assert.equal(git(manifest.paths.dsh_home, 'rev-parse', 'HEAD'), f.repositories.platform_manager_dsh_home.commit)
-  initializeLab({ ...f, isolateRuntime: true, reuse: true })
-  writeFileSync(join(manifest.paths.dsh_home, 'README.md'), 'dirty')
-  assert.throws(() => initializeLab({ ...f, isolateRuntime: true, reuse: true }), /未提交/)
+test('拒绝已移除的元数据目录', t => {
+  const f = fixture(t)
+  mkdirSync(join(f.destination, '.hep-lab'), { recursive: true })
+  assert.throws(() => initializeLab(f), /已移除的 \.hep-lab 元数据目录/)
 })
-test('doctor拒绝tracked凭据、runtime目录、嵌套repo和Registry错绑', t => {
+test('doctor拒绝tracked凭据、嵌套repo和Registry错绑', t => {
   const f = fixture(t); initializeLab(f)
   const business = join(f.destination, 'business-agents')
   git(business, 'config', 'user.name', 'Lab Test'); git(business, 'config', 'user.email', 'lab@example.invalid')
@@ -97,14 +97,14 @@ test('doctor拒绝tracked凭据、runtime目录、嵌套repo和Registry错绑', 
   const manifest = readLab(f.destination); manifest.repositories.business_agents.commit = git(business, 'rev-parse', 'HEAD')
   rmSync(join(business, 'nested'), { recursive: true })
   const config = JSON.stringify(manifest)
-  writeFileSync(join(f.destination, '.hep-lab/manifest.yaml'), config)
+  writeFileSync(join(f.destination, 'hep-lab.yaml'), config)
   const unsafe = doctorLab(f.destination)
   assert.ok(unsafe.issues.some(item => item.code === 'runtime_or_secret_path'))
   assert.ok(unsafe.issues.some(item => item.code === 'agent_reference'))
   mkdirSync(join(business, 'nested')); git(join(business, 'nested'), 'init', '-b', 'main')
   writeFileSync(join(business, '.gitignore'), '.env\nsessions/\nnode_modules/\nnested/\n')
   git(business, 'add', '.gitignore'); git(business, 'commit', '-qm', 'ignore nested'); manifest.repositories.business_agents.commit = git(business, 'rev-parse', 'HEAD')
-  writeFileSync(join(f.destination, '.hep-lab/manifest.yaml'), JSON.stringify(manifest))
+  writeFileSync(join(f.destination, 'hep-lab.yaml'), JSON.stringify(manifest))
   assert.ok(doctorLab(f.destination).issues.some(item => item.code === 'nested_repository'))
 })
 test('输入拒绝含凭据URL、选项伪装、短SHA和符号链接目的地', t => {
@@ -120,7 +120,7 @@ test('输入拒绝含凭据URL、选项伪装、短SHA和符号链接目的地',
 })
 test('CLI不接受update执行和未知参数，不回显Git凭据诊断', t => {
   const cli = new URL('../cli.mts', import.meta.url).pathname
-  for (const args of [['update', '--lab', '/missing'], ['status', '--lab', '/missing', '--force'], ['init', '--destination', '/missing']]) {
+  for (const args of [['update', '--lab', '/missing'], ['status', '--lab', '/missing', '--force'], ['init', '--destination', '/missing'], ['init', '--destination', '/missing', '--isolate-runtime']]) {
     const result = spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' })
     assert.equal(result.status, 2)
     assert.ok(result.stderr.startsWith('hep-lab:'))
@@ -162,6 +162,6 @@ test('doctor只解析原生Profile，报告不存在引用与机器依赖并容�
 })
 test('损坏YAML只输出格式错误，不泄漏正文内容', t => {
   const f = fixture(t); initializeLab(f)
-  writeFileSync(join(f.destination, '.hep-lab/manifest.yaml'), 'secret: [DO_NOT_PRINT_THE_PAYLOAD')
+  writeFileSync(join(f.destination, 'hep-lab.yaml'), 'secret: [DO_NOT_PRINT_THE_PAYLOAD')
   assert.throws(() => readLab(f.destination), error => error.message.includes('YAML') && !error.message.includes('DO_NOT_PRINT'))
 })

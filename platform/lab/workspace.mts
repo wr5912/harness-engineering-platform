@@ -12,11 +12,10 @@ export interface RepositoryInput { url: string; ref?: string; commit?: string }
 export interface RepositoryState extends RepositoryInput { commit: string; path: string }
 export interface LabManifest {
   schema_version: 1
-  initializer_version: 1
+  initializer_version: 2
   created_at: string
   repositories: Record<RepositoryKey, RepositoryState>
   paths: { dsh_home: string; business_agents_root: string }
-  runtime: { isolation: boolean }
 }
 export interface InitOptions {
   destination: string
@@ -24,7 +23,6 @@ export interface InitOptions {
   allowFloatingRef?: boolean
   checkOnly?: boolean
   reuse?: boolean
-  isolateRuntime?: boolean
 }
 export interface Finding { code: string; path?: string; message: string }
 const commitPattern = /^[0-9a-f]{40}$/
@@ -122,20 +120,21 @@ function resolveRemote(input: RepositoryInput): string {
   if (input.commit && found !== input.commit) fail('仓库 ref 与指定 commit 不一致')
   return found
 }
-function manifestPath(lab: string) { return join(resolve(lab), '.hep-lab/manifest.yaml') }
+function manifestPath(lab: string) { return join(resolve(lab), 'hep-lab.yaml') }
+function legacyMetadataPath(lab: string) { return join(resolve(lab), '.hep-lab') }
 export function readLab(lab: string): LabManifest {
   const root = resolve(lab)
   safeDirectory(root)
+  if (existsSync(legacyMetadataPath(root))) fail('检测到已移除的 .hep-lab 元数据目录，请清理后重新初始化')
   const manifest = readYaml(manifestPath(root)) as LabManifest
-  if (manifest?.schema_version !== 1 || manifest.initializer_version !== 1 || !manifest.repositories || typeof manifest.runtime?.isolation !== 'boolean') fail('hep-lab 清单格式无效')
+  if (manifest?.schema_version !== 1 || manifest.initializer_version !== 2 || !manifest.repositories) fail('hep-lab 清单版本不受支持，请重新初始化')
   for (const key of keys) {
     const item = manifest.repositories[key]
     inputOf(item)
     if (!commitPattern.test(item?.commit) || item.path !== join(root, repositoryNames[key])) fail(`hep-lab 仓库清单路径或提交无效：${key}`)
   }
-  const runtime = manifest.runtime.isolation ? join(root, '.hep-lab/runtime') : root
-  if (manifest.paths?.dsh_home !== join(runtime, manifest.runtime.isolation ? 'dsh-home' : repositoryNames.platform_manager_dsh_home)
-    || manifest.paths.business_agents_root !== join(runtime, repositoryNames.business_agents)) fail('hep-lab 运行路径无效')
+  if (manifest.paths?.dsh_home !== join(root, repositoryNames.platform_manager_dsh_home)
+    || manifest.paths.business_agents_root !== join(root, repositoryNames.business_agents)) fail('hep-lab 运行路径无效')
   return manifest
 }
 export function statusLab(lab: string) {
@@ -257,8 +256,8 @@ export function initializeLab(options: InitOptions) {
   const root = resolve(options.destination)
   safeDirectory(root)
   const inputs = Object.fromEntries(keys.map(key => [key, inputOf(options.repositories[key])])) as Record<RepositoryKey, RepositoryInput>
+  if (existsSync(legacyMetadataPath(root))) fail('目标目录包含已移除的 .hep-lab 元数据目录，请清理后重新初始化')
   const existingManifest = existsSync(manifestPath(root)) ? readLab(root) : undefined
-  if (existingManifest && existingManifest.runtime.isolation !== Boolean(options.isolateRuntime)) fail('运行隔离模式与既有清单不同')
   let locks = existsSync(join(root, repositoryNames.data, '.git')) ? repositoryLocks(join(root, repositoryNames.data)) : {}
   const states = {} as Record<RepositoryKey, RepositoryState>
   // 在任何写入前检查全部已存在工作树，避免后续失败覆盖用户改动。
@@ -267,7 +266,7 @@ export function initializeLab(options: InitOptions) {
     const state = inspectRepository(join(root, repositoryNames[key]), inputs[key], Boolean(options.reuse))
     if (state) states[key] = state
   }
-  const allowed = new Set([...Object.values(repositoryNames), '.hep-lab'])
+  const allowed = new Set([...Object.values(repositoryNames), 'hep-lab.yaml'])
   if (existsSync(root) && readdirSync(root).some(name => !allowed.has(name))) fail('目标目录含非 hep-lab 内容，请使用空目录')
   for (const key of keys) {
     if (!inputs[key].commit && !options.allowFloatingRef) fail(`${key} 缺少 commit 锁定；开发环境可显式使用 --allow-floating-ref`)
@@ -275,7 +274,7 @@ export function initializeLab(options: InitOptions) {
     if (states[key] && states[key].commit !== commit) fail(`已有仓库与远端 ref 不一致：${key}`)
     inputs[key] = { ...inputs[key], commit }
   }
-  if (options.checkOnly) return { check_only: true, repositories: inputs, existing: Object.keys(states), runtime: { isolation: Boolean(options.isolateRuntime) } }
+  if (options.checkOnly) return { check_only: true, repositories: inputs, existing: Object.keys(states) }
   mkdirSync(root, { recursive: true })
   // 先检出数据，再校验其锁定；锁冲突仅保留新检出的数据，不继续其他仓库。
   for (const key of ['data', ...keys.filter(key => key !== 'data')] as RepositoryKey[]) {
@@ -292,21 +291,8 @@ export function initializeLab(options: InitOptions) {
       for (const candidate of keys) inputs[candidate] = withLock(inputs[candidate], locks[candidate])
     }
   }
-  let runtime = root
-  if (options.isolateRuntime) {
-    runtime = join(root, '.hep-lab/runtime')
-    mkdirSync(runtime, { recursive: true, mode: 0o700 })
-    for (const [key, name] of [['platform_manager_dsh_home', 'dsh-home'], ['business_agents', 'business-agents']] as const) {
-      const path = join(runtime, name)
-      if (!existsSync(path)) git(states[key].path, ['worktree', 'add', '--detach', path, states[key].commit])
-      else {
-        clean(path)
-        if (git(path, ['rev-parse', 'HEAD']) !== states[key].commit || realpathSync(git(path, ['rev-parse', '--git-common-dir'])) !== realpathSync(join(states[key].path, '.git'))) fail('已有运行工作树来源不一致')
-      }
-    }
-  }
-  const manifest: LabManifest = { schema_version: 1, initializer_version: 1, created_at: existingManifest?.created_at ?? new Date().toISOString(), repositories: Object.fromEntries(keys.map(key => [key, states[key]])) as Record<RepositoryKey, RepositoryState>,
-    paths: { dsh_home: join(runtime, options.isolateRuntime ? 'dsh-home' : repositoryNames.platform_manager_dsh_home), business_agents_root: join(runtime, 'business-agents') }, runtime: { isolation: Boolean(options.isolateRuntime) } }
+  const manifest: LabManifest = { schema_version: 1, initializer_version: 2, created_at: existingManifest?.created_at ?? new Date().toISOString(), repositories: Object.fromEntries(keys.map(key => [key, states[key]])) as Record<RepositoryKey, RepositoryState>,
+    paths: { dsh_home: join(root, repositoryNames.platform_manager_dsh_home), business_agents_root: join(root, repositoryNames.business_agents) } }
   const validation = inspectLab(manifest)
   writeYaml(manifestPath(root), { ...manifest, validation })
   return { manifest, validation, start: { command: join(states.platform.path, 'platform/dsh-platform'), args: ['start'], environment: { HARNESS_PROGRAM_ROOT: states.platform.path, HARNESS_ASSET_ROOT: states.data.path, HARNESS_MANAGER_DSH_HOME: manifest.paths.dsh_home } } }

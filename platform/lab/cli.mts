@@ -20,7 +20,6 @@ const usage = `用法：
     --check-only          只验证输入与已有目录，不 clone/fetch/写入
     --reuse               复用 origin、版本均一致且干净的仓库
     --allow-floating-ref  开发环境显式允许解析分支，清单仍记录实际 SHA
-    --isolate-runtime    从已锁定提交创建独立管理 HOME 和业务仓库 worktree
   platform/hep-lab status --lab <目录> [--json] [--request-id <id>]
   platform/hep-lab doctor --lab <目录> [--json] [--request-id <id>]
   platform/hep-lab update --lab <目录> --plan-only [--json] [--request-id <id>]
@@ -39,7 +38,7 @@ function failure(error: unknown) {
 }
 try {
   const options: Record<string, { type: 'string' | 'boolean' }> = Object.fromEntries([
-    ...['help', 'version', 'check-only', 'reuse', 'allow-floating-ref', 'isolate-runtime', 'plan-only', 'json'].map(name => [name, { type: 'boolean' as const }]),
+    ...['help', 'version', 'check-only', 'reuse', 'allow-floating-ref', 'plan-only', 'json'].map(name => [name, { type: 'boolean' as const }]),
     ...['destination', 'lab', 'request-id', ...Object.values(prefixes).flatMap(prefix => ['repository', 'ref', 'commit'].map(suffix => `${prefix}-${suffix}`))].map(name => [name, { type: 'string' as const }]),
   ])
   const { values, positionals } = parseArgs({ options, allowPositionals: true })
@@ -53,7 +52,7 @@ try {
   else {
     if (positionals.length !== 1) throw new Error('只能指定一个 hep-lab 命令')
     const command = positionals[0]
-    const initNames = ['destination', 'check-only', 'reuse', 'allow-floating-ref', 'isolate-runtime', 'request-id', ...Object.values(prefixes).flatMap(prefix => ['repository', 'ref', 'commit'].map(suffix => `${prefix}-${suffix}`))]
+    const initNames = ['destination', 'check-only', 'reuse', 'allow-floating-ref', 'request-id', ...Object.values(prefixes).flatMap(prefix => ['repository', 'ref', 'commit'].map(suffix => `${prefix}-${suffix}`))]
     const allowed = command === 'init' ? initNames : command === 'update' ? ['lab', 'plan-only', 'request-id'] : ['lab', 'request-id']
     for (const name of Object.keys(values)) if (!['json', ...allowed].includes(name)) throw new Error(`当前命令不支持 --${name}`)
     let result: any
@@ -65,7 +64,7 @@ try {
         return [key, { url, ...(ref ? { ref: String(ref) } : {}), ...(commit ? { commit: String(commit) } : {}) } as RepositoryInput]
       })) as Record<RepositoryKey, RepositoryInput>
       result = initializeLab({ destination: values.destination, repositories, checkOnly: values['check-only'] === true, reuse: values.reuse === true,
-        allowFloatingRef: values['allow-floating-ref'] === true, isolateRuntime: values['isolate-runtime'] === true })
+        allowFloatingRef: values['allow-floating-ref'] === true })
       if (result.validation && !result.validation.valid) process.exitCode = 1
     } else {
       if (typeof values.lab !== 'string') throw new Error('需要 --lab <目录>')
