@@ -100,7 +100,7 @@ lock_value() {
   awk -v section="$section" -v field="$field" '
     $0 == "  " section ":" { inside=1; next }
     inside && $0 ~ /^  [^ ]/ { inside=0 }
-    inside && $1 == field ":" { sub(/^[^:]+:[[:space:]]*/, "", $0); gsub(/^['\"]|['\"]$/, "", $0); print; exit }
+    inside && $1 == field ":" { sub(/^[^:]+:[[:space:]]*/, "", $0); gsub(/^["\047]|["\047]$/, "", $0); print; exit }
   ' "$file"
 }
 
