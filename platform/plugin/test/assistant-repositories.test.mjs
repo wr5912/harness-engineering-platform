@@ -61,6 +61,7 @@ test('业务工作区只暴露 data 与 business-agents，程序仓和管理 HOM
   assert.equal(scope.business_repository_id, 'business-agents')
   assert.equal(scope.roots.data, f.root)
   assert.equal(scope.roots.business_agents, f.repository)
+  assert.equal(scope.manager_workspace_root, join(f.root, '..', 'manager-workspace'))
   assert.equal(scope.roles['harness-engineering-platform'], 'tool-source-only')
   assert.equal(scope.roles['platform-manager-dsh-home'], 'runtime-identity-only')
   writeFileSync(join(f.root, 'config/assistant-workspace.json'), JSON.stringify({
