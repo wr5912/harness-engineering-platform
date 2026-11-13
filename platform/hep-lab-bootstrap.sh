@@ -56,11 +56,7 @@ sha "$DATA_COMMIT"
 need_command git
 need_command node
 
-NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)
-case "$NODE_MAJOR" in
-  ''|*[!0-9]*) fail "无法读取 Node.js 版本" ;;
-esac
-[ "$NODE_MAJOR" -ge 24 ] || fail "需要 Node.js 24 或更新版本，当前为 $(node -p 'process.versions.node')"
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 24 || (major === 24 && minor >= 9) ? 0 : 1)' || fail "需要 Node.js 24.9 或更新版本，当前为 $(node -p 'process.versions.node')"
 
 case "$DESTINATION" in
   /*) ;;

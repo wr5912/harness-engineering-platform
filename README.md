@@ -29,7 +29,7 @@ Harness 工程平台（Harness Engineering Platform，简称 HEP）面向个人�
 
 ## 快速启动
 
-准备 Node.js 24、pnpm、与[插件兼容声明](platform/plugin/package.json)匹配的系统全局 DSH，以及 Python 3.10 及以上版本和 PyYAML。业务实例另需 Docker 和匹配的标准 Runtime 镜像；目标架构与依赖准备见[源码主机部署](docs/platform-design/23_离线一键打包与安装.md#源码主机部署)。
+准备 Node.js 24.9 及以上版本、pnpm、与[插件兼容声明](platform/plugin/package.json)匹配的系统全局 DSH，以及 Python 3.10 及以上版本和 PyYAML。Node.js 下限遵循当前 DSH 的 `engines.node`；Python 入口与算法使用 3.10 类型能力。工作区控制工具单独支持 Node.js 22.18 及以上版本，不需要 Python。业务实例另需 Docker 和匹配的标准 Runtime 镜像；目标架构与依赖准备见[源码主机部署](docs/platform-design/23_离线一键打包与安装.md#源码主机部署)。
 
 ```bash
 git clone https://github.com/wr5912/harness-engineering-platform.git

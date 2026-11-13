@@ -50,7 +50,7 @@ export function installRuntime(bundle: string, prefix: string, dataRoot: string)
   } else if (existsSync(join(offline, 'node', 'bin', 'node'))) {
     copyTree(join(offline, 'node'), nodeDirectory)
   } else {
-    throw new Error('安装包缺少 Node 24 运行时')
+    throw new Error('安装包缺少 Node 24.9 及以上运行时')
   }
   const node = join(nodeDirectory, 'bin', 'node')
   if (!existsSync(node)) throw new Error('包内 Node 运行时缺少 bin/node')
@@ -160,7 +160,7 @@ exec "$BASE/../platform/dsh-platform" start "$@"
   if (pnpm) versions.pnpm = toolVersion(pnpm, ['--version'], env)
   versions.git = gitVersion
   if (dsh) versions.dsh = toolVersion(node, [dsh, '--version'], env)
-  run(node, ['-e', 'if(Number(process.versions.node.split(".")[0])<24) process.exit(1)'], { env })
+  run(node, ['-e', 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 24 || (major === 24 && minor < 9)) process.exit(1)'], { env })
   run(python, ['-c', 'import sys,yaml; assert sys.version_info >= (3,10)'], { env })
   const expected = JSON.parse(readFileSync(join(prefix, 'platform/plugin/package.json'), 'utf8')).peerDependencies['@deepseek-ai/dsh-client-connection']
   if (versions.dsh !== expected) throw new Error(`包内 DSH ${versions.dsh} 与平台 ${expected} 不兼容`)

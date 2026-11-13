@@ -122,7 +122,8 @@ export async function createBootstrapServer(options: BootstrapOptions) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('初始化服务需要 Node.js 24 或更新版本')
+    const [major, minor] = process.versions.node.split('.').map(Number)
+    if (major < 24 || (major === 24 && minor < 9)) throw new Error('初始化服务需要 Node.js 24.9 或更新版本')
     if (process.argv[2] === '--check') console.log(JSON.stringify(await inspectWorkspace(process.argv[3])))
     else {
       const options = JSON.parse(process.env.HARNESS_BOOTSTRAP_OPTIONS || '{}')
@@ -131,5 +132,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       process.once('SIGTERM', () => instance.close().then(() => process.exit(0)))
       process.once('SIGINT', () => instance.close().then(() => process.exit(130)))
     }
-  } catch { console.error('初始化入口无法启动，请检查 Node.js 24、目录权限和端口状态'); process.exitCode = 1 }
+  } catch { console.error('初始化入口无法启动，请检查 Node.js 24.9 及以上版本、目录权限和端口状态'); process.exitCode = 1 }
 }

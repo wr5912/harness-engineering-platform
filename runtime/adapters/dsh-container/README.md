@@ -12,7 +12,7 @@ export HARNESS_ASSET_ROOT="$HOME/harness-engineering-platform-data"
 /usr/bin/python3 runtime/adapters/dsh-container/dsh-dev --repo "$HARNESS_ASSET_ROOT" ps --all
 ```
 
-程序保留 `source.lock.json`、运行适配器与校验 Skill；数据工作区保留 `workspace.json`、`config/`、`agents/` 和 `evolution/`。当前装载不依赖全局来源表；固定历史提交的恢复只兼容该提交自身的旧声明，具体合同见[版本身份与装载声明](../../../docs/platform-design/03_存储架构与数据契约.md#版本身份与装载声明)。校验器从程序侧读取规范与实现，不要求把程序文档复制到数据仓库。评测工具使用 Python 3.10 或更新版本，TypeScript 入口需要 Node.js 24；检查 PATH 时应同时核对这两个版本。
+程序保留 `source.lock.json`、运行适配器与校验 Skill；数据工作区保留 `workspace.json`、`config/`、`agents/` 和 `evolution/`。当前装载不依赖全局来源表；固定历史提交的恢复只兼容该提交自身的旧声明，具体合同见[版本身份与装载声明](../../../docs/platform-design/03_存储架构与数据契约.md#版本身份与装载声明)。校验器从程序侧读取规范与实现，不要求把程序文档复制到数据仓库。评测工具使用 Python 3.10 或更新版本，TypeScript 入口需要 Node.js 24.9 或更新版本；检查 PATH 时应同时核对这两个版本。
 
 ## SDK 无界面调用
 

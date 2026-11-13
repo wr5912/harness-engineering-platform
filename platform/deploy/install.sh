@@ -17,9 +17,8 @@ if [ -z "$NODE" ]; then
   exit 4
 fi
 VERSION=$("$NODE" -p "process.versions.node")
-MAJOR=$(printf '%s' "$VERSION" | cut -d. -f1)
-if [ "$MAJOR" -lt 24 ]; then
-  echo "install: 需要 Node 24 或更新版本，当前为 $VERSION" >&2
+if ! "$NODE" -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 24 || (major === 24 && minor >= 9) ? 0 : 1)'; then
+  echo "install: 需要 Node 24.9 或更新版本，当前为 $VERSION" >&2
   exit 4
 fi
 "$NODE" "$ROOT/program/platform/deploy/cli.mts" install --bundle-root "$ROOT" "$@"

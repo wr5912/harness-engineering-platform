@@ -3,7 +3,7 @@ HEP_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 if [ -f "$HEP_ROOT/bin/hep-env.sh" ]; then
   . "$HEP_ROOT/bin/hep-env.sh"
 fi
-if ! command -v node >/dev/null 2>&1 || ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 24 ? 0 : 1)'; then
-  echo "hep: 需要可执行的 Node.js 24 或更新版本" >&2
+if ! command -v node >/dev/null 2>&1 || ! node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 24 || (major === 24 && minor >= 9) ? 0 : 1)'; then
+  echo "hep: 需要可执行的 Node.js 24.9 或更新版本" >&2
   exit 2
 fi

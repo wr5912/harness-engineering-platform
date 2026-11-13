@@ -102,7 +102,7 @@ test('安装环境不依赖解包目录，特殊路径按原值进入 shell，Gi
   assert.notEqual(installed.versions.git, 'unknown')
   assert.ok(installed.git.startsWith(prefix))
   renameSync(path, path + '-moved')
-  const result = spawnSync('/bin/sh', ['-c', '. "$1/bin/hep-env.sh"; "$HEP_NODE" -p "JSON.stringify([process.env.HARNESS_PROGRAM_ROOT, process.env.HARNESS_ASSET_ROOT])"; git --version; "$HEP_PYTHON" -c "import hep_install_probe; print(hep_install_probe.VALUE)"', 'sh', prefix], { cwd: root, encoding: 'utf8' })
+  const result = spawnSync('/bin/sh', ['-c', '. "$1/bin/hep-env.sh"; "$HEP_NODE" -p "JSON.stringify([process.env.HARNESS_PROGRAM_ROOT, process.env.HARNESS_ASSET_ROOT])"; git --version; "$HEP_PYTHON" -c "import hep_install_probe; print(hep_install_probe.VALUE)"', 'sh', prefix], { cwd: root, env: { ...process.env, HARNESS_ASSET_ROOT: '' }, encoding: 'utf8' })
   assert.equal(result.status, 0, result.stderr)
   assert.deepEqual(JSON.parse(result.stdout.split('\n')[0]), [prefix, data])
   assert.match(result.stdout, /git-version-bundled/)

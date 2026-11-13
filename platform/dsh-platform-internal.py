@@ -940,13 +940,13 @@ def prepare(home, offline=False):
 def bootstrap_state():
     node = shutil.which("node")
     if not node:
-        raise PlatformError("初始化检查需要 Node.js 24 或更新版本；请安装后将 node 加入 PATH。")
+        raise PlatformError("初始化检查需要 Node.js 24.9 或更新版本；请安装后将 node 加入 PATH。")
     try:
         result = subprocess.run([node, str(REPO / "platform/bootstrap/server.ts"), "--check", str(asset_root())],
                                 capture_output=True, text=True, check=True, timeout=15)
         return json.loads(result.stdout)
     except (OSError, ValueError, subprocess.SubprocessError):
-        raise PlatformError("无法检查数据工作区；请核对 Node.js 24、Git 与数据目录读取权限。") from None
+        raise PlatformError("无法检查数据工作区；请核对 Node.js 24.9 及以上版本、Git 与数据目录读取权限。") from None
 
 
 def initialize_from_browser(host, port):
