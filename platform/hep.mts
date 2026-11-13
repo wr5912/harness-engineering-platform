@@ -15,7 +15,7 @@ const domains: Record<Domain, { description: string; command: string[] }> = {
   agent: { description: 'Agent 资产、版本、迁移与融合', command: ['node', '--experimental-transform-types', join(PLATFORM_ROOT, 'plugin/src/agents/cli.ts')] },
   eval: { description: '确定性评测与 DSH 评测执行器', command: [join(PROJECT_ROOT, 'runtime/adapters/dsh-container/dsh-eval')] },
   instance: { description: 'DSH 实例创建、启停、重载和状态', command: [join(PROJECT_ROOT, 'runtime/adapters/dsh-container/dsh-dev')] },
-  mcp: { description: 'MCP 数据迁移；配置与组合管理使用平台 MCP 页面/RPC', command: ['node', join(PLATFORM_ROOT, 'deploy/cli.mts'), 'mcp-migrate'] },
+  mcp: { description: 'MCP 清单校验、组合读取与迁移；配置保存使用平台 GUI/RPC', command: ['node', join(PLATFORM_ROOT, 'mcp-cli.mts')] },
 }
 
 function json(value: unknown) { process.stdout.write(JSON.stringify(value, null, 2) + '\n') }
@@ -53,6 +53,10 @@ try {
   if (!(command in domains)) throw Object.assign(new Error(`未知命令：${command}`), { code: 'unknown_command' })
   const spec = domains[command as Domain]
   const args = argv.slice(1)
+  if (command === 'mcp' && args[0] === 'migrate') {
+    spec.command = ['node', join(PLATFORM_ROOT, 'deploy/cli.mts'), 'mcp-migrate']
+    args.shift()
+  }
   const result = spawnSync(spec.command[0], [...spec.command.slice(1), ...args], { cwd: PROJECT_ROOT, stdio: 'inherit', env: process.env })
   if (result.error) throw result.error
   process.exitCode = result.status ?? 1

@@ -61,3 +61,17 @@ test('unknown hep command has a machine-readable error', () => {
   assert.equal(value.error.code, 'unknown_command')
 })
 
+test('hep mcp exposes read-only catalog and composition receipts', () => {
+  const dataRoot = join(project, '..', 'harness-engineering-platform-data')
+  const catalog = run(hep, ['mcp', 'catalog', '--data-root', dataRoot, '--json'])
+  assert.equal(catalog.status, 0, catalog.stderr)
+  const catalogValue = JSON.parse(catalog.stdout)
+  assert.equal(catalogValue.status, 'succeeded')
+  assert.equal(catalogValue.value.registered_count, 11)
+  assert.ok(catalogValue.value.manager.server_ids.includes('ai-soc-master'))
+  const shown = run(hep, ['mcp', 'show', '--data-root', dataRoot, '--id', 'inspection-baseline', '--json'])
+  assert.equal(shown.status, 0, shown.stderr)
+  const shownValue = JSON.parse(shown.stdout)
+  assert.equal(shownValue.value.composition.id, 'inspection-baseline')
+})
+
