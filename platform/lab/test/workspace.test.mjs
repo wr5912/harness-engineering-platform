@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import test from 'node:test'
 import { doctorLab, initializeLab, planUpdate, readLab, repositoryNames, statusLab } from '../workspace.mts'
 
@@ -222,6 +222,39 @@ test('doctor只解析原生Profile，报告不存在引用与机器依赖并容�
   assert.ok(issue.issues.some(item => item.code === 'profile_configuration'))
   writeFileSync(join(localHome, 'profiles/web/package.json'), '{"dsh":{"profile":{"bundles":[]}},"dependencies":{"fixture":"file:/machine/plugin.tgz"}}')
   assert.ok(doctorLab(f.destination).issues.some(item => item.code === 'profile_configuration' && item.message.includes('绝对路径')))
+})
+test('doctor复用 PATH 中 DSH 的原生 bundle 解析，只报告真正缺失的依赖', t => {
+  const f = fixture(t), home = f.repositories.platform_manager_dsh_home.url
+  const bin = join(f.root, 'bin'), installation = join(f.root, 'cli'), entry = join(installation, 'bin.js')
+  const native = join(installation, 'node_modules/@deepseek-ai/dsh-app-boot')
+  mkdirSync(bin); mkdirSync(native, { recursive: true }); writeFileSync(entry, '')
+  symlinkSync(entry, join(bin, 'dsh'))
+  writeFileSync(join(native, 'package.json'), JSON.stringify({ main: 'index.cjs' }))
+  writeFileSync(join(native, 'index.cjs'), `exports.resolveBundleDir = (bin, name, anchor, profile) => {
+    require('node:assert/strict').equal(bin, 'dsh');
+    require('node:assert/strict').equal(anchor, ${JSON.stringify(entry)});
+    require('node:assert/strict').ok(profile.endsWith('/profiles/web'));
+    if (name === '@fixture/in-box') return '/native/bundle';
+    throw new Error('missing bundle');
+  }`)
+  writeFileSync(join(home, 'profiles/web/package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@fixture/in-box', '@fixture/missing'] } } }))
+  git(home, 'add', '.'); git(home, 'commit', '-qm', 'installation bundles'); f.repositories.platform_manager_dsh_home.commit = git(home, 'rev-parse', 'HEAD')
+  const previousEntry = process.env.HARNESS_DSH_ENTRY, previousPath = process.env.PATH
+  t.after(() => {
+    if (previousEntry === undefined) delete process.env.HARNESS_DSH_ENTRY; else process.env.HARNESS_DSH_ENTRY = previousEntry
+    if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath
+  })
+  delete process.env.HARNESS_DSH_ENTRY; process.env.PATH = bin + delimiter + (previousPath ?? '')
+  const report = initializeLab(f).validation
+  assert.equal(report.valid, true, JSON.stringify(report))
+  const pending = report.warnings.filter(item => item.code === 'profile_dependency_pending')
+  assert.equal(pending.length, 1)
+  assert.match(pending[0].message, /@fixture\/missing/)
+  // 没有 CLI 时，以包清单识别本地 bundle，不要求它导出 JavaScript 入口。
+  process.env.HARNESS_DSH_ENTRY = join(f.root, 'missing-cli')
+  const localBundle = join(f.destination, 'platform-manager-dsh-home/profiles/web/node_modules/@fixture/in-box')
+  mkdirSync(localBundle, { recursive: true }); writeFileSync(join(localBundle, 'package.json'), '{"exports":{}}')
+  assert.deepEqual(doctorLab(f.destination).warnings.filter(item => item.code === 'profile_dependency_pending'), pending)
 })
 test('损坏YAML只输出格式错误，不泄漏正文内容', t => {
   const f = fixture(t); initializeLab(f)

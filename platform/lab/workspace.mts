@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { delimiter, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 
@@ -250,6 +250,14 @@ export function inspectLab(manifest: LabManifest) {
 function inspectProfiles(home: string, expected: string | undefined, issues: Finding[], warnings: Finding[]) {
   const profiles = join(home, 'profiles')
   if (!existsSync(profiles)) return
+  const entry = process.env.HARNESS_DSH_ENTRY || (process.env.PATH ?? '').split(delimiter).map(path => join(path, 'dsh')).find(path => existsSync(path))
+  let resolveBundle: ((name: string, profile: string) => unknown) | undefined
+  try {
+    if (entry) {
+      const anchor = realpathSync(entry), native = createRequire(anchor)('@deepseek-ai/dsh-app-boot')
+      resolveBundle = (name, profile) => native.resolveBundleDir('dsh', name, anchor, profile)
+    }
+  } catch { /* 未安装 DSH 时仍可静态检查 Profile 本地依赖。 */ }
   const library = yaml(), schema = library.DEFAULT_SCHEMA.extend([new library.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (value: string) => value })])
   for (const entry of readdirSync(profiles, { withFileTypes: true })) {
     if (!entry.isDirectory() || entry.name === 'node_modules') continue
@@ -266,7 +274,10 @@ function inspectProfiles(home: string, expected: string | undefined, issues: Fin
       const resolver = createRequire(manifestPath)
       for (const name of value.dsh.profile.bundles) {
         if (typeof name !== 'string') fail('Profile bundle 名称无效')
-        try { resolver.resolve(name) } catch { warnings.push({ code: 'profile_dependency_pending', path: profile, message: `Profile bundle ${name} 尚未安装；请运行平台 prepare` }) }
+        try {
+          if (resolveBundle) resolveBundle(name, profile)
+          else if (!(resolver.resolve.paths(name) ?? []).some(path => existsSync(join(path, name, 'package.json')))) throw new Error('bundle not installed')
+        } catch { warnings.push({ code: 'profile_dependency_pending', path: profile, message: `Profile bundle ${name} 尚未安装；请运行平台 prepare` }) }
       }
       for (const file of ['cordis.yml', 'cordis.patch.yml'].filter(name => existsSync(join(profile, name)))) {
         const path = join(profile, file), source = readFileSync(path, 'utf8')
