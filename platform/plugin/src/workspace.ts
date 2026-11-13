@@ -97,7 +97,19 @@ export interface AssistantWorkspaceScope {
   business_repository_id: 'business-agents'
   excluded_repository_ids: string[]
   roles: Record<string, string>
+  manager_workspace_root: string
   roots: { data: string; business_agents: string }
+}
+
+export function managerWorkspaceRoot(assetRoot: string): string {
+  const explicit = process.env.HARNESS_MANAGER_WORKSPACE_ROOT
+  if (explicit) return resolve(explicit)
+  const config = join(resolve(assetRoot), 'config/assistant-workspace.json')
+  try {
+    const value = JSON.parse(readFileSync(config, 'utf8'))
+    if (typeof value?.workspaceRoot === 'string' && value.workspaceRoot && !isAbsolute(value.workspaceRoot)) return resolve(assetRoot, value.workspaceRoot)
+  } catch { /* 契约校验在 assistantWorkspaceScope 中报告；旧 fixture 使用默认入口。 */ }
+  return resolve(assetRoot, '..', 'manager-workspace')
 }
 
 /**
@@ -120,6 +132,7 @@ export function assistantWorkspaceScope(assetRoot: string): AssistantWorkspaceSc
       'harness-engineering-platform': 'tool-source-only',
       'platform-manager-dsh-home': 'runtime-identity-only',
     },
+    workspaceRoot: '../manager-workspace',
   }
   let value: any = fallback
   if (existsSync(path)) {
@@ -131,11 +144,14 @@ export function assistantWorkspaceScope(assetRoot: string): AssistantWorkspaceSc
   const allowed = new Set(isIds(value?.allowedRepositoryIds) ? value.allowedRepositoryIds : [])
   const excluded = new Set(isIds(value?.excludedRepositoryIds) ? value.excludedRepositoryIds : [])
   const requiredRoles = ['data', 'business-agents', 'harness-engineering-platform', 'platform-manager-dsh-home']
+  const configuredWorkspaceRoot = value?.workspaceRoot ?? '../manager-workspace'
   if (value?.schemaVersion !== 1 || value.kind !== fallback.kind || value.defaultRepositoryId !== 'data'
     || value.businessRepositoryId !== 'business-agents' || !isIds(value.allowedRepositoryIds)
     || value.allowedRepositoryIds.length !== 2 || !allowed.has('data') || !allowed.has('business-agents')
     || !isIds(value.excludedRepositoryIds) || !excluded.has('harness-engineering-platform') || !excluded.has('platform-manager-dsh-home')
     || value.excludedRepositoryIds.some((item: string) => allowed.has(item))
+    || typeof configuredWorkspaceRoot !== 'string' || isAbsolute(configuredWorkspaceRoot)
+    || resolve(root, configuredWorkspaceRoot) !== resolve(root, '..', 'manager-workspace')
     || !value.roles || typeof value.roles !== 'object' || Array.isArray(value.roles)
     || requiredRoles.some(item => typeof value.roles[item] !== 'string' || !value.roles[item].trim())) {
     throw new Error(`管理助手业务工作区契约无效：${path}`)
@@ -148,6 +164,7 @@ export function assistantWorkspaceScope(assetRoot: string): AssistantWorkspaceSc
     business_repository_id: 'business-agents',
     excluded_repository_ids: [...value.excludedRepositoryIds],
     roles: { ...value.roles },
+    manager_workspace_root: managerWorkspaceRoot(root),
     roots: { data: root, business_agents: businessAgentsRoot(root) },
   }
 }

@@ -61,6 +61,21 @@ def business_agents_root():
     return sibling if sibling.is_dir() else asset_root().resolve()
 
 
+def manager_workspace_root():
+    explicit = os.environ.get("HARNESS_MANAGER_WORKSPACE_ROOT")
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    config = asset_root() / "config" / "assistant-workspace.json"
+    try:
+        value = json.loads(config.read_text(encoding="utf-8"))
+        relative = value.get("workspaceRoot") if isinstance(value, dict) else None
+        if isinstance(relative, str) and relative and not Path(relative).is_absolute():
+            return (asset_root() / relative).resolve()
+    except (OSError, ValueError, TypeError):
+        pass
+    return (asset_root().parent / "manager-workspace").resolve()
+
+
 def platform_home():
     selected = os.environ.get("HARNESS_MANAGER_DSH_HOME")
     if not selected:
@@ -119,6 +134,7 @@ def runtime_environment(home):
     return {**environment, "DSH_HOME": str(home), "HARNESS_ASSET_ROOT": str(asset_root()),
             "HARNESS_PROGRAM_ROOT": str(REPO),
             "HARNESS_BUSINESS_AGENTS_ROOT": str(business_agents_root()),
+            "HARNESS_MANAGER_WORKSPACE_ROOT": str(manager_workspace_root()),
             "HARNESS_PYTHON": sys.executable,
             "HARNESS_SITES_CONFIG": str(asset_root() / "config" / "sites.json")}
 
