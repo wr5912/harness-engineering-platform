@@ -36,7 +36,7 @@ hep-lab update    只生成远端更新计划，不直接修改仓库
 
 ## 独立安装与一键初始化
 
-`platform/hep-lab` 在源码工作区内直接执行核心 CLI；`platform/hep-lab bootstrap` 或 `platform/hep-lab-bootstrap.sh` 是独立 Bootstrap 入口。Bootstrap 自身只依赖 Node.js 24、Git 和 pnpm（已有缓存时不重复安装依赖），不要求先进入平台源码目录。
+`platform/hep-lab` 在源码工作区内直接执行核心 CLI；`platform/hep-lab bootstrap` 或 `platform/hep-lab-bootstrap.sh` 是独立 Bootstrap 入口。Bootstrap 自身只依赖 Node.js 24、Git 和 pnpm（已有缓存时不重复安装依赖），不要求先进入平台源码目录。 单独下载 `platform/hep-lab` 时，缺少源码和同目录 Bootstrap 的分支会从固定 Git SHA 的 raw 地址下载并校验 Bootstrap；该路径需要 `curl`/`wget` 与 `sha256sum`/`shasum`。
 
 Bootstrap 流程固定程序仓库和数据仓库提交，下载并校验程序 CLI，从数据仓库 `locks/repositories.yaml` 解析四个仓库的 URL 与完整 SHA，然后调用核心 `init`：
 

@@ -1,13 +1,18 @@
 #!/bin/sh
 set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+BOOTSTRAP_SOURCE_COMMIT=7d589b66d2bd3f097bbd22ff86b69d9d3ac693c5
+BOOTSTRAP_DATA_COMMIT=6ef2bc56fb1cbf707743a659dcc4042ab4591b9d
+BOOTSTRAP_SHA256=0a3cee1550794ac72617c4145c4f719c68aff1256edac62d99014bc8d3b505f5
 
 if [ "${1-}" = bootstrap ]; then
   shift
-  exec "$SCRIPT_DIR/hep-lab-bootstrap.sh" "$@"
+  BOOTSTRAP_MODE=1
+else
+  BOOTSTRAP_MODE=0
 fi
 
-if [ -f "$SCRIPT_DIR/tool-env.sh" ] && [ -f "$SCRIPT_DIR/lab/cli.mts" ]; then
+if [ "$BOOTSTRAP_MODE" -eq 0 ] && [ -f "$SCRIPT_DIR/tool-env.sh" ] && [ -f "$SCRIPT_DIR/lab/cli.mts" ]; then
   . "$SCRIPT_DIR/tool-env.sh"
   exec node "$HEP_ROOT/platform/lab/cli.mts" "$@"
 fi
@@ -16,5 +21,26 @@ if [ -x "$SCRIPT_DIR/hep-lab-bootstrap.sh" ]; then
   exec "$SCRIPT_DIR/hep-lab-bootstrap.sh" "$@"
 fi
 
-echo "hep-lab: 未找到源码 CLI 或 hep-lab-bootstrap.sh；请下载完整 platform 目录" >&2
-exit 2
+if [ "${1-}" = init ]; then shift; fi
+TMP=$(mktemp "${TMPDIR:-/tmp}/hep-lab-bootstrap.XXXXXX")
+cleanup() { rm -f "$TMP"; }
+trap cleanup EXIT HUP INT TERM
+URL="https://raw.githubusercontent.com/wr5912/harness-engineering-platform/$BOOTSTRAP_SOURCE_COMMIT/platform/hep-lab-bootstrap.sh"
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL --retry 2 -o "$TMP" -- "$URL"
+elif command -v wget >/dev/null 2>&1; then
+  wget -qO "$TMP" -- "$URL"
+else
+  echo "hep-lab: 独立入口缺少 curl 或 wget，无法下载固定 Bootstrap" >&2
+  exit 2
+fi
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL=$(sha256sum "$TMP" | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+  ACTUAL=$(shasum -a 256 "$TMP" | awk '{print $1}')
+else
+  echo "hep-lab: 独立入口缺少 sha256sum/shasum，无法校验 Bootstrap" >&2
+  exit 2
+fi
+[ "$ACTUAL" = "$BOOTSTRAP_SHA256" ] || { echo "hep-lab: 固定 Bootstrap 校验失败" >&2; exit 2; }
+HEP_LAB_DATA_COMMIT="$BOOTSTRAP_DATA_COMMIT" exec sh "$TMP" "$@"
