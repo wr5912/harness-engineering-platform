@@ -4,6 +4,9 @@
   "private": true,
   "description": "基于 DSH 的 Harness 工程平台：智能体资产、评测、实例与 MCP 工具管理",
   "type": "module",
+  "engines": {
+    "node": ">=24.9.0"
+  },
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",

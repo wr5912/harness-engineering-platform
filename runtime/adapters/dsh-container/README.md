@@ -146,7 +146,7 @@ docker exec -w /opt/dsh-managed/dsh-voice-hub <instance-name> \
 
 ## 评测实例与本地装载核验
 
-`dsh-dev` 是宿主侧实例启动器（只依赖 Python 3 标准库、Docker CLI 和 Compose），把受控 Compose 渲染成仓库外实例。新实例只支持 `--mode eval`（内部模式 `verification`）：`session_preset` 与 `target_preset` 都来自所选来源，注册工作区固定为 `/work/harness/workspace`，三棵 Candidate 资产全部只读，且不挂载判分材料。
+`dsh-dev` 是宿主侧实例启动器（只依赖 Python 3.10+ 标准库、Docker CLI 和 Compose），把受控 Compose 渲染成仓库外实例。新实例只支持 `--mode eval`（内部模式 `verification`）：`session_preset` 与 `target_preset` 都来自所选来源，注册工作区固定为 `/work/harness/workspace`，三棵 Candidate 资产全部只读，且不挂载判分材料。
 
 目标 Preset 由选定版本 `candidate/harness.yaml` 的 `loadable_assets.preset_id` 与可选 `preset_file` 指定，适配层不内联业务 Agent 名。Harness 创建或修改由宿主开发会话通过项目技能完成，再启动新的评测实例观察结果。
 

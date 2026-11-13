@@ -4,7 +4,7 @@ description: >-
   审查平台程序仓的研发 Skill，包括触发范围、指令、包内依赖、工具耦合和维护成本。
   适用于研发技能的对抗审查、精简和改进；工作区投影治理使用 hep-skill-governance，
   管理助手及业务 Harness 的运行技能审查使用管理助手 HOME 的入口。
-compatibility: Requires only file-reading capability; optional static inspector uses Python 3.9+ offline.
+compatibility: Requires only file-reading capability; optional static inspector uses Python 3.10+ offline.
 metadata:
   version: "1.0.0"
 ---

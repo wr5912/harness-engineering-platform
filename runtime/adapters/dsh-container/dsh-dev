@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """dsh-dev：按来源选择器启动本地 DSH 容器实例，并交付本次进程的认证 URL。
 
-设计合同见 docs/DSH开发与评测启动器设计方案.md。本工具只依赖 Python 3 标准库、
+设计合同见 docs/DSH开发与评测启动器设计方案.md。本工具只依赖 Python 3.10+ 标准库、
 Docker CLI 与 Compose；实例配置生成在仓库外，Token 不落盘、不入仓库、不回显到日志。
 
 会话身份（session_preset）与待评估目标（target_preset）都来自所选来源声明的业务 preset。

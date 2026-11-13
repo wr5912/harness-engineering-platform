@@ -25,7 +25,7 @@
 
 > 请使用 reviewing-agent-skills 对 `/path/to/skill` 做对抗式审查，重点检查 MCP 工具名硬编码、过长的 Agent 编排链，输出证据、最小整改 Diff 和验收测试，不要直接修改原 Skill。
 
-### 可选：本地静态提示检查（Python 3.9+，无第三方依赖）
+### 可选：本地静态提示检查（Python 3.10+，无第三方依赖）
 
 ```bash
 python3 reviewing-agent-skills/scripts/inspect_skill.py /path/to/target-skill
