@@ -96,7 +96,7 @@ test('CLI 只传数据仓库参数即可初始化四库工作区', t => {
   assert.equal(output.status, 'succeeded')
   assert.equal(output.manifest.repositories.business_agents.commit, f.repositories.business_agents.commit)
 })
-test('dirty工作树、非空目录、origin和版本冲突均保留用户内容', t => {
+test('dirty工作树、非空目录、来源和版本冲突均保留用户内容', t => {
   const f = fixture(t); initializeLab(f)
   const path = join(f.destination, 'business-agents/README.md')
   writeFileSync(path, '用户修改\n')
@@ -108,7 +108,30 @@ test('dirty工作树、非空目录、origin和版本冲突均保留用户内容
   assert.throws(() => initializeLab({ ...f, destination: other }), /非 hep-lab/)
   assert.equal(readFileSync(join(other, 'user.txt'), 'utf8'), 'keep')
   git(join(f.destination, 'business-agents'), 'remote', 'set-url', 'origin', f.repositories.data.url)
-  assert.throws(() => initializeLab({ ...f, reuse: true }), /未提交|origin/)
+  assert.throws(() => initializeLab({ ...f, reuse: true }), /未提交|来源/)
+})
+test('复用 gitlab 远端并接受 HTTP 来源，检查过程不修改已有仓库', t => {
+  const f = fixture(t); initializeLab(f)
+  const business = join(f.destination, 'business-agents')
+  git(business, 'remote', 'rename', 'origin', 'gitlab')
+  assert.equal(initializeLab({ ...f, reuse: true }).validation.valid, true)
+  assert.equal(doctorLab(f.destination).valid, true)
+  assert.equal(git(business, 'remote'), 'gitlab')
+  const repositories = structuredClone(f.repositories)
+  repositories.business_agents.url = 'http://gitlab.example.invalid/ai-soc/business-agents.git'
+  git(business, 'remote', 'set-url', 'gitlab', repositories.business_agents.url)
+  git(business, 'remote', 'add', 'origin', f.repositories.data.url)
+  const result = initializeLab({ ...f, repositories, reuse: true, checkOnly: true })
+  assert.equal(result.repositories.business_agents.url, repositories.business_agents.url)
+  assert.equal(git(business, 'remote', 'get-url', 'gitlab'), repositories.business_agents.url)
+  assert.equal(git(business, 'status', '--porcelain'), '')
+  assert.equal(git(business, 'rev-parse', 'HEAD'), f.repositories.business_agents.commit)
+  const manifest = readLab(f.destination)
+  manifest.repositories.business_agents.url = repositories.business_agents.url
+  writeFileSync(join(f.destination, 'hep-lab.yaml'), JSON.stringify(manifest))
+  assert.equal(readLab(f.destination).repositories.business_agents.url, repositories.business_agents.url)
+  git(business, 'remote', 'remove', 'gitlab')
+  assert.throws(() => initializeLab({ ...f, repositories, reuse: true, checkOnly: true }), /来源不匹配/)
 })
 test('浮动分支冻结实际 SHA，固定提交不受来源分支后续移动影响', t => {
   const f = fixture(t)

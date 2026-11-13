@@ -45,8 +45,8 @@ function repositoryUrl(value: unknown): string {
   if (typeof value !== 'string' || !value || /[\0\r\n]/.test(value) || value.startsWith('-')) fail('仓库地址无效')
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
     const url = new URL(value)
-    if (!['https:', 'ssh:', 'file:'].includes(url.protocol) || url.password || url.username && url.protocol !== 'ssh:' || url.search || url.hash) fail('仓库地址不得包含凭据、查询参数或片段')
-  } else if (!isAbsolute(value) && !/^git@[a-zA-Z0-9.-]+:[\w./-]+$/.test(value)) fail('仓库地址须为绝对本地路径、file/https/ssh URL 或 git@ SSH 地址')
+    if (!['http:', 'https:', 'ssh:', 'file:'].includes(url.protocol) || url.password || url.username && url.protocol !== 'ssh:' || url.search || url.hash) fail('仓库地址不得包含凭据、查询参数或片段')
+  } else if (!isAbsolute(value) && !/^git@[a-zA-Z0-9.-]+:[\w./-]+$/.test(value)) fail('仓库地址须为绝对本地路径、file/http/https/ssh URL 或 git@ SSH 地址')
   return value
 }
 function inputOf(input: RepositoryInput): RepositoryInput {
@@ -105,7 +105,9 @@ function inspectRepository(root: string, input: RepositoryInput, reuse: boolean)
   if (!reuse) fail(`已有仓库需要 --reuse：${root}`)
   if (realpathSync(git(root, ['rev-parse', '--show-toplevel'])) !== realpathSync(root)) fail(`仓库根目录不匹配：${root}`)
   clean(root)
-  if (git(root, ['remote', 'get-url', 'origin']) !== input.url) fail(`已有仓库 origin 不匹配：${root}`)
+  const identity = (url: string) => url.replace(/^git@([^:]+):/, 'https://$1/').replace(/^ssh:\/\/git@/, 'https://').replace(/\.git\/?$/, '').replace(/\/$/, '')
+  const matches = git(root, ['remote']).split('\n').filter(Boolean).some(remote => identity(git(root, ['remote', 'get-url', remote])) === identity(input.url))
+  if (!matches) fail(`已有仓库来源不匹配：${root}`)
   const commit = git(root, ['rev-parse', 'HEAD'])
   if (input.commit && input.commit !== commit) fail(`已有仓库提交不同，请先查看 update --plan-only：${root}`)
   if (input.ref && !input.commit) {

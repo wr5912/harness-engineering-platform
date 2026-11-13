@@ -19,7 +19,7 @@ const usage = `用法：
     其余三仓库默认从数据仓库 locks/repositories.yaml 推导；也可显式传入同名前缀的 URL/ref/commit。
     business-agents 是保存全部业务智能体的单个仓库。
     --check-only          只验证输入与已有目录，不 clone/fetch/写入
-    --reuse               复用 origin、版本均一致且干净的仓库
+    --reuse               复用来源、版本均一致且干净的仓库，远端名称不限
     --allow-floating-ref  开发环境显式允许解析分支，清单仍记录实际 SHA
   platform/hep-lab status --lab <目录> [--json] [--request-id <id>]
   platform/hep-lab doctor --lab <目录> [--json] [--request-id <id>]
