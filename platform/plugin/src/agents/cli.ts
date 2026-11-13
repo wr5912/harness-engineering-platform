@@ -7,17 +7,20 @@ import { defaultAssetRoot } from '../workspace.ts'
 // 与页面和助手共用智能体及版本入口；不另建迁移、创建或融合实现。
 try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
-    'asset-root': { type: 'string' }, input: { type: 'string' }, help: { type: 'boolean' },
+    'asset-root': { type: 'string' }, input: { type: 'string' }, 'request-id': { type: 'string' },
+    'operation-id': { type: 'string' }, help: { type: 'boolean' }, json: { type: 'boolean' },
   } })
   if (values.help) {
-    process.stdout.write('用法：node --experimental-transform-types platform/plugin/src/agents/cli.ts <action> --asset-root <数据根> [--input <JSON文件或->]\n新建智能体：new，输入 agent_id、name、description、role，可选 profile、evaluation_cases；版本派生：create。\n迁移预览：versions/migration-plan；确认：versions/migration-apply，输入 confirmed 与 expected_plan_sha256。\n融合草稿：fusion/prepare；解决冲突：fusion/resolve；跨进程确认：fusion/confirm，输入 operation_id、confirmed、expected_plan_sha256；进度与恢复：fusion/status、fusion/recover。旧 preview 请求确认仍可用。\n')
+    process.stdout.write('用法：node --experimental-transform-types platform/plugin/src/agents/cli.ts <action> --asset-root <数据根> [--input <JSON文件或->] [--request-id <id>] [--operation-id <id>] [--json]\n动作直接映射 createAgentsHandler，覆盖 list/detail/new/create、assets/edit/cases/eval/runs/decision、compute-variants、migrations、fusion、features、research、tasks 和 sdk；写操作继续由现有 CAS、锁和确认合同约束。\n')
   } else {
     if (positionals.length !== 1) throw new Error('须指定一个 agents action；使用 --help 查看用法')
-    if (!/^(?:list|detail|new|create|fusion\/(?:preview|prepare|resolve|recover|proposal|confirm|status|verify|finalize)|versions\/migration-(?:plan|apply))$/.test(positionals[0]!)) throw new Error('CLI 仅提供智能体与版本领域入口')
+    if (!/^(?:list|description|detail|new|create|(?:assets|edit|cases|eval|runs|decision|compute-variants|migrations|fusion|features|research|tasks|sdk|versions|legacy|documents)(?:\/|$).+)$/.test(positionals[0]!)) throw new Error('不支持的 agents action；使用 --help 查看可用动作')
     const input = values.input ? JSON.parse(readFileSync(values.input === '-' ? 0 : values.input, 'utf8')) : {}
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('输入须为 JSON 对象')
-    // 本地版本动作不使用连接 peer；SDK、部署等依赖连接身份的动作不在 CLI 范围。
-    const result = await createAgentsHandler(resolve(values['asset-root'] ?? defaultAssetRoot()))(positionals[0]!, input, new AbortController().signal, undefined!)
+    const request = { ...(input as Record<string, unknown>) }
+    if (values['request-id'] !== undefined) request.request_id ??= values['request-id']
+    if (values['operation-id'] !== undefined) request.operation_id ??= values['operation-id']
+    const result = await createAgentsHandler(resolve(values['asset-root'] ?? defaultAssetRoot()))(positionals[0]!, request, new AbortController().signal, undefined!)
     process.stdout.write(JSON.stringify(result, null, 2) + '\n')
     if (!result.ok) process.exitCode = 1
   }

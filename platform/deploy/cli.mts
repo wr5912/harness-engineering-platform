@@ -2,14 +2,29 @@ import { homedir } from 'node:os'
 import { isIP } from 'node:net'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readFileSync } from 'node:fs'
-import { pack } from './pack.mts'
-import { install } from './install.mts'
-import { verifyDeployment } from './verify.mts'
+import { existsSync, readFileSync } from 'node:fs'
 import type { Arch } from './manifest.mts'
-import { defaultAssetRoot } from '../plugin/src/workspace.ts'
 
 const REPO = resolve(fileURLToPath(new URL('../..', import.meta.url)))
+
+/**
+ * Keep help, version and argument validation independent from the plugin graph.
+ * The plugin graph includes optional production dependencies such as js-yaml;
+ * a clean source archive must still be able to explain how to install them.
+ */
+function defaultAssetRoot(): string {
+  if (process.env.HARNESS_ASSET_ROOT) {
+    const value = process.env.HARNESS_ASSET_ROOT
+    return resolve(value === '~' ? homedir() : value.startsWith('~/') ? join(homedir(), value.slice(2)) : value)
+  }
+  const locator = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'harness-engineering-platform/workspace.json')
+  if (existsSync(locator)) {
+    const value = JSON.parse(readFileSync(locator, 'utf8'))
+    if (typeof value?.assetRoot !== 'string' || !value.assetRoot.startsWith('/')) throw new Error('部署定位文件必须包含绝对 assetRoot')
+    return resolve(value.assetRoot)
+  }
+  return join(homedir(), 'harness-engineering-platform-data')
+}
 
 type Options = Record<string, string | boolean | undefined>
 
@@ -309,6 +324,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       } finally { process.off('SIGINT', cancel); process.off('SIGTERM', cancel) }
     }
     if (command === 'pack') {
+      const { pack } = await import('./pack.mts')
       const result = pack({
         programRoot: resolve(text(options, 'program-root', REPO) as string),
         out: resolve(text(options, 'out', join(REPO, 'dist')) as string),
@@ -331,6 +347,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return 0
     }
     if (command === 'verify') {
+      const { verifyDeployment } = await import('./verify.mts')
       const prefix = text(options, 'prefix', join(homedir(), 'work', 'harness-engineering-platform-data')) as string
       const dataRoot = text(options, 'data-root', join(homedir(), 'harness-engineering-platform-data')) as string
       const report = await verifyDeployment({ prefix, dataRoot, url: text(options, 'url') })
@@ -340,6 +357,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return report.ok ? 0 : 1
     }
     if (command === 'install') {
+      const { install } = await import('./install.mts')
       const bundleRoot = text(options, 'bundle-root')
       if (!bundleRoot) throw new Error('install 需要 --bundle-root（install.sh 会自动传入）')
       const host = text(options, 'host')
