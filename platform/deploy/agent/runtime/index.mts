@@ -1,8 +1,10 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { stageManagedProjections } from './projections.mts'
+import { collectEntries, sha256File, writeChecksums } from '../../manifest.mts'
+import { migrateStandaloneConnections } from '../../../plugin/src/standalone/connections.ts'
 
-export interface RuntimeBundleOptions { programRoot: string; imageTag: string; imageId?: string; imageFingerprint?: string; arch: 'amd64' | 'arm64'; agentId: string; experimentId: string; presetId: string; profilePatch: string; profile?: 'web' | 'sdk'; harnessRuntime?: any; bridgeRequired?: boolean }
+export interface RuntimeBundleOptions { programRoot: string; imageTag: string; imageId?: string; imageFingerprint?: string; arch: 'amd64' | 'arm64'; agentId: string; experimentId: string; presetId: string; profilePatch: string; profile?: 'web' | 'sdk'; harnessRuntime?: any }
 
 /** 已有预览沿用冻结资产，只刷新同一版本的运行器，不生成归档。 */
 export async function refreshAgentPreview(root: string, programRoot: string, preview: { agentId: string; experimentId: string; candidateSha256: string; arch: string }) {
@@ -11,10 +13,21 @@ export async function refreshAgentPreview(root: string, programRoot: string, pre
     || manifest.source.experimentId !== preview.experimentId || manifest.source.candidateSha256 !== preview.candidateSha256
     || manifest.package.arch !== preview.arch) throw new Error('预览目录与所选智能体版本、资产摘要或架构不一致')
   if (manifest.source.profile === 'sdk') throw new Error('现有预览运行器刷新仅支持 Web 包；SDK 包请使用正式导出入口')
-  const config = JSON.parse(readFileSync(join(root, 'config-seed/standalone.json'), 'utf8'))
+  const seedFile = join(root, 'config-seed/standalone.json')
+  const config = migrateStandaloneConnections(JSON.parse(readFileSync(seedFile, 'utf8')), join(root, 'assets/managed'))
+  writeFileSync(seedFile, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 })
+  for (const legacy of ['runtime/lfx', 'runtime/extensions', 'mcp/compositions']) rmSync(join(root, legacy), { recursive: true, force: true })
+  delete manifest.extensions
   await writeRuntimeBundle(root, { programRoot, imageTag: manifest.image.tag, imageId: manifest.image.id,
     imageFingerprint: manifest.image.fingerprint, arch: manifest.package.arch, agentId: config.agentId,
     experimentId: config.experimentId, presetId: config.presetId, profilePatch: config.profilePatch, profile: config.profile })
+  const refreshed = ['agent', 'install.sh', 'README.md', 'config-seed/standalone.json']
+  manifest.files = manifest.files.filter((file: { path: string }) => !file.path.startsWith('runtime/') && !file.path.startsWith('mcp/compositions/') && !refreshed.includes(file.path))
+  manifest.files.push(...collectEntries(join(root, 'runtime')).map(file => ({ ...file, path: `runtime/${file.path}` })),
+    ...refreshed.map(path => ({ path, type: 'file', sha256: sha256File(join(root, path)), mode: lstatSync(join(root, path)).mode & 0o777 })))
+  manifest.files.sort((a: { path: string }, b: { path: string }) => a.path.localeCompare(b.path))
+  writeFileSync(join(root, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 })
+  writeChecksums(root, manifest.files)
 }
 
 /** 目标机只用 Bash 和 Docker；Node、DSH 与初始化均在同一标准镜像内执行。 */
@@ -59,7 +72,7 @@ export async function writeRuntimeBundle(staging: string, options: RuntimeBundle
     volume.push({ type: 'bind', source: './runtime/model-binding-runtime.js', target: '/opt/harness-model-runtime/model-binding-runtime.mjs', read_only: true })
   }
   const common = { image: options.imageTag, pull_policy: 'never', working_dir: '/work/harness/workspace', volumes: volume,
-    environment: { DSH_HOME: '/var/lib/dsh', STANDALONE_UID: '${AGENT_UID:-1000}', STANDALONE_GID: '${AGENT_GID:-1000}', ...(!sdk ? { STANDALONE_HOST: '${AGENT_HOST:-127.0.0.1}', STANDALONE_PORT: '${AGENT_PORT:-18500}' } : {}), STANDALONE_ROOT: '/opt/standalone', DSH_TELEMETRY_DISABLED: '1', HARNESS_DSH_ENTRY: '/opt/dsh/apps/cli/lib/bin.js', ...(sdk ? { HARNESS_SDK_OPTIONS: '/var/lib/dsh/standalone/sdk-options.json' } : {}) } }
+    environment: { HOME: '/var/lib/dsh', DSH_HOME: '/var/lib/dsh', STANDALONE_UID: '${AGENT_UID:-1000}', STANDALONE_GID: '${AGENT_GID:-1000}', ...(!sdk ? { STANDALONE_HOST: '${AGENT_HOST:-127.0.0.1}', STANDALONE_PORT: '${AGENT_PORT:-18500}' } : {}), STANDALONE_ROOT: '/opt/standalone', DSH_TELEMETRY_DISABLED: '1', HARNESS_DSH_ENTRY: '/opt/dsh/apps/cli/lib/bin.js', ...(sdk ? { HARNESS_SDK_OPTIONS: '/var/lib/dsh/standalone/sdk-options.json' } : {}) } }
   const compose = { services: {
     init: { ...common, user: '0:0', network_mode: 'none', entrypoint: ['/bin/sh', '-c'], command: ['node /opt/standalone/runtime/standalone-bootstrap.js init && chown -R $$STANDALONE_UID:$$STANDALONE_GID /var/lib/dsh'] },
     dsh: { ...common, user: '${AGENT_UID:-1000}:${AGENT_GID:-1000}', init: true, depends_on: { init: { condition: 'service_completed_successfully' } },

@@ -9,7 +9,7 @@ export type FixedCompositionBinding = {
   compositionId: string; versionId: string; expectedImplementationDigest: string; input_schema: Record<string, any>
 }
 type Client = { connect(transport: any, options?: any): Promise<any>; listTools(params?: any, options?: any): Promise<any>; callTool(params: any, options?: any): Promise<any>; close(): Promise<any> }
-type ClientFactory = (url: string, token: string, signal: AbortSignal) => Promise<Client>
+type ClientFactory = (url: string, token: string, signal: AbortSignal, headers?: Record<string, string>) => Promise<Client>
 const executions = new AsyncLocalStorage<ModelAttemptContext>()
 const GROUP_TARGET_META_KEY = 'io.deepseek.dsh/mcp-group-target'
 const canonical = (value: any): string => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
@@ -21,13 +21,13 @@ export function fixedCompositionToolName(name: string, binding: FixedComposition
 }
 export function withFixedCompositionExecution<T>(execution: ModelAttemptContext, task: () => T): T { return executions.run(execution, task) }
 
-async function nativeClient(url: string, token: string, signal: AbortSignal): Promise<Client> {
+async function nativeClient(url: string, token: string, signal: AbortSignal, headers?: Record<string, string>): Promise<Client> {
   // 与当前业务 MCP 桥共用锁定 DSH 的官方 SDK，凭据来自原生管理服务。
   const require = createRequire(process.env.DSH_MCP_CLIENT_ANCHOR || '/opt/dsh/packages/mcp/mcp-client/package.json')
   const { Client, StreamableHTTPClientTransport } = require('@modelcontextprotocol/client')
   const client = new Client({ name: 'harness-fixed-composition', version: '0.1.0' }, { versionNegotiation: { mode: 'auto' } })
   try {
-    await client.connect(new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers: { authorization: `Bearer ${token}` } } }), { signal })
+    await client.connect(new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers: headers ?? { authorization: `Bearer ${token}` } } }), { signal })
     return client
   } catch { await client.close().catch(() => {}); throw new Error('固定组合 MCP 连接失败') }
 }
@@ -49,8 +49,7 @@ function decodedResult(value: any): any {
 export function registerFixedCompositionTools(ctx: any, bindings: Record<string, FixedCompositionBinding>, dependencies: { clientFactory?: ClientFactory } = {}): Map<string, string> {
   const aliases = new Map<string, string>()
   for (const [name, supplied] of Object.entries(bindings)) {
-    const original: FixedCompositionBinding = structuredClone(supplied)
-    let binding: FixedCompositionBinding = original
+    const binding: FixedCompositionBinding = structuredClone(supplied)
     const groupVersion = binding.group_link_version ?? 1
     if (!/^[A-Za-z0-9_-]{1,32}$/.test(binding.group_id) || !/^[0-9a-f]{64}$/.test(binding.group_target_digest)
       || !/^[0-9a-f]{64}$/.test(binding.versionId) || !/^[0-9a-f]{64}$/.test(binding.expectedImplementationDigest)
@@ -58,7 +57,7 @@ export function registerFixedCompositionTools(ctx: any, bindings: Record<string,
       || ![1, 2].includes(groupVersion) || typeof binding.tool_name !== 'string'
       || !(groupVersion === 2 ? /^[A-Za-z0-9_.-]+$/.test(binding.tool_name) : binding.tool_name.startsWith('mcp__compositions__'))
       || !binding.input_schema || typeof binding.input_schema !== 'object') throw new Error('固定组合绑定无效')
-    const alias = fixedCompositionToolName(name, original)
+    const alias = fixedCompositionToolName(name, binding)
     ctx.tools.register({ name: alias, description: `执行固定组合 ${name}`, parameters: binding.input_schema,
       isConcurrencySafe: () => false,
       output: { schema: { type: 'object', additionalProperties: true }, render: (_args: any, value: any) => value.content ?? [],
@@ -66,30 +65,28 @@ export function registerFixedCompositionTools(ctx: any, bindings: Record<string,
           composition_id: binding.compositionId, version_id: binding.versionId, implementation_digest: binding.expectedImplementationDigest } }) },
       async execute(args: Record<string, any>, exec: any) {
         exec.signal.throwIfAborted()
-        const projected = ctx.standaloneBindings?.resolve(name, original)
-        if (projected && (projected.compositionId !== original.compositionId || projected.versionId !== original.versionId
-          || projected.group_id !== original.group_id || projected.group_link_version !== original.group_link_version
-          || projected.tool_name !== original.tool_name || canonical(projected.input_schema) !== canonical(original.input_schema))) throw new Error('部署绑定不得改变固定组合的版本或工具合同')
-        binding = projected ?? original
         if (!ctx.tools.get(name, exec.agent)) throw new Error('固定组合原工具不在当前实例范围')
-        const current = () => ctx.mcpSessionManager?.currentGroup(binding.group_id, groupVersion)
+        const manager = ctx.mcpSessionManager
+        const remote = manager?.groupConnection?.(binding.group_id, groupVersion)
+        const connectionIdentity = remote && canonical(remote)
         const assertGroup = () => {
-          const group = current()
+          if (remote) {
+            if (canonical(manager.groupConnection(binding.group_id, groupVersion)) !== connectionIdentity) throw new Error('固定组合 MCP 连接已变化')
+            return remote
+          }
+          const group = manager?.currentGroup(binding.group_id, groupVersion)
           if (!group?.token || group.targetDigest !== binding.group_target_digest) throw new Error('固定组合 MCP 分组已变化')
           return group
         }
         const group = assertGroup()
         let client: Client
-        if (groupVersion === 2) {
-          if (typeof ctx.mcpSessionManager?.listGroupTools !== 'function' || typeof ctx.mcpSessionManager?.callGroupTool !== 'function') {
-            throw new Error('原生 MCP 分组 v2 服务未就绪')
-          }
-          client = {
-            listTools: () => ctx.mcpSessionManager.listGroupTools(binding.group_id, 2),
-            callTool: (params: any) => ctx.mcpSessionManager.callGroupTool(binding.group_id, 2,
-              params.name, params.arguments, params._meta, exec),
-            connect: async () => {}, close: async () => {},
-          }
+        if (remote) {
+          client = await (dependencies.clientFactory ?? nativeClient)(remote.url, '', exec.signal, remote.headers)
+        } else if (groupVersion === 2) {
+          if (typeof manager?.listGroupTools !== 'function' || typeof manager?.callGroupTool !== 'function') throw new Error('原生 MCP 分组 v2 服务未就绪')
+          client = { listTools: () => manager.listGroupTools(binding.group_id, 2),
+            callTool: (params: any) => manager.callGroupTool(binding.group_id, 2, params.name, params.arguments, params._meta, exec),
+            connect: async () => {}, close: async () => {} }
         } else {
           if (!Number.isInteger(ctx.webServer?.port) || ctx.webServer.port < 1) throw new Error('原生 MCP 分组服务未就绪')
           const path = `/mcp/groups/${binding.group_id}`

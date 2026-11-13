@@ -101,7 +101,7 @@ for (const directory of ['agent-access', 'instances/external']) {
   for (const file of (await readdir(new URL('../../' + base + '/', import.meta.url))).filter(file => file.endsWith('.ts')).sort()) implementationFiles.push(`${base}/${file}`)
 }
 const implementationHash = createHash('sha256')
-implementationFiles.push('platform/plugin/src/mcp/lfx-runtime.ts', 'platform/plugin/src/mcp/lfx-assets.ts', ...['hep_lfx.py', 'server.py', 'requirements.txt'].map(file => `platform/mcp/lfx/${file}`))
+implementationFiles.push('platform/plugin/src/redact.ts', 'platform/plugin/src/mcp/lfx-runtime.ts', 'platform/plugin/src/mcp/lfx-http.ts', 'platform/plugin/src/mcp/lfx-assets.ts', ...['hep_lfx.py', 'server.py', 'requirements.txt'].map(file => `platform/mcp/lfx/${file}`))
 const implementationSources = []
 for (const file of implementationFiles) {
   const bytes = await readFile(new URL('../../' + file, import.meta.url))

@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { publishedCompositionService, type Catalog } from '../mcp/compositions.ts'
 
 export interface StandaloneConfig {
   agentId: string
@@ -13,20 +12,11 @@ export interface StandaloneConfig {
   defaultModel?: { provider: string; model: string; reasoningEffort?: string }
   environmentKeys?: string[]
   mcp: { servers: any[]; groups: any[]; sharedToken: string; mountServerIds?: string[]; mountOverrides?: Record<string, { serverName?: string; tools?: any }> }
-  compositions?: any
-  fixedBindings?: Record<string, any>
   offlineKnowledge?: unknown
   sourceDigest?: string
-  extensions?: Array<{ id: string; entry: string; sha256: string; sourceDigest: string }>
 }
 
-export function compositionCatalog(config: StandaloneConfig): Catalog {
-  const value = config.compositions
-  return value?.schema_version === '1.0' && Array.isArray(value.compositions) ? value : { schema_version: '1.0', compositions: [] }
-}
-export function configuredServers(config: StandaloneConfig) {
-  return [...config.mcp.servers.filter(server => !server.platformComposition && server.id !== 'platform-compositions'), publishedCompositionService(compositionCatalog(config))]
-}
+export function configuredServers(config: StandaloneConfig) { return config.mcp.servers }
 
 export const configPath = (home = process.env.DSH_HOME || '/var/lib/dsh') => join(home, 'standalone/config.json')
 export function readStandaloneConfig(home?: string): StandaloneConfig {
@@ -40,7 +30,10 @@ export function validateStandaloneConfig(value: any): StandaloneConfig {
     || value.profile !== undefined && !['web', 'sdk'].includes(value.profile)
     || !value.mcp || !Array.isArray(value.mcp.servers) || !Array.isArray(value.mcp.groups)) throw new Error('独立智能体配置无效，请核对模型与 MCP 配置文件')
   if (value.environmentKeys && (!Array.isArray(value.environmentKeys) || value.environmentKeys.some((key: any) => typeof key !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(key)))) throw new Error('独立智能体环境配置键无效')
-  return { ...value, modelPatch: value.modelPatch || [], mcp: { ...value.mcp, sharedToken: value.mcp.sharedToken || randomBytes(32).toString('hex') } }
+  const { compositions: _compositions, extensions: _extensions, fixedBindings: _fixedBindings, ...client } = value
+  return { ...client, modelPatch: value.modelPatch || [], mcp: { ...value.mcp,
+    servers: value.mcp.servers.map((server: any) => ({ enabled: true, tools: { mode: 'all', names: [] }, ...server })),
+    sharedToken: value.mcp.sharedToken || randomBytes(32).toString('hex') } }
 }
 export function writeStandaloneConfig(value: StandaloneConfig, home?: string) {
   const path = configPath(home)

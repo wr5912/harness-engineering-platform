@@ -8,6 +8,7 @@ import { Writable } from 'node:stream'
 import { networkInterfaces } from 'node:os'
 import { dump, load, DEFAULT_SCHEMA, Type } from 'js-yaml'
 import { configPath, configuredServers, readEnvironment, readStandaloneConfig, runtimeRoot, validateStandaloneConfig, writeStandaloneConfig, type StandaloneConfig } from './config.ts'
+import { harnessMcpConnections, migrateStandaloneConnections } from './connections.ts'
 import { parseHarnessRuntime } from '../models/harness-runtime.ts'
 import { redactRunText } from '../agents/run-files.ts'
 
@@ -15,35 +16,13 @@ const patchSchema = DEFAULT_SCHEMA.extend(new (Type as any)('tag:yaml.org,2002:j
 const forbidden = /(?:harness-platform|harness-business-runtime|harness-model-runtime|business-runtime\.js|platform-mcp-manager|business\/mcp-manager|\/business-control\/)/
 
 /** 仅投影装载边界；保留业务 Preset 与工具配置，移除平台服务，不修改冻结资产。 */
-export function projectManagedPatch(text: string, groupIds: string[] = []): any[] {
+export function projectManagedPatch(text: string): any[] {
   const rows = load(text, { schema: patchSchema }) as any[]
   if (!Array.isArray(rows)) throw new Error('业务 Profile Patch 必须是数组')
   function project(row: any): any {
     if (!row || typeof row !== 'object') throw new Error('业务 Profile 条目无效')
     if (/^(?:agent-default-model|llm-deepseek|llm-deepseek-account|llm-pi-ai)$/.test(row.id || '') || forbidden.test(`${row.id || ''} ${row.name || ''}`) || row.id === 'mcp-session-manager' || /mcp-manager\.(?:m?js|ts)$/.test(row.name || '')) return undefined
     const value = { ...row }
-    let localGroup = false
-    function projectValue(item: any): any {
-      if (typeof item === 'string') {
-        let url: URL
-        try { url = new URL(item) } catch { return item }
-        const match = /\/mcp\/groups\/([A-Za-z0-9_-]{1,32})\/v2$/.exec(url.pathname)
-        if (match && groupIds.includes(match[1])) {
-          localGroup = true
-          const path = `/mcp/groups/${match[1]}/v2`
-          return { __dshExpression: `new URL(ctx.webServer.publicPath(${JSON.stringify(path)}), ctx.webServer.getOrigin()).href` }
-        }
-        return item
-      }
-      if (Array.isArray(item)) return item.map(projectValue)
-      if (item && typeof item === 'object') return Object.fromEntries(Object.entries(item).map(([key, entry]) => [key, projectValue(entry)]))
-      return item
-    }
-    if (value.config) value.config = projectValue(value.config)
-    if (localGroup) {
-      if (value.inject && !Array.isArray(value.inject)) throw new Error('业务模块依赖声明不能自动投影 MCP 地址')
-      value.inject = [...new Set([...(value.inject || []), 'webServer'])]
-    }
     if (value.insert) { value.insert = value.insert.map(project).filter(Boolean); if (!value.insert.length && Object.keys(value).length === 1) return undefined }
     return value
   }
@@ -80,7 +59,7 @@ export function generateProfile(config: StandaloneConfig, home: string, root: st
   const access = existsSync(harnessFile) ? (load(readFileSync(harnessFile, 'utf8')) as any)?.standalone?.web?.access : undefined
   if (config.profile !== 'sdk' && access !== undefined && access !== 'anonymous-lan') throw new Error('Harness standalone.web.access 只支持 anonymous-lan')
   const managed = join(root, 'assets/managed', config.profilePatch)
-  const business = projectManagedPatch(readFileSync(managed, 'utf8'), config.mcp.groups.map(group => group.id))
+  const business = projectManagedPatch(readFileSync(managed, 'utf8'))
   const sdk = config.profile === 'sdk'
   const connection = join(home, 'standalone/connection')
   if (!sdk) {
@@ -100,7 +79,7 @@ export function generateProfile(config: StandaloneConfig, home: string, root: st
       { id: 'legacy-prompt-variables', name: join(root, 'runtime/runtime-compat/index.ts') },
       { id: 'standalone-agent', name: join(root, 'runtime/standalone-plugin.js'), config: { home, root } },
       ...(sdk ? [
-        // 此 loopback 端点只承载容器内 MCP 分组，不发布业务 HTTP 或前端。
+        // 仅为原生客户端插件提供 Host 服务，不装载组合执行器。
         { id: 'standalone-mcp-server', name: '@deepseek-ai/dsh-host-webserver', config: { host: '127.0.0.1', port: 0 } },
         { id: 'standalone-connection', name: '@deepseek-ai/dsh-client-connection' },
         { id: 'standalone-workspace', name: '@deepseek-ai/dsh-workspace' },
@@ -128,34 +107,19 @@ export function generateProfile(config: StandaloneConfig, home: string, root: st
 export function initializeStandalone({ root = runtimeRoot(), home = process.env.DSH_HOME || '/var/lib/dsh', installAnchor = '/opt/dsh/apps/cli/package.json' } = {}) {
   mkdirSync(home, { recursive: true, mode: 0o700 })
   if (existsSync(join(home, 'standalone/initialized.json'))) {
+    const previous = JSON.parse(readFileSync(configPath(home), 'utf8'))
+    const current = migrateStandaloneConnections(previous, join(root, 'assets/managed'))
+    if (current !== previous) writeStandaloneConfig(validateStandaloneConfig(current), home)
     generateProfile(readStandaloneConfig(home), home, root, false)
     return { initialized: false }
   }
-  const initial = validateStandaloneConfig(JSON.parse(readFileSync(join(root, 'config-seed/standalone.json'), 'utf8')))
+  const initial = validateStandaloneConfig(migrateStandaloneConnections(JSON.parse(readFileSync(join(root, 'config-seed/standalone.json'), 'utf8')), join(root, 'assets/managed')))
   const seed = existsSync(configPath(home)) ? readStandaloneConfig(home) : initial
   const modelFile = join(home, 'profiles/standalone/cordis.patch.yml')
   seed.modelPatch = existsSync(modelFile) ? load(readFileSync(modelFile, 'utf8'), { schema: patchSchema }) as unknown[] : initial.modelPatch
-  let declaredServers: any[] | undefined
-  function collect(rows: any[]) {
-    for (const row of rows) {
-      if (row?.insert) collect(row.insert)
-      if (row?.id === 'mcp-session-manager' || /mcp-manager\.(?:m?js|ts)$/.test(row?.name || '')) if (Array.isArray(row.config?.servers)) declaredServers = row.config.servers
-    }
-  }
-  for (const path of [join(root, 'assets/managed/web-profile.seed.patch.yml'), join(root, 'assets/managed', seed.profilePatch)]) {
-    if (!existsSync(path)) continue
-    const rows = load(readFileSync(path, 'utf8'), { schema: patchSchema })
-    if (Array.isArray(rows)) collect(rows)
-  }
-  if (declaredServers) {
-    const enabled = declaredServers.filter(server => typeof server.id === 'string' && server.enabled !== false)
-    for (const server of enabled) {
-      if ((server.url || server.specUrl) && !seed.mcp.groups.some(group => group.id === server.id) && !seed.mcp.servers.some(current => current.id === server.id)) {
-        seed.mcp.servers.push({ ...server, enabled: true, tools: server.tools ?? { mode: 'all', names: [] } })
-      }
-    }
-    seed.mcp.mountServerIds = [...new Set(enabled.map(server => server.id))]
-    seed.mcp.mountOverrides = Object.fromEntries(enabled.map(server => [server.id, { ...(server.serverName ? { serverName: server.serverName } : {}), ...(server.tools ? { tools: server.tools } : {}) }]))
+  const native = harnessMcpConnections(join(root, 'assets/managed'), seed.profilePatch)
+  for (const server of native.servers) {
+    if (!seed.mcp.servers.some(current => current.id === server.id)) seed.mcp.servers.push(server)
   }
   nativeFallback(home, installAnchor, seed.profile === 'sdk' ? ['@deepseek-ai/dsh-sdk-client'] : [])
   writeStandaloneConfig(seed, home)
@@ -285,7 +249,7 @@ export async function startStandalone({ root = runtimeRoot(), home = process.env
   const port = process.env.STANDALONE_PORT || '18500'
   const publicHost = process.env.STANDALONE_HOST || '127.0.0.1'
   const publicUrl = `http://${publicHost}:${port}/assistant/`
-  const child = spawn(process.execPath, ['--expose-internals', '/opt/dsh/apps/cli/lib/bin.js', '--profile', 'standalone', '--patch', join(home, 'standalone/runtime.patch.yml'), '--host', host, '--port', '3080', '--public-url', publicUrl, '--trusted-host', `${publicHost}:${port}`, `127.0.0.1:${port}`, `localhost:${port}`, '--no-open'], { cwd: '/work/harness/workspace', env: { ...process.env, ...environment, DSH_HOME: home, ...(config.offlineKnowledge ? { DSH_WEB_FETCH_PROVIDER: 'harness-offline-knowledge' } : {}) }, stdio: 'inherit' })
+  const child = spawn(process.execPath, ['--expose-internals', '/opt/dsh/apps/cli/lib/bin.js', '--profile', 'standalone', '--patch', join(home, 'standalone/runtime.patch.yml'), '--host', host, '--port', '3080', '--public-url', publicUrl, '--trusted-host', `${publicHost}:${port}`, `127.0.0.1:${port}`, `localhost:${port}`, '--no-open'], { cwd: '/work/harness/workspace', env: { ...process.env, ...environment, HOME: home, DSH_HOME: home, ...(config.offlineKnowledge ? { DSH_WEB_FETCH_PROVIDER: 'harness-offline-knowledge' } : {}) }, stdio: 'inherit' })
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => child.kill(signal))
   const code = await new Promise<number>((resolve, reject) => { child.once('error', reject); child.once('exit', code => resolve(code ?? 1)) })
   return code
@@ -313,7 +277,7 @@ export async function runStandaloneSdk(inputFile: string, exampleInput?: string,
   const environment = readEnvironment(join(home, 'standalone/environment.llm-api-key'))
   const args = exampleInput === undefined ? [join(root, 'runtime/sdk-runner.mts'), join(home, 'standalone/sdk-options.json'), inputFile]
     : [join(home, 'standalone/sdk-app/example.ts'), exampleInput]
-  const child = spawn(process.execPath, args, { env: { ...process.env, ...environment, DSH_HOME: home, HARNESS_SDK_OPTIONS: join(home, 'standalone/sdk-options.json'), ...(readStandaloneConfig(home).offlineKnowledge ? { DSH_WEB_FETCH_PROVIDER: 'harness-offline-knowledge' } : {}) }, stdio: ['inherit', 'pipe', 'pipe'] })
+  const child = spawn(process.execPath, args, { env: { ...process.env, ...environment, HOME: home, DSH_HOME: home, HARNESS_SDK_OPTIONS: join(home, 'standalone/sdk-options.json'), ...(readStandaloneConfig(home).offlineKnowledge ? { DSH_WEB_FETCH_PROVIDER: 'harness-offline-knowledge' } : {}) }, stdio: ['inherit', 'pipe', 'pipe'] })
   const secrets = Object.entries(environment).filter(([key, value]) => /key|token|password|secret|cookie/i.test(key) && value).map(([, value]) => value)
   const forward = async (input: NodeJS.ReadableStream, output: NodeJS.WritableStream) => {
     const reader = createInterface({ input })

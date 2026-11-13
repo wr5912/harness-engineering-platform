@@ -11,6 +11,7 @@ services:
     cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE]
     security_opt: ["no-new-privileges:true"]
     environment:
+      - HOME=/var/lib/dsh
       - DSH_HOME=/var/lib/dsh
       - DSH_HARNESS_MODE=verification
       - DSH_RUNTIME_UID=${DSH_RUNTIME_UID:-1000}
@@ -59,6 +60,7 @@ services:
     tmpfs:
       - /tmp:rw,exec,nosuid,nodev,size=64m,mode=1777
     environment:
+      - HOME=/var/lib/dsh
       - DSH_HOME=/var/lib/dsh
       - DSH_HARNESS_MODE=verification
       - DSH_PERMISSION_MODE=read-only

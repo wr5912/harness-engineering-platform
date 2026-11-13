@@ -1,6 +1,6 @@
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { collectEntries, sha256File } from '../../manifest.mts'
+import { collectEntries, sha256File, writeChecksums } from '../../manifest.mts'
 import { safeRelative } from '../../fsutil.mts'
 import { copyAgentSnapshot } from '../snapshot.mts'
 import { stageManagedProjections } from './projections.mts'
@@ -67,11 +67,7 @@ export function refreshAgentAssets(root: string, programRoot: string, snapshot: 
     manifest.source = { ...manifest.source, candidateSha256: snapshot.candidateSha256, commit: snapshot.git.commit, dirty: snapshot.git.dirty, files: snapshot.files, omitted: snapshot.omitted }
     manifest.files.sort((a, b) => a.path.localeCompare(b.path))
     writeFileSync(join(root, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 })
-    const checksums = [...manifest.files.filter(file => file.type === 'file'), { path: 'manifest.json', sha256: sha256File(join(root, 'manifest.json')) }].map(file => {
-      const escaped = /[\\\n]/.test(file.path)
-      return `${escaped ? '\\' : ''}${file.sha256}  ${file.path.replaceAll('\\', '\\\\').replaceAll('\n', '\\n')}`
-    })
-    writeFileSync(join(root, 'SHA256SUMS'), checksums.join('\n') + '\n', { mode: 0o600 })
+    writeChecksums(root, manifest.files)
   } catch (error) {
     for (const path of changed) {
       rmSync(`${join(root, path)}.update-${process.pid}`, { force: true })

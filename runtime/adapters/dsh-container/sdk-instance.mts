@@ -88,8 +88,8 @@ const compose = { services: { dsh: {
   user: '1000:1000', working_dir: options.cwd, read_only: true, stop_grace_period: '20s',
   entrypoint: ['node', '/opt/dsh-adapter/sdk-runner.mts'],
   command: ['/opt/harness-sdk/options.json', '/opt/harness-sdk/input.json'],
-  environment: { DSH_HOME: '/var/lib/dsh', DSH_TELEMETRY_DISABLED: '1', HARNESS_SDK_OPTIONS: '/opt/harness-sdk/options.json',
-    ...Object.fromEntries((launch.environmentNames as string[]).map(key => [key, `\${${key}}`])) },
+  environment: { DSH_TELEMETRY_DISABLED: '1', HARNESS_SDK_OPTIONS: '/opt/harness-sdk/options.json',
+    ...Object.fromEntries((launch.environmentNames as string[]).map(key => [key, `\${${key}}`])), HOME: '/var/lib/dsh', DSH_HOME: '/var/lib/dsh' },
   tmpfs: ['/tmp:rw,exec,nosuid,nodev,size=64m,mode=1777'], volumes,
 } } }
 write(join(target, 'compose.yaml'), compose)

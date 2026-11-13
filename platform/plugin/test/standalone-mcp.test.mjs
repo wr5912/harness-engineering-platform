@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test, { after } from 'node:test'
-import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -19,7 +18,7 @@ process.env.HARNESS_DSH_ENTRY ??= '/opt/dsh/npm/lib/node_modules/@deepseek-ai/ds
 after(() => { if (previousEntry === undefined) delete process.env.HARNESS_DSH_ENTRY; else process.env.HARNESS_DSH_ENTRY = previousEntry })
 const directory = await mkdtemp(join(tmpdir(), 'standalone-mcp-'))
 after(() => rm(directory, { recursive: true, force: true }))
-await symlink(join(process.cwd(), 'node_modules'), join(directory, 'node_modules'), 'dir')
+await symlink(new URL('../node_modules', import.meta.url).pathname, join(directory, 'node_modules'), 'dir')
 const outfile = join(directory, 'plugin.mjs')
 await build({ entryPoints: [new URL('../src/standalone/plugin.ts', import.meta.url).pathname], outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external', plugins: [managerSources] })
 const standalone = await import(pathToFileURL(outfile).href)
@@ -33,16 +32,10 @@ async function until(check, label) {
   const deadline = Date.now() + 3000
   while (!await check()) { if (Date.now() > deadline) throw new Error(`未观察到${label}`); await new Promise(resolve => setTimeout(resolve, 10)) }
 }
-async function fixture(t, mcp, extension) {
+async function fixture(t, mcp) {
   const root = await mkdtemp(join(directory, 'fixture-')), home = join(root, 'home')
   await mkdir(join(home, 'standalone'), { recursive: true })
   const config = { agentId: 'fixture', experimentId: 'EXP-fixture-001', presetId: 'fixture', profilePatch: 'agent.patch.yml', mcp }
-  if (extension) {
-    const entry = 'runtime/extensions/security-operations-compositions/plugin.mjs'
-    await mkdir(join(root, 'runtime/extensions/security-operations-compositions'), { recursive: true })
-    await writeFile(join(root, entry), extension)
-    config.extensions = [{ id: 'security-operations-compositions', entry, sha256: createHash('sha256').update(extension).digest('hex'), sourceDigest: 'a'.repeat(64) }]
-  }
   await writeFile(join(home, 'standalone/config.json'), JSON.stringify(config))
   const routes = [], ctx = new Context()
   const gateway = await serve(t, (request, response) => {
@@ -69,61 +62,41 @@ async function fixture(t, mcp, extension) {
   t.after(async () => { await scope.dispose(); await loaded.dispose(); await ctx.fiber.dispose() })
   return { ctx, agent, home, root, emit() { ctx.emit('agent/created', { agent }) } }
 }
-test('独立组合从安装根读取冻结 LFX，运行与报告写入 HOME 并可查询', async t => {
-  const f = await fixture(t, { servers: [], groups: [{ id: 'frozen', members: [{ serverId: 'platform-compositions', names: ['frozen_probe', 'get_composition_run', 'get_composition_artifact'] }] }], sharedToken: 'a'.repeat(64), mountServerIds: ['frozen'] }, `export function populate(ctx) {
-    ctx.platformMcp.compositionExtension.workflows = { probe: {
-      inputSchema: {type:'object', properties:{}, additionalProperties:false}, connections:()=>[], responseMode:'complete',
-      execute:async()=>({fixture:true}), artifacts:()=>[{id:'report', filename:'report.html', contentType:'text/html', body:'<p>fixture</p>'}]
-    } };
-  }`)
-  const bundle = { engine: 'lfx==1.13.1', flow: { data: { nodes: [{ id: 'output', position: { x: 0, y: 0 }, data: { id: 'output', type: 'Output', node: { is_output: true, template: { code: { value: '' } } } } }], edges: [] } }, modules: {}, children: {} }
-  const flowDigest = createHash('sha256').update(JSON.stringify(bundle)).digest('hex')
-  const path = join(f.root, 'mcp/compositions/probe/versions', flowDigest)
-  await mkdir(path, { recursive: true }); await writeFile(join(path, 'bundle.json'), JSON.stringify(bundle))
-  const configPath = join(f.home, 'standalone/config.json'), config = JSON.parse(await readFile(configPath, 'utf8'))
-  config.compositions = { schema_version: '1.0', compositions: [{ id: 'probe', published: { kind: 'workflow', workflow: 'probe', engine: 'lfx', flowDigest, toolName: 'frozen_probe', title: '冻结目录验证', description: '' } }] }
-  await writeFile(configPath, JSON.stringify(config))
+test('组合发现、调用、状态、明细和报告全部请求远端平台，智能体不装配执行器', async t => {
+  const calls = [], names = ['run_probe', 'get_composition_run', 'get_composition_details', 'get_composition_artifact']
+  const protocol = createMcpHandler(() => {
+    const server = new McpServer({ name: 'platform', version: '1' }, { capabilities: { tools: {} } })
+    server.server.setRequestHandler('tools/list', async () => ({ tools: names.map(name => ({ name, inputSchema: { type: 'object' } })) }))
+    server.server.setRequestHandler('tools/call', async request => {
+      calls.push(request.params)
+      const result = request.params.name === 'run_probe' ? { run_id: 'platform-run', status: 'running' }
+        : request.params.name === 'get_composition_run' ? { status: 'completed' }
+        : request.params.name === 'get_composition_details' ? { items: ['remote-detail'] }
+        : { body: '<p>platform report</p>' }
+      return { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result }
+    })
+    return server
+  })
+  t.after(() => protocol.close())
+  const upstream = await serve(t, toNodeHandler(protocol))
+  const f = await fixture(t, { servers: [{ id: 'business', enabled: true, url: upstream.origin + '/mcp', tools: { mode: 'all', names: [] } }], groups: [], sharedToken: 'a'.repeat(64) })
   f.emit()
-  await until(() => f.ctx.tools.get('mcp__frozen__frozen_probe', f.agent), '冻结组合工具')
-  const call = async (name, args) => {
-    const response = await f.ctx.tools.get(`mcp__frozen__${name}`, f.agent).execute(args, { agent: f.agent, signal: new AbortController().signal })
-    assert.notEqual(response.isError, true, JSON.stringify(response))
-    return response.structuredContent ?? JSON.parse(response.content[0].text)
-  }
-  const response = await call('frozen_probe', {})
-  const runId = response.result.run_id
-  assert.equal(response.ok, true)
-  assert.equal((await call('get_composition_run', { run_id: runId })).status, 'completed')
-  assert.equal((await call('get_composition_artifact', { run_id: runId, artifactId: 'report' })).body, '<p>fixture</p>')
-  assert.equal(JSON.parse(await readFile(join(f.home, `mcp/.local/runs/${runId}.json`), 'utf8')).status, 'completed')
-  await assert.rejects(readFile(join(f.root, `mcp/.local/runs/${runId}.json`)), { code: 'ENOENT' })
+  await until(() => names.every(name => f.ctx.tools.get(`mcp__business__${name}`, f.agent)), '平台组合工具')
+  const signal = new AbortController().signal
+  const admitted = await f.ctx.tools.resolve({ agent: f.agent, modelSelection: {}, signal })
+  t.after(() => admitted.dispose())
+  assert.deepEqual(f.ctx.tools.schemas(f.agent, admitted).filter(tool => tool.name.startsWith('mcp__business__')).map(tool => tool.name).sort(), names.map(name => `mcp__business__${name}`).sort())
+  const call = async name => (await f.ctx.tools.get(`mcp__business__${name}`, f.agent, admitted).execute({ run_id: 'platform-run' }, { agent: f.agent, signal, toolSet: admitted })).structuredContent
+  assert.equal((await call(names[0])).status, 'running')
+  assert.equal((await call(names[1])).status, 'completed')
+  assert.deepEqual((await call(names[2])).items, ['remote-detail'])
+  assert.equal((await call(names[3])).body, '<p>platform report</p>')
+  assert.deepEqual(calls.map(call => call.name), names)
+  assert.equal(f.ctx.get('platformMcp'), undefined)
+  assert.equal(f.ctx.get('standaloneBindings'), undefined)
+  await assert.rejects(readFile(join(f.home, 'mcp/.local/runs/platform-run.json')), { code: 'ENOENT' })
 })
-test('独立 Runtime 原生分组可查询本地编排状态、分页明细和报告', async t => {
-  const names = ['get_composition_run', 'get_composition_details', 'get_composition_artifact']
-  const f = await fixture(t, { servers: [], groups: [{ id: 'runs', members: [{ serverId: 'platform-compositions', names }] }], sharedToken: 'd'.repeat(64), mountServerIds: ['runs'] })
-  const runId = 'run-12345678-1234-4123-8123-123456789abc', directory = join(f.home, 'mcp/.local/runs')
-  await mkdir(directory, { recursive: true })
-  await writeFile(join(directory, `${runId}.json`), JSON.stringify({ engine: 'workflow', run_id: runId, status: 'completed',
-    nodes: { root: { status: 'completed', result: { items: ['first', 'second'] } } },
-    artifacts: [{ id: 'report', filename: 'report.html', contentType: 'text/html', body: '<p>saved report</p>' }] }))
-  f.emit()
-  await until(() => names.every(name => f.ctx.tools.get(`mcp__runs__${name}`, f.agent)), '原生组合查询工具')
-  const call = async (name, args) => {
-    const result = await f.ctx.tools.get(`mcp__runs__${name}`, f.agent).execute({ run_id: runId, ...args }, { agent: f.agent, signal: new AbortController().signal })
-    assert.notEqual(result.isError, true)
-    return result.structuredContent ?? JSON.parse(result.content[0].text)
-  }
-  assert.equal((await call(names[0])).status, 'completed')
-  assert.deepEqual((await call(names[1], { node_id: 'root', offset: 1, limit: 1 })).items, ['second'])
-  assert.equal((await call(names[2], { artifactId: 'report' })).body, '<p>saved report</p>')
-})
-test('真实 Cordis 插件依赖允许冻结业务扩展读取原生模型与设置服务', async t => {
-  const f = await fixture(t, { servers: [], groups: [], sharedToken: 'a'.repeat(64) }, `export function populate(ctx) {
-    if (!ctx.llm.fixture || !ctx.settingsController.fixture) throw new Error('缺少原生模型或设置服务');
-    ctx.platformMcp.compositionExtension.id = 'fixture-extension';
-  }`)
-  assert.equal(f.ctx.platformMcp.compositionExtension.id, 'fixture-extension')
-})
+
 test('按名称选择分组工具时，原生客户端发现与调用使用相同挂载范围', async t => {
   const protocol = createMcpHandler(() => {
     const server = new McpServer({ name: 'selected-upstream', version: '1' }, { capabilities: { tools: {} } })

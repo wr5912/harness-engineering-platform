@@ -955,11 +955,13 @@ export function apply(ctx: any, config: any): void {
         if (config.withToolContext) {
           const currentServer = () => {
             server.platformAssertCurrent?.()
-            const latest = snapshot(config).servers.find(item => item.id === server.id && item.enabled !== false)
+            const current = snapshot(config)
+            const latest = (config.mountServers ? config.mountServers(current.servers) : current.servers)
+              .find((item: any) => item.id === server.id && item.enabled !== false)
             if (!latest) throw new Error('MCP 服务器已停用或移除')
             return latest
           }
-          if (server.platformGroup) scope.ctx.inject(['mcpResources'], (inner: any) => {
+          if (!server.specUrl) scope.ctx.inject(['mcpResources'], (inner: any) => {
             inner.mcpResources.register(server.id, { request: (request: any, execution: any) => config.withToolContext(execution, async () => {
               const active = { ...currentServer(), platformSignal: execution.signal }
               active.platformAssertCurrent?.()

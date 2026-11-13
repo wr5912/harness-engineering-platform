@@ -121,6 +121,12 @@ export function writeManifest(path: string, manifest: Manifest): void {
   writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n', { mode: 0o644 })
 }
 
+export function writeChecksums(root: string, files: FileEntry[]): void {
+  const entries = [...files.filter(file => file.type === 'file'), { path: 'manifest.json', sha256: sha256File(join(root, 'manifest.json')) }]
+  const lines = entries.map(file => `${/[\\\n]/.test(file.path) ? '\\' : ''}${file.sha256}  ${file.path.replaceAll('\\', '\\\\').replaceAll('\n', '\\n')}`)
+  writeFileSync(join(root, 'SHA256SUMS'), lines.join('\n') + '\n', { mode: 0o600 })
+}
+
 export function verifyEntries(root: string, expected: FileEntry[], ignoreExtra: string[] = []): string[] {
   const actual = collectEntries(root)
   const expectedMap = new Map(expected.map(entry => [entry.path, entry]))

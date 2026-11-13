@@ -256,10 +256,18 @@ function standaloneCache(f, dependency) {
 }
 test('Node精确锁生成与只读挂载回执可供普通构建使用，篡改和镜像变化保持pending', async t => {
   const f = fixture(t)
-  write(f.root, `${base}/dsh/managed/plugin/package.json`, JSON.stringify({ name: 'plugin', dependencies: { example: '^1.2.0' }, scripts: { preinstall: 'never execute' } }))
+  write(f.root, `${base}/dsh/managed/plugin/package.json`, JSON.stringify({ name: 'plugin', dependencies: { example: '^1.2.0' }, peerDependencies: { '@deepseek-ai/cordis': '^4.0.4' }, devDependencies: { '@deepseek-ai/dsh': '0.1.7-rc.2' }, scripts: { preinstall: 'never execute' } }))
   assert.equal(resolvePreparedAssetDependencies(f.root, id).status, 'pending')
   const env = fakeEnvironment(f), prepared = await createAssetDependenciesHandler(f.root, { command: env.command })({ experiment_id: id })
   assert.equal(prepared.ok, true, JSON.stringify(prepared)); assert.equal(prepared.value.status, 'ready')
+  const install = env.calls.find(call => call.args.includes('ci'))
+  assert.ok(install.args.includes('--legacy-peer-deps'))
+  assert.ok(install.args.includes('--omit=dev'))
+  assert.equal(install.args[install.args.indexOf('--user') + 1], `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`)
+  assert.ok(install.args.includes('HOME=/tmp'))
+  const runtimeManifest = JSON.parse(readFileSync(join(dirname(prepared.value.mounts[0].source), 'package.json'), 'utf8'))
+  assert.equal(runtimeManifest.devDependencies, undefined)
+  assert.deepEqual(runtimeManifest.peerDependencies, { '@deepseek-ai/cordis': '^4.0.4' })
   assert.deepEqual(prepared.value.generated_locks, ['dsh/managed/plugin/package-lock.json'])
   assert.equal(prepared.value.mounts[0].target, '/opt/dsh-managed/plugin/node_modules')
   assert.equal(resolvePreparedAssetDependencies(f.root, id, { image_id: 'other' }).status, 'pending')
@@ -279,7 +287,7 @@ test('Node精确锁生成与只读挂载回执可供普通构建使用，篡改�
   write(prepared.value.mounts[0].source, 'example/index.js', 'changed')
   assert.equal(resolvePreparedAssetDependencies(f.root, id).status, 'pending')
 })
-test('Node安装Hook依赖和不完整声明选择不能报告准备完成', async t => {
+test('Node依赖忽略安装Hook，空声明选择仍明确报错', async t => {
   const f = fixture(t)
   write(f.root, `${base}/dsh/managed/plugin/package.json`, '{"dependencies":{"example":"1.2.3"}}')
   let env
@@ -291,9 +299,9 @@ test('Node安装Hook依赖和不完整声明选择不能报告准备完成', asy
   const handler = createAssetDependenciesHandler(f.root, { command: env.command })
   assert.equal((await handler({ experiment_id: id, declaration_paths: [] })).error.code, 'invalid_request')
   const result = await handler({ experiment_id: id })
-  assert.equal(result.ok, false); assert.match(result.error.message, /安装 Hook/)
-  assert.equal(existsSync(join(f.candidate, 'dsh/managed/plugin/package-lock.json')), false)
-  assert.equal(resolvePreparedAssetDependencies(f.root, id).status, 'pending')
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.equal(existsSync(join(f.candidate, 'dsh/managed/plugin/package-lock.json')), true)
+  assert.ok(env.calls.filter(call => call.args.includes('npm')).every(call => call.args.includes('--ignore-scripts')))
 })
 test('Managed根级声明按Node祖先目录规则供子插件使用', async t => {
   const f = fixture(t)

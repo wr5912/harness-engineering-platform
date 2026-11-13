@@ -185,7 +185,8 @@ export function applyTools(ctx: Context) {
   const modelProjection = (agentId: string, selected?: { provider: string; model: string; reasoningEffort?: string }, candidatePath?: string) => projectModelPolicy(assetRoot, agentId, {
     sessionController: ctx.sessionController, settingsController: ctx.settingsController, credentials: ctx.credentials, llm: ctx.llm,
   }, selected, candidatePath)
-  const deployments = createDeployments(assetRoot, { seed: createDeploymentSeed(assetRoot, modelProjection), notify: () => notify(['agents']) })
+  const deployments = createDeployments(assetRoot, { seed: createDeploymentSeed(assetRoot, modelProjection,
+    id => new URL(ctx.webServer.publicPath(`/mcp/groups/${id}/v2`), ctx.webServer.getOrigin()).href), notify: () => notify(['agents']) })
   ctx.effect(() => () => deployments.dispose())
   registrationContext.connection.fetch.register({ path: '/api/harness-platform/agent-deployments/download', methods: ['GET'], requestBody: 'buffered', fetch: deployments.download })
   const domains = {

@@ -27,6 +27,7 @@ test('SDK 独立包保留官方运行入口、示例与文档，无业务 Web �
   tarExtract(result.archive, root)
   assert.equal(result.manifest.source.profile, 'sdk')
   const compose = JSON.parse(readFileSync(join(root, 'runtime/compose.yaml'), 'utf8'))
+  for (const service of Object.values(compose.services)) { assert.equal(service.environment.HOME, '/var/lib/dsh'); assert.equal(service.environment.DSH_HOME, '/var/lib/dsh') }
   assert.equal(compose.services.dsh.ports, undefined)
   assert.equal(compose.services.dsh.healthcheck, undefined)
   assert.equal(compose.services.dsh.environment.STANDALONE_PORT, undefined)

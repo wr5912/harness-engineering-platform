@@ -41,7 +41,7 @@ function declarations(candidate: string): Declaration[] {
     const node = names.find(path => path.endsWith('/package.json'))
     if (node) {
       const manifest = JSON.parse(readFileSync(dataPath(candidate, node), 'utf8'))
-      if (Object.keys({ ...manifest.dependencies, ...manifest.devDependencies, ...manifest.optionalDependencies }).length) {
+      if (Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies }).length) {
         const lock = `${directory}/package-lock.json`
         result.push({ kind: 'node', path: node, directory, files: [node, ...(existsSync(dataPath(candidate, lock)) ? [lock] : [])].map(path => ({ path, sha256: hash(readFileSync(dataPath(candidate, path))) })) })
       }
@@ -243,9 +243,9 @@ export function createAssetDependenciesHandler(assetRoot: string, options: { com
         const destination = join(staging, `package-${index}`); mkdirSync(destination)
         if (item.kind === 'node') {
           const manifest = JSON.parse(readFileSync(dataPath(source.candidate, item.path), 'utf8'))
-          if (Object.keys({ ...manifest.dependencies, ...manifest.devDependencies, ...manifest.optionalDependencies }).some(name => name.startsWith('@deepseek-ai/'))) throw new DependencyError('dependency_pending', 'DSH 公共模块应使用目标 Runtime 的共享 peerDependencies，不能安装第二份 DSH/Cordis')
-          if (manifest.workspaces || Object.values({ ...manifest.dependencies, ...manifest.devDependencies, ...manifest.optionalDependencies }).some(value => typeof value !== 'string' || /^(?:file:|link:|workspace:|git|https?:|\.\.?\/|\/)/.test(value))) throw new DependencyError('dependency_pending', 'Node 依赖包含工作区、本地路径或 VCS/URL；请先给出包索引版本')
-          const sanitized = { ...manifest, scripts: {}, bin: undefined, workspaces: undefined }
+          if (Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies }).some(name => name.startsWith('@deepseek-ai/'))) throw new DependencyError('dependency_pending', 'DSH 公共模块应使用目标 Runtime 的共享 peerDependencies，不能安装第二份 DSH/Cordis')
+          if (manifest.workspaces || Object.values({ ...manifest.dependencies, ...manifest.optionalDependencies }).some(value => typeof value !== 'string' || /^(?:file:|link:|workspace:|git|https?:|\.\.?\/|\/)/.test(value))) throw new DependencyError('dependency_pending', 'Node 依赖包含工作区、本地路径或 VCS/URL；请先给出包索引版本')
+          const sanitized = { ...manifest, scripts: {}, bin: undefined, workspaces: undefined, devDependencies: undefined }
           writeFileSync(join(destination, 'package.json'), JSON.stringify(sanitized, null, 2) + '\n')
           const lockPath = `${item.directory}/package-lock.json`, existing = existsSync(dataPath(source.candidate, lockPath))
           if (!existing && ['pnpm-lock.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb'].some(name => existsSync(dataPath(source.candidate, `${item.directory}/${name}`)))) throw new DependencyError('dependency_pending', '该包已使用其他锁文件；请先明确转换为 package-lock.json，不能并行维护两份依赖锁')
@@ -254,12 +254,11 @@ export function createAssetDependenciesHandler(assetRoot: string, options: { com
             if (!saved.packages || Object.values(saved.packages).some((pkg: any) => pkg.link || pkg.resolved && !/^https:\/\//.test(pkg.resolved))) throw new DependencyError('dependency_pending', 'Node 锁文件包含非包索引来源，或缺少精确 packages 清单')
             writeFileSync(join(destination, 'package-lock.json'), JSON.stringify(saved, null, 2) + '\n')
           }
-          const docker = ['run', '--rm', '--read-only', '--tmpfs', '/tmp:rw,size=256m', '-e', 'npm_config_cache=/tmp/npm-cache', '-v', `${destination}:/prepare:rw`, '-w', '/prepare', '--entrypoint', 'npm', target.image_id]
-          if (!existing) await command('docker', [...docker, 'install', '--package-lock-only', '--ignore-scripts', '--omit=peer', '--no-audit', '--no-fund'], { signal })
-          await command('docker', [...docker, 'ci', '--ignore-scripts', '--omit=peer', '--no-audit', '--no-fund'], { signal })
+          const docker = ['run', '--rm', '--read-only', '--user', `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`, '--tmpfs', '/tmp:rw,size=256m', '-e', 'HOME=/tmp', '-e', 'npm_config_cache=/tmp/npm-cache', '-v', `${destination}:/prepare:rw`, '-w', '/prepare', '--entrypoint', 'npm', target.image_id]
+          // 原生 DSH/Cordis 的 peer 由目标 Runtime 提供，不让 npm 再解析或安装另一份。
+          if (!existing) await command('docker', [...docker, 'install', '--package-lock-only', '--ignore-scripts', '--legacy-peer-deps', '--omit=peer', '--omit=dev', '--no-audit', '--no-fund'], { signal })
+          await command('docker', [...docker, 'ci', '--ignore-scripts', '--legacy-peer-deps', '--omit=peer', '--omit=dev', '--no-audit', '--no-fund'], { signal })
           const nodeModules = join(destination, 'node_modules'); if (!existsSync(nodeModules)) throw new DependencyError('dependency_pending', 'Node 安装器没有生成依赖目录')
-          const installedLock = JSON.parse(readFileSync(join(destination, 'package-lock.json'), 'utf8'))
-          if (Object.values(installedLock.packages ?? {}).some((pkg: any) => pkg.hasInstallScript)) throw new DependencyError('dependency_pending', 'Node 依赖包含安装 Hook；已跳过执行，需先提供无需 Hook 的目标依赖或受控适配后再准备')
           if (!existing) pendingLocks.push({ path: lockPath, value: readFileSync(join(destination, 'package-lock.json'), 'utf8') })
           packages.push({ kind: 'node', declaration: item.path, path: `package-${index}/node_modules`, target: runtimeDirectory(item.directory) + '/node_modules', files_sha256: hash(JSON.stringify(entries(nodeModules))) })
         } else {

@@ -21,6 +21,15 @@ test('独立包 CLI 的业务默认模型读取可由原生 Node 直接装载', 
   assert.equal(new BusinessDefaultError('busy', 'fixture').code, 'busy')
 })
 
+test('原生 DSH peer 由目标 Runtime 提供，不依赖打包主机安装目录', t => {
+  const f = fixture(t)
+  write(join(f.candidate, 'dsh/managed/native-plugin/package.json'), JSON.stringify({
+    name: 'native-plugin', peerDependencies: { '@deepseek-ai/cordis': '*', '@deepseek-ai/schemastery': '*', react: '*' },
+    dsh: { client: { platform: 'web' } },
+  }))
+  assert.deepEqual(inspectAgentSnapshot(f.input).dependencies, [])
+})
+
 test('单 Agent 快照读取实际未提交字节、保留来源身份，排除其他 Agent 和运行态', t => {
   const f = fixture(t)
   const source = inspectAgentSnapshot(f.input)
@@ -55,6 +64,18 @@ test('仅配置模型的独立包生成可初始化的空 MCP 配置，不要求
   assert.deepEqual(config.mcp.groups, [])
 })
 
+test('出包保留原生模型及环境表达式，显式投影覆盖对应配置', t => {
+  const f = fixture(t)
+  write(join(f.candidate, 'dsh/managed/alpha.patch.yml'), '- id: llm-pi-ai\n  config:\n    providers:\n      local:\n        baseURL: !!js process.env.MODEL_URL\n- id: agent-default-model\n  config: {provider: local, model: qwen}\n')
+  const source = inspectAgentSnapshot(f.input)
+  const seed = agentSeed(source)
+  assert.deepEqual(seed.modelPatch[0].config.providers.local.baseURL, { __dshExpression: 'process.env.MODEL_URL' })
+  assert.equal(seed.modelPatch[1].config.model, 'qwen')
+  const replacement = { id: 'llm-pi-ai', config: { providers: {} } }
+  assert.deepEqual(agentSeed(source, { modelPatch: [replacement], defaultModel: { provider: 'other', model: 'new' } }).modelPatch,
+    [replacement, { id: 'agent-default-model', config: { provider: 'other', model: 'new' } }])
+})
+
 test('未承接的迁移运行声明在独立包预览和打包前明确拒绝，不能静默改变行为', async t => {
   const f = fixture(t), harness = join(f.candidate, 'harness.yaml')
   write(harness, readFileSync(harness, 'utf8') + '\nrole_instructions:\n  alpha-main: dsh/workspace/AGENTS.md\n')
@@ -84,7 +105,9 @@ test('单 Agent 包归档、SHA与安装脚本完整，凭据不进入 manifest 
   assert.equal(readFileSync(join(extracted, 'assets/workspace/AGENTS.md'), 'utf8'), '# 当前已保存且未提交的业务规则\n')
   assert.ok(existsSync(join(extracted, 'install.sh')))
   assert.ok(existsSync(join(extracted, 'agent')))
-  const healthcheck = JSON.parse(readFileSync(join(extracted, 'runtime/compose.yaml'), 'utf8')).services.dsh.healthcheck
+  const compose = JSON.parse(readFileSync(join(extracted, 'runtime/compose.yaml'), 'utf8'))
+  for (const service of Object.values(compose.services)) { assert.equal(service.environment.HOME, '/var/lib/dsh'); assert.equal(service.environment.DSH_HOME, '/var/lib/dsh') }
+  const healthcheck = compose.services.dsh.healthcheck
   assert.equal(healthcheck.start_period, '180s')
   assert.equal(healthcheck.retries, 30)
   assert.deepEqual(verifyEntries(extracted, result.manifest.files, ['manifest.json', 'SHA256SUMS']), [])

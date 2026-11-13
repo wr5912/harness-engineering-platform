@@ -136,7 +136,7 @@ function pythonPackages(candidate: string, input: AgentPackageInput, extraDirect
   return result
 }
 
-function dependencyPackages(candidate: string, input: AgentPackageInput, extraDirectories: string[] = [], sharedSdk = false): DependencyPackage[] {
+function dependencyPackages(candidate: string, input: AgentPackageInput, extraDirectories: string[] = []): DependencyPackage[] {
   const result: DependencyPackage[] = []
   let preparedPackages: Array<{ path: string; lockSha256?: string; preparedTarget?: DependencyPackage['preparedTarget'] }> = []
   if (input.resourcesDir) {
@@ -150,7 +150,7 @@ function dependencyPackages(candidate: string, input: AgentPackageInput, extraDi
       // Web 客户端的 React 由原生 ModuleLoader 提供，不是容器内的 Node 依赖。
       const dependencies = [...new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {}).filter(name => !pkg.peerDependenciesMeta?.[name]?.optional
         && !(name === 'react' && pkg.dsh?.client?.platform === 'web')
-        && !(name.startsWith('@deepseek-ai/') && (sharedSdk && name === '@deepseek-ai/dsh-sdk-client' || existsSync(join(input.programRoot, 'platform/plugin/node_modules', name, 'package.json')))))])]
+        && !name.startsWith('@deepseek-ai/'))])]
       if (dependencies.length) {
         const relativePath = portableDependencyPath(candidate, path)
         const lock = ['pnpm-lock.yaml', 'package-lock.json', 'npm-shrinkwrap.json'].map(name => join(path, name)).find(existsSync)
@@ -212,7 +212,7 @@ export function inspectAgentSnapshot(input: AgentPackageInput, targetImage?: { t
   }
   for (const path of extraRoots) if (!files.some(file => file.sourcePath === path || file.sourcePath.startsWith(path + '/'))) throw new Error(`SDK 运行资产未包含在快照中：${path}`)
   const projectDirectories = sdkRuntime?.project_workspace ? [sdkRuntime.project_workspace.path] : []
-  const dependencies = [...dependencyPackages(candidate, input, projectDirectories, source.profile === 'sdk'), ...pythonPackages(candidate, input, projectDirectories)]
+  const dependencies = [...dependencyPackages(candidate, input, projectDirectories), ...pythonPackages(candidate, input, projectDirectories)]
   let image: { tag?: string; id?: string } = targetImage ?? {}
   if (!targetImage && input.resourcesDir) try { image = JSON.parse(readFileSync(join(input.resourcesDir, 'resources.json'), 'utf8')).image ?? {} } catch { /* 运行资源缺失由调用方报告。 */ }
   const matchesTarget = (dependency: DependencyPackage) => !dependency.preparedTarget || !image.id || dependency.preparedTarget.imageId === image.id && dependency.preparedTarget.image === image.tag

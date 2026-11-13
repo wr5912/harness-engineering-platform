@@ -19,7 +19,7 @@
 
 默认允许局域网远程访问，直接打开 `http://<目标机地址>:<端口>/assistant/`，无需登录、访问 Token 或访客 Cookie；所有访问者共享该实例的会话和数据。`open` 打开同一直接入口。独立包不连接平台统一网关，不装载平台 Guard 或访问校验服务；第三方 MCP 自身的认证仍使用配置中的凭据。启动、停止与重启保留 `state/home/` 内的原生设置、会话和数据；重启会中断当前任务，先等待任务结束。参数不正确会直接显示帮助并以非零状态退出。
 
-DSH 原生 MCP 客户端负责连接和装载工具、资源；分组和组合编排由随包装载的平台 MCP 服务端插件实现。也可修改 MCP 配置连接可达的平台 MCP 服务，此时依赖该外部服务。Harness 与必要插件通过映射由 DSH Runtime 装载。
+DSH 原生 MCP 客户端按 Harness 配置连接平台或第三方 MCP，发现并调用工具、资源。组合由平台 MCP 服务中的 LFX 执行，组合版本、下游服务配置和执行记录留在平台数据仓。安装包不含 LFX、平台执行器或冻结流程；离线安装仅表示安装介质完整，使用模型及平台组合仍需网络连接。平台不可达时相关工具不可用，其他正常对话不受阻塞。Harness 与业务插件通过映射由 DSH Runtime 装载。
 
 导出结束会清除本次临时构建目录和未完成归档；失败或取消同样清理。安装器先按镜像 tag、Image ID、架构和构建指纹核对 Docker 中已有的标准 Runtime；身份完全匹配时直接复用，不重复导入归档，也不重新打包镜像。安装成功会自动删除安装目录内的 `images/` 和 `offline/`，保留源安装包作为重新安装介质。源包与解包目录由其持有人按需删除。`./agent cleanup` 停止该安装并清除容器、网络及残余安装介质，保留共享标准镜像、Harness、配置、HOME 和会话；再次运行 `./agent start` 可恢复。较早版本可在平台程序根执行 `platform/dsh-deploy agent-cleanup --prefix <安装目录>`。
 
@@ -40,7 +40,7 @@ AGENT_HOST=192.168.1.100
 
 编辑时保留原文件的 `COMPOSE_PROJECT_NAME`、`AGENT_UID` 和 `AGENT_GID`，不要把同一部署改成另一套容器。端口须在 1–65535 内且未被占用。重启重新建立端口映射，镜像与 HOME 保持不变。
 
-MCP 的当前配置只保存在 `state/home/standalone/config.json` 的 `mcp.servers` 中，按 `id` 找到对应连接，编辑后执行 `./agent restart`。首次初始化会保留 Harness 声明的外部直连 MCP；本地分组连接由包内服务生成。保留其余身份、分组与组合版本字段。OpenAPI 连接使用 `specUrl`（规范文件地址）、`apiKey` 和 `authHeader`；普通 MCP 连接使用 `url` 和 `headers`，Bearer Token 位于 `Authorization` Header。文件权限应保持 `600`。`config-seed/` 仅用于首次初始化，重启不会用种子覆盖当前配置。
+MCP 的当前配置只保存在 `state/home/standalone/config.json` 的 `mcp.servers` 中，按 `id` 找到对应连接，编辑后执行 `./agent restart`。首次初始化沿用 Harness 声明的平台与外部 MCP 连接、工具选择和客户端分组。保留其余身份与连接配置；组合版本由平台执行并返回。OpenAPI 连接使用 `specUrl`（规范文件地址）、`apiKey` 和 `authHeader`；普通 MCP 连接使用 `url` 和 `headers`，Bearer Token 位于 `Authorization` Header。文件权限应保持 `600`。`config-seed/` 仅用于首次初始化，重启不会用种子覆盖当前配置。
 
 也可通过参数更新同一份当前配置：
 

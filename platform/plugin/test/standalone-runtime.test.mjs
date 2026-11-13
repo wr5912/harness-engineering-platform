@@ -23,7 +23,7 @@ function fixture(t) {
   mkdirSync(connection, { recursive: true })
   writeFileSync(join(connection, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-client-connection', exports: { './package.json': './package.json', './client': { default: './client.browser.js' } }, dsh: { client: { inject: [], platform: 'web', immediately: true } } }))
   writeFileSync(join(connection, 'client.browser.js'), '// 同镜像原生浏览器连接\n')
-  writeFileSync(join(root, 'assets/managed/agent.patch.yml'), '- id: agent-default-model\n  config: {provider: old, model: old}\n- insert:\n    - id: business-tools\n      name: /opt/dsh-managed/tools.mjs\n    - id: mcp-session-manager\n      name: /opt/dsh-managed/mcp-manager.mjs\n      config:\n        servers:\n          - id: group-one\n')
+  writeFileSync(join(root, 'assets/managed/agent.patch.yml'), '- id: agent-default-model\n  config: {provider: old, model: old}\n- insert:\n    - id: business-tools\n      name: /opt/dsh-managed/tools.mjs\n    - id: mcp-session-manager\n      name: /opt/dsh-managed/mcp-manager.mjs\n      config:\n        servers:\n          - id: group-one\n            url: http://platform.test/mcp/groups/group-one/v2\n')
   const seed = { agentId: 'demo', experimentId: 'EXP-demo-001', presetId: 'demo', profilePatch: 'agent.patch.yml', modelPatch: [{ id: 'agent-default-model', config: { provider: 'api', model: 'model-a' } }], mcp: { servers: [], groups: [{ id: 'group-one', members: [] }], sharedToken: 'a'.repeat(64) } }
   writeFileSync(join(root, 'config-seed/standalone.json'), JSON.stringify(seed))
   writeFileSync(join(root, 'config-seed/environment.llm-api-key'), JSON.stringify({ DEMO_LLM_API_KEY: 'fixture-value' }))
@@ -34,7 +34,7 @@ test('新 HOME 原生初始化一次，冻结业务配置保留，模型与 MCP 
   const f = fixture(t)
   assert.equal(initializeStandalone(f).initialized, true)
   const first = readStandaloneConfig(f.home)
-  assert.deepEqual(first.mcp.mountServerIds, ['group-one'])
+  assert.equal(first.mcp.mountServerIds, undefined)
   const runtime = readFileSync(join(f.home, 'standalone/runtime.patch.yml'), 'utf8')
   assert.match(runtime, /business-tools/)
   assert.doesNotMatch(runtime, /mcp-manager\.mjs|provider: old|business-runtime/)
@@ -69,7 +69,7 @@ test('独立 Web 访问声明随 Harness 读取，不支持的模式明确报错
   assert.throws(() => initializeStandalone(f), /standalone.web.access/)
 })
 
-test('初始化保留 Harness 直连 MCP，已有连接优先，本地分组不回连平台，重配后重启不覆盖', async t => {
+test('初始化保留 Harness 直连 MCP，已有连接优先，平台地址保持原样，重配后重启不覆盖', async t => {
   const f = fixture(t)
   const direct = { id: 'report-write', enabled: true, serverName: 'report-write', url: 'http://external.test/mcp', headers: [{ name: 'X-API-Key', value: 'fixture-key' }], tools: { mode: 'selected', names: ['save', 'get'] } }
   const existing = { id: 'existing', enabled: true, url: 'http://current.test/mcp', tools: { mode: 'all', names: [] } }
@@ -81,15 +81,37 @@ test('初始化保留 Harness 直连 MCP，已有连接优先，本地分组不�
   ] } }]))
   initializeStandalone(f)
   const first = readStandaloneConfig(f.home)
-  assert.deepEqual(first.mcp.servers, [existing, direct, { id: 'minimal', url: 'http://minimal.test/mcp', enabled: true, tools: { mode: 'all', names: [] } }])
-  assert.deepEqual(first.mcp.mountServerIds, ['group-one', 'report-write', 'existing', 'minimal'])
-  assert.deepEqual(first.mcp.mountOverrides['report-write'], { serverName: direct.serverName, tools: direct.tools })
+  assert.deepEqual(first.mcp.servers.map(server => server.id), ['existing', 'group-one', 'report-write', 'minimal', 'disabled'])
+  assert.equal(first.mcp.servers[1].url, 'http://old-platform.test/mcp/groups/group-one/v2')
+  assert.equal(first.mcp.servers[4].enabled, false)
+  assert.equal(first.mcp.mountServerIds, undefined)
   await configureMcpConnection({ id: 'report-write', url: 'http://new.test/mcp', token: 'new-token' }, f)
   const changed = readStandaloneConfig(f.home)
   assert.equal(initializeStandalone(f).initialized, false)
   assert.deepEqual(readStandaloneConfig(f.home), changed)
-  assert.equal(changed.mcp.servers[1].url, 'http://new.test/mcp')
-  assert.deepEqual(changed.mcp.servers[1].headers, [...direct.headers, { name: 'Authorization', value: 'Bearer new-token' }])
+  assert.equal(changed.mcp.servers[2].url, 'http://new.test/mcp')
+  assert.deepEqual(changed.mcp.servers[2].headers, [...direct.headers, { name: 'Authorization', value: 'Bearer new-token' }])
+})
+
+test('已有安装升级移除嵌入执行配置，恢复远程连接并保留原生模型及会话', t => {
+  const f = fixture(t)
+  initializeStandalone(f)
+  const current = readStandaloneConfig(f.home)
+  const legacy = { ...current, compositions: { flows: ['old-flow'] }, extensions: ['old-runtime'], fixedBindings: [], mcp: { ...current.mcp, servers: [{ id: 'platform-compositions', url: 'http://localhost/embedded' }], groups: [{ id: 'local-executor', members: [{ serverId: 'platform-compositions' }] }], mountServerIds: ['local-executor'] } }
+  writeFileSync(join(f.home, 'standalone/config.json'), JSON.stringify(legacy))
+  writeFileSync(join(f.home, 'profiles/standalone/cordis.patch.yml'), '# 用户原生模型\n[]\n')
+  mkdirSync(join(f.home, 'sessions'), { recursive: true })
+  writeFileSync(join(f.home, 'sessions/retained.json'), '{"id":"retained"}')
+  assert.equal(initializeStandalone(f).initialized, false)
+  const migrated = readStandaloneConfig(f.home)
+  assert.deepEqual(migrated.mcp.servers.map(row => row.id), ['group-one'])
+  assert.equal(migrated.mcp.servers[0].url, 'http://platform.test/mcp/groups/group-one/v2')
+  assert.deepEqual(migrated.mcp.groups, [])
+  assert.equal('compositions' in migrated, false)
+  assert.equal('extensions' in migrated, false)
+  assert.equal('fixedBindings' in migrated, false)
+  assert.match(readFileSync(join(f.home, 'profiles/standalone/cordis.patch.yml'), 'utf8'), /用户原生模型/)
+  assert.equal(readFileSync(join(f.home, 'sessions/retained.json'), 'utf8'), '{"id":"retained"}')
 })
 
 test('明确重配仅更新模型/MCP，保留业务身份及专用凭据路径', async t => {
@@ -125,15 +147,12 @@ test('仅重配 MCP 时不回写过期模型种子，原生设置页面的新模
   assert.equal(readStandaloneConfig(f.home).mcp.sharedToken, 'c'.repeat(64))
 })
 
-test('选定分组的业务连接配置动态指向本地桥，其他外部服务地址保持原值', () => {
-  const rows = projectManagedPatch('- insert:\n    - id: threat-analysis\n      name: /opt/dsh-managed/threat.mjs\n      config:\n        connections:\n          runtimeGroup:\n            id: selected\n            url: http://old-platform:18120/hep/mcp/groups/selected/v2\n        external: http://independent-mcp/mcp\n', ['selected'])
+test('业务连接配置保留原生平台地址，不投影成本地执行器', () => {
+  const rows = projectManagedPatch('- insert:\n    - id: threat-analysis\n      name: /opt/dsh-managed/threat.mjs\n      config:\n        connections:\n          runtimeGroup:\n            id: selected\n            url: http://platform:18120/hep/mcp/groups/selected/v2\n        external: http://independent-mcp/mcp\n')
   const plugin = rows[0].insert[0]
-  assert.deepEqual(plugin.inject, ['webServer'])
+  assert.equal(plugin.inject, undefined)
+  assert.equal(plugin.config.connections.runtimeGroup.url, 'http://platform:18120/hep/mcp/groups/selected/v2')
   assert.equal(plugin.config.external, 'http://independent-mcp/mcp')
-  const ctx = { webServer: { publicPath: path => '/assistant' + path, getOrigin: () => 'http://172.27.0.2:3080' } }
-  const actual = new Function('ctx', `return (${plugin.config.connections.runtimeGroup.url.__dshExpression})`)(ctx)
-  assert.equal(actual, 'http://172.27.0.2:3080/assistant/mcp/groups/selected/v2')
-  assert.doesNotMatch(actual, /old-platform|18120/)
 })
 
 test('当前模型仅保存在原生设置，MCP配置中不维护另一份可编辑模型副本', t => {
@@ -203,7 +222,7 @@ test('SDK 独立环境使用原生SDK组合和固定Preset，初始化及重配�
   assert.equal(existsSync(join(f.home, 'standalone/input.json')), false)
 })
 
-test('MCP 重配与实际装载共用本地组合服务，不要求在可编辑连接中保存派生服务', async t => {
+test('已有内嵌组合配置迁移为原生客户端，重配不再保存组合或派生服务', async t => {
   const f = fixture(t)
   f.seed.mcp.servers = [{ id: 'soc', enabled: true, specUrl: 'http://old.test/openapi.json' }]
   f.seed.mcp.groups = [{ id: 'policy-response', members: [{ serverId: 'platform-compositions', names: ['policy_change', 'get_composition_run'] }] }]
@@ -214,8 +233,8 @@ test('MCP 重配与实际装载共用本地组合服务，不要求在可编辑�
   const current = readStandaloneConfig(f.home)
   assert.equal(current.mcp.servers[0].specUrl, 'http://new.test/openapi.json')
   assert.equal(current.mcp.servers[0].apiKey, 'new-key')
-  assert.deepEqual(current.mcp.groups, f.seed.mcp.groups)
-  assert.deepEqual(current.compositions, f.seed.compositions)
+  assert.deepEqual(current.mcp.groups, [])
+  assert.equal(current.compositions, undefined)
   assert.equal(current.mcp.servers.some(server => server.id === 'platform-compositions'), false)
   await assert.rejects(configureStandalone({ mcp: { ...current.mcp, groups: [{ id: 'bad', members: [{ serverId: 'missing', names: ['query'] }] }] } }, f), /分组成员/)
   assert.deepEqual(readStandaloneConfig(f.home), current)

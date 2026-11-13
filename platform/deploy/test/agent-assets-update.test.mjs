@@ -64,11 +64,11 @@ test('现场修改、依赖或运行身份变化均拒绝覆盖', t => {
   assert.throws(() => refreshAgentAssets(f.root, programRoot, f.snapshot(), 'arm64', 'runtime:fixed'), /同一智能体/)
 })
 
-test('投影失败恢复资产、原投影和清单，不留下半次更新', t => {
+test('挂载方式变化时恢复资产、原投影和清单，不留下半次更新', t => {
   const f = fixture(t), oldManifest = readFileSync(join(f.root, 'manifest.json'))
   const oldProjection = readFileSync(join(f.root, 'runtime/projections/managed/ui/index.js'))
-  f.put(join(f.candidate, 'dsh/managed/ui/index.js'), 'const definition={fixedCompositions:{}};')
-  assert.throws(f.update, /唯一 SDK/)
+  f.put(join(f.candidate, 'dsh/managed/ui/index.js'), "export const value='native';")
+  assert.throws(f.update, /挂载方式变化/)
   assert.deepEqual(readFileSync(join(f.root, 'manifest.json')), oldManifest)
   assert.deepEqual(readFileSync(join(f.root, 'runtime/projections/managed/ui/index.js')), oldProjection)
   assert.match(readFileSync(join(f.root, 'assets/managed/ui/index.js'), 'utf8'), /value='old'/)

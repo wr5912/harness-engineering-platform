@@ -1,16 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, symlinkSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { collectEntries, verifyEntries } from '../manifest.mts'
+import { execFileSync } from 'node:child_process'
 const programRoot = fileURLToPath(new URL('../../../', import.meta.url))
 const { build } = createRequire(join(programRoot, 'platform/plugin/package.json'))('esbuild')
 
 test('复制到其他目录的 compiled worker 仍从显式程序根装载运行器脚本', async t => {
   const root = mkdtempSync(join(tmpdir(), 'agent-runtime-compiled-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
+  symlinkSync(join(programRoot, 'platform/plugin/node_modules'), join(root, 'node_modules'), 'dir')
   const outfile = join(root, 'relocated/plugin/lib/agent-deployment-worker.mjs')
   await build({ entryPoints: [join(programRoot, 'platform/deploy/agent/runtime/index.mts')], outfile, platform: 'node', format: 'esm', bundle: true, packages: 'external' })
   const { writeRuntimeBundle, refreshAgentPreview } = await import(pathToFileURL(outfile).href)
@@ -28,13 +31,25 @@ test('复制到其他目录的 compiled worker 仍从显式程序根装载运行
   mkdirSync(join(staging, 'state/home'), { recursive: true })
   writeFileSync(join(staging, 'state/home/retained'), 'session-and-config')
   writeFileSync(join(staging, 'config-seed/standalone.json'), JSON.stringify(options))
+  for (const path of ['runtime/lfx', 'runtime/extensions', 'mcp/compositions']) {
+    mkdirSync(join(staging, path), { recursive: true })
+    writeFileSync(join(staging, path, 'legacy.json'), '{}')
+  }
   const preview = { agentId: options.agentId, experimentId: options.experimentId, candidateSha256: 'f'.repeat(64), arch: options.arch }
-  writeFileSync(join(staging, 'manifest.json'), JSON.stringify({ kind: 'standalone-agent', source: preview, package: { arch: options.arch }, image: { tag: options.imageTag } }))
+  writeFileSync(join(staging, 'manifest.json'), JSON.stringify({ kind: 'standalone-agent', source: preview, package: { arch: options.arch }, image: { tag: options.imageTag }, files: collectEntries(staging, ['state']) }))
+  const compose = JSON.parse(readFileSync(join(staging, 'runtime/compose.yaml')))
+  delete compose.services.dsh.environment.HOME
+  writeFileSync(join(staging, 'runtime/compose.yaml'), JSON.stringify(compose))
   await assert.rejects(refreshAgentPreview(staging, programRoot, { ...preview, candidateSha256: 'a'.repeat(64) }), /不一致/)
   await refreshAgentPreview(staging, programRoot, preview)
+  for (const path of ['runtime/lfx', 'runtime/extensions', 'mcp/compositions']) assert.equal(existsSync(join(staging, path)), false)
   assert.equal(readFileSync(join(staging, 'state/home/retained'), 'utf8'), 'session-and-config')
   assert.equal(readFileSync(join(staging, 'assets/managed/probe.mjs'), 'utf8'), 'export const name="source-companion";\n')
   const manifest = JSON.parse(readFileSync(join(staging, 'manifest.json'), 'utf8'))
+  assert.equal(JSON.parse(readFileSync(join(staging, 'runtime/compose.yaml'))).services.dsh.environment.HOME, '/var/lib/dsh')
+  assert.deepEqual(verifyEntries(staging, manifest.files, ['manifest.json', 'SHA256SUMS', 'state/home/retained']), [])
+  assert.equal(manifest.files.some(file => file.path.startsWith('state/')), false)
+  execFileSync('sha256sum', ['-c', 'SHA256SUMS', '--quiet'], { cwd: staging })
   manifest.source.profile = 'sdk'
   writeFileSync(join(staging, 'manifest.json'), JSON.stringify(manifest))
   await assert.rejects(refreshAgentPreview(staging, programRoot, preview), /仅支持 Web 包/)

@@ -77,9 +77,10 @@ test('取消导出不自动重放；进程中断回读明确区分，原工作�
   assert.equal((await manager.handler('status', { job_id: id }, signal())).value.state, 'interrupted')
 })
 
-test('连接种子只收集当前业务来源的MCP闭包和环境，不携带其他服务或平台治理', async t => {
+test('连接种子沿用业务原生MCP连接和环境，不复制平台下游服务或治理配置', async t => {
   const f = fixture(t)
   write(join(f.candidate, 'dsh/workspace/AGENTS.md'), '# 当前业务\n\n使用 mcp__business-group__lookup。\n')
+  write(join(f.candidate, 'dsh/managed/alpha.patch.yml'), `- id: mcp-session-manager\n  config:\n    servers:\n      - id: business-platform\n        serverName: business-platform\n        url: http://platform.internal/hep/mcp/groups/business-group/v2\n        tools: { mode: all, names: [] }\n`)
   write(join(f.data, 'config/mcp-manager.json'), JSON.stringify({ schemaVersion: 1, servers: [
     { id: 'needed', serverName: 'needed', url: 'http://mcp.internal', tools: { mode: 'all', names: [] } },
     { id: 'other', serverName: 'other', url: 'http://other.internal', tools: { mode: 'all', names: [] } },
@@ -87,9 +88,10 @@ test('连接种子只收集当前业务来源的MCP闭包和环境，不携带�
   write(join(f.data, '.local/credentials/mcp-manager.json'), JSON.stringify({ schemaVersion: 1, sharedToken: 'fixture-shared', servers: { needed: { apiKey: 'fixture-needed' }, other: { apiKey: 'fixture-other' } } }))
   const load = createDeploymentSeed(f.data, async () => ({ policy: { patch: [{ id: 'llm-test' }], default: { provider: 'test', model: 'test' } }, environment: { MODEL_FIXTURE_KEY: 'fixture-model' } }))
   const { seed } = await load({ agent_id: 'alpha', experiment_id: f.id }, signal())
-  assert.deepEqual(seed.mcp.servers.map(server => server.id), ['needed'])
-  assert.deepEqual(seed.mcp.groups.map(group => group.id), ['business-group'])
-  assert.equal(seed.mcp.servers[0].apiKey, 'fixture-needed')
+  assert.deepEqual(seed.mcp.servers.map(server => server.id), ['business-platform'])
+  assert.deepEqual(seed.mcp.groups, [])
+  assert.equal(seed.mcp.servers[0].url, 'http://platform.internal/hep/mcp/groups/business-group/v2')
+  assert.equal(JSON.stringify(seed).includes('fixture-needed'), false)
   assert.equal(JSON.stringify(seed).includes('fixture-other'), false)
   assert.equal(seed.environment.MODEL_FIXTURE_KEY, 'fixture-model')
   assert.equal(seed.environment.TEST_MODEL_KEY, 'synthetic-fixture-value')
