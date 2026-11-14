@@ -31,6 +31,9 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+if sys.version_info < (3, 10):
+    raise SystemExit('dsh-dev 需要 Python 3.10 或更新版本；请使用项目指定的 HARNESS_PYTHON。')
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from source_contract import EXPERIMENT, IMAGE_LABEL_KEY, REPO, SOURCES, instance_desired_source, resolve, strict_json  # noqa: E402
@@ -1481,8 +1484,13 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
             "project_workspace_host": contract.get("project_workspace_host")} if contract.get("harness_runtime") and not analysis_workspace else {}),
         "mount_modes": ({"analysis_workspace": "ro"} if analysis_workspace else {
             "workspace": "ro", "presets": "ro", "managed": "ro",
+            **({"project_workspace": "rw"} if contract.get("harness_runtime", {}).get("project_workspace") else {}),
             **({"plugin_node_modules": "ro"} if plugin_node_modules else {}),
         }),
+        "workspace_mode": "workspace-write" if contract.get("harness_runtime", {}).get("project_workspace") and not analysis_workspace else "read-only",
+        "permission_mode": "workspace-write" if contract.get("harness_runtime", {}).get("project_workspace") and not analysis_workspace else "read-only",
+        "project_workspace_path": contract.get("harness_runtime", {}).get("project_workspace", {}).get("path")
+            if contract.get("harness_runtime", {}).get("project_workspace") and not analysis_workspace else None,
         "required_env_names": required_env_names(contract, analysis_workspace),
         "model_policy": model_policy_summary(policy),
         "optional_env_names": [name for name in runtime_env_names(contract, analysis_workspace)
@@ -1852,6 +1860,10 @@ def build_plan(args: argparse.Namespace, contract: dict) -> dict:
             *([{"container": "/opt/node_modules", "mode": "ro"}]
               if getattr(args, "plugin_node_modules", None) else []),
         ]),
+        "workspace_mode": "workspace-write" if contract.get("harness_runtime", {}).get("project_workspace") and not analysis_workspace else "read-only",
+        "permission_mode": "workspace-write" if contract.get("harness_runtime", {}).get("project_workspace") and not analysis_workspace else "read-only",
+        "project_workspace_path": contract.get("harness_runtime", {}).get("project_workspace", {}).get("path")
+            if contract.get("harness_runtime", {}).get("project_workspace") and not analysis_workspace else None,
         "web_adapter_mount": {"host": str(WEB_ADAPTER), "container": "/opt/dsh-web", "mode": "ro"},
         "context_assets": [],
         "web_cold_start": web_cold_start_hint(args.mode, analysis_workspace, bool(contract.get("business_control")), contract),
@@ -2722,6 +2734,11 @@ def instance_entry(target: Path, manifest: dict, observation: dict | None = None
         "image_build_fingerprint": manifest.get("image_build_fingerprint"),
         "mounts": manifest.get("mounts") or {},
         "mount_modes": manifest.get("mount_modes") or {},
+        "workspace_mode": manifest.get("workspace_mode", "workspace-write" if manifest.get("project_workspace_host") else "read-only"),
+        "permission_mode": manifest.get("permission_mode", "workspace-write" if manifest.get("project_workspace_host") else "read-only"),
+        "project_workspace_path": manifest.get("harness_runtime", {}).get("project_workspace", {}).get("path")
+            if isinstance(manifest.get("harness_runtime"), dict) and isinstance(manifest.get("harness_runtime", {}).get("project_workspace"), dict)
+            else None,
         "home_volume": resolved_volume,
         "home_directory": manifest.get("home_directory"),
         "home_preserved": home_preserved,

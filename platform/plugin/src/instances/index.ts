@@ -40,6 +40,8 @@ export interface InstanceActionRequest {
   apply_source_mcp?: boolean
   expected_state?: string
   mode?: 'eval'
+  /** 请求的工作区能力；可写能力必须由 Candidate 的 project_workspace 声明授权。 */
+  workspace_mode?: 'read-only' | 'workspace-write'
   business_control?: boolean
   access_mode?: 'authenticated' | 'anonymous'
   identity_mode?: 'development' | 'published'
@@ -72,6 +74,12 @@ interface RegisteredSource {
   selectable: boolean
   reason: string
   model_binding?: ModelSelection
+}
+
+type WorkspaceCapability = {
+  workspace_mode: 'read-only' | 'workspace-write'
+  permission_mode: 'read-only' | 'workspace-write'
+  project_workspace_path: string | null
 }
 
 type InstanceRecord = Record<string, unknown> & {
@@ -259,6 +267,30 @@ function instanceSourceRef(manifest?: Record<string, unknown> | null): string | 
   return ref
 }
 
+function workspaceCapability(assetRoot: string, source: string | undefined, manifest?: Record<string, unknown> | null): WorkspaceCapability {
+  const runtime = manifest?.harness_runtime && typeof manifest.harness_runtime === 'object' && !Array.isArray(manifest.harness_runtime)
+    ? manifest.harness_runtime as Record<string, unknown> : source?.startsWith('experiment:')
+      ? versionSource(assetRoot, source.slice('experiment:'.length), instanceSourceRef(manifest)?.slice(4)).harness_runtime as Record<string, unknown> | undefined
+      : undefined
+  const project = runtime?.project_workspace && typeof runtime.project_workspace === 'object' && !Array.isArray(runtime.project_workspace)
+    ? runtime.project_workspace as Record<string, unknown> : undefined
+  const path = typeof project?.path === 'string' ? project.path : null
+  const mounts = manifest?.mounts && typeof manifest.mounts === 'object' && !Array.isArray(manifest.mounts)
+    ? manifest.mounts as Record<string, unknown> : undefined
+  const mountModes = manifest?.mount_modes && typeof manifest.mount_modes === 'object' && !Array.isArray(manifest.mount_modes)
+    ? manifest.mount_modes as Record<string, unknown> : undefined
+  const write = Boolean(path) && !mounts?.analysis_workspace && (manifest === undefined || mountModes?.project_workspace === 'rw')
+  return { workspace_mode: write ? 'workspace-write' : 'read-only', permission_mode: write ? 'workspace-write' : 'read-only', project_workspace_path: path }
+}
+
+function assertWorkspaceCapability(requested: InstanceActionRequest['workspace_mode'], capability: WorkspaceCapability): void {
+  if (requested !== 'workspace-write' || capability.workspace_mode === 'workspace-write') return
+  const error = new Error('当前来源没有可写项目工作区；请在 Candidate harness.yaml 声明 project_workspace.path，并创建新的开发实例') as Error & { diagnostic?: Record<string, unknown> }
+  error.diagnostic = { code: 'workspace_write_unavailable', message: error.message, requested_workspace_mode: requested, ...capability,
+    next_action: '创建带 project_workspace.path 的独立业务开发实例后重新预览' }
+  throw error
+}
+
 async function ensureRealSource(assetRoot: string, source: string, sourceRef?: string): Promise<string> {
   return versionSource(assetRoot, source.replace(/^experiment:/, ''), sourceRef?.replace(/^git:/, '')).agent_id
 }
@@ -353,10 +385,12 @@ async function assertKnownForMutation(assetRoot: string, name: string, signal?: 
   return state
 }
 
-async function requestForUp(assetRoot: string, request: InstanceActionRequest, requireRecordedModel: boolean): Promise<InstanceActionRequest & { manifest?: any; registered_source_digest?: string }> {
+async function requestForUp(assetRoot: string, request: InstanceActionRequest, requireRecordedModel: boolean): Promise<InstanceActionRequest & { manifest?: any; registered_source_digest?: string; workspace_capability: WorkspaceCapability }> {
   const manifest = request.operation === 'create' ? undefined : await manifestFor(assetRoot, request.name)
   if (request.operation !== 'create' && !manifest) throw new Error(`未找到实例 ${request.name}`)
   const requestedSource = request.source || (manifest ? instanceDesiredSource(assetRoot, manifest) : undefined)
+  const workspace = workspaceCapability(assetRoot, requestedSource, manifest)
+  assertWorkspaceCapability(request.workspace_mode, workspace)
   if (manifest?.profile === 'sdk' || typeof requestedSource === 'string' && requestedSource.startsWith('experiment:')
     && versionSource(assetRoot, requestedSource.slice(11), instanceSourceRef(manifest)?.slice(4)).profile === 'sdk') {
     throw new Error('SDK 型智能体由 TypeScript 应用启动，请使用 SDK 调试入口提交输入；不创建 Web 实例')
@@ -395,6 +429,7 @@ async function requestForUp(assetRoot: string, request: InstanceActionRequest, r
       ...(interruptedReload && typeof registered?.sourceDigest === 'string' ? { registered_source_digest: registered.sourceDigest } : {}),
     } : {}),
     source: requestedSource ? assertSource(requestedSource) : undefined,
+    workspace_capability: workspace,
     port: request.port ?? optionalPort(manifest?.port),
     model_selection: request.model_selection ?? (registeredDefault == null ? undefined : modelSelection(registeredDefault)),
   }
@@ -440,8 +475,9 @@ function reloadArgs(request: InstanceActionRequest, dryRun = false): string[] {
 async function reloadWithPolicy(assetRoot: string, request: InstanceActionRequest, dryRun: boolean, modelPolicy?: ModelPolicyProvider, signal?: AbortSignal) {
   const prepared = await requestForUp(assetRoot, request, Boolean(modelPolicy))
   const agentId = await ensureRealSource(assetRoot, prepared.source!, instanceSourceRef(prepared.manifest))
-  return runUpWithModelPolicy(assetRoot, reloadArgs(request, dryRun), prepared, agentId, modelPolicy,
-    prepared.model_selection, dryRun ? undefined : request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)
+  return { ...(await runUpWithModelPolicy(assetRoot, reloadArgs(request, dryRun), prepared, agentId, modelPolicy,
+    prepared.model_selection, dryRun ? undefined : request.expected_model_policy_hash, registeredModelSnapshot(prepared.manifest), signal)),
+    workspace_capability: prepared.workspace_capability }
 }
 
 async function previewOne(assetRoot: string, request: InstanceActionRequest, signal?: AbortSignal, modelPolicy?: ModelPolicyProvider) {
@@ -449,6 +485,7 @@ async function previewOne(assetRoot: string, request: InstanceActionRequest, sig
   if (request.operation === 'reload') {
     const projected = await reloadWithPolicy(assetRoot, request, true, modelPolicy, signal)
     return { operation: request.operation, name, plan: JSON.parse(projected.result.stdout), retention: retention(request.operation),
+      workspace_capability: projected.workspace_capability,
       model_selection: projected.model_selection, model_policy_hash: projected.model_policy_hash }
   }
   if (request.operation === 'create' || request.operation === 'start' || request.operation === 'restart') {
@@ -459,6 +496,7 @@ async function previewOne(assetRoot: string, request: InstanceActionRequest, sig
     const projected = await runUpWithModelPolicy(assetRoot, upArgs(assetRoot, { ...prepared, name, source }, true), prepared, agentId,
       modelPolicy, prepared.model_selection, undefined, registeredModelSnapshot(prepared.manifest), signal)
     return { operation: request.operation, name, plan: JSON.parse(projected.result.stdout), retention: retention(request.operation),
+      workspace_capability: prepared.workspace_capability,
       ...(prepared.business_control ? { access_mode: prepared.access_mode, identity_mode: prepared.identity_mode } : {}),
       model_selection: projected.model_selection, model_policy_hash: projected.model_policy_hash }
   }
@@ -586,7 +624,7 @@ async function runOne(assetRoot: string, request: InstanceActionRequest, signal?
           }
         }
         return { name, operation: request.operation, ok: true, requested_source_id: source,
-          value: parseCommandOutput(projected.result.stdout, projected.result.stderr) }
+          value: { ...parseCommandOutput(projected.result.stdout, projected.result.stderr), workspace_capability: prepared.workspace_capability } }
       }
       const command = request.operation === 'delete' ? 'delete' : 'down'
       const before = command === 'delete' ? await manifestFor(assetRoot, name) : null
@@ -676,7 +714,7 @@ function actionRequest(payload: unknown): InstanceActionRequest {
       request[field] = object[field] as string
     }
   }
-  if (operation === 'reload' && ['source', 'port', 'model_selection', 'business_control', 'access_mode', 'identity_mode', 'allow_missing_env'].some(field => object[field] !== undefined)) {
+  if (operation === 'reload' && ['source', 'port', 'model_selection', 'business_control', 'access_mode', 'identity_mode', 'allow_missing_env', 'workspace_mode'].some(field => object[field] !== undefined)) {
     throw new Error('重载保留已登记的来源、端口、模型与业务身份，不接受覆盖参数')
   }
   if (object.expected_state !== undefined) {
@@ -699,6 +737,10 @@ function actionRequest(payload: unknown): InstanceActionRequest {
   if (object.mode !== undefined) {
     if (object.mode !== 'eval') throw new Error('mode 只能是 eval')
     request.mode = 'eval'
+  }
+  if (object.workspace_mode !== undefined) {
+    if (!['read-only', 'workspace-write'].includes(String(object.workspace_mode))) throw new Error('workspace_mode 只能是 read-only 或 workspace-write')
+    request.workspace_mode = object.workspace_mode as InstanceActionRequest['workspace_mode']
   }
   return request
 }

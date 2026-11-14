@@ -407,6 +407,7 @@ test('助手重载冻结实际来源与代次，批量部分失败和旧确认�
 test('业务实例创建冻结来源摘要、访问方式并使用统一网关入口', async t => {
   const contract = assistantActionContract('instances', 'run')
   for (const key of ['business_control', 'access_mode', 'identity_mode']) assert.ok(contract.input_schema.properties[key], `${key} 应出现在实例合同`)
+  assert.deepEqual(contract.input_schema.properties.workspace_mode.enum, ['read-only', 'workspace-write'])
   assert.deepEqual(contract.input_schema.properties.access_mode.enum, ['authenticated', 'anonymous'])
   assert.deepEqual(contract.input_schema.properties.identity_mode.enum, ['development', 'published'])
   const digest = 'sha256:' + 'b'.repeat(64)
@@ -434,6 +435,28 @@ test('业务实例创建冻结来源摘要、访问方式并使用统一网关�
   assert.equal(run.input.expected_source_digest, digest)
   assert.equal(run.input.access_mode, 'anonymous')
   assert.equal(receipt.result.value.entry_url, 'http://172.16.138.228:53105/agents/security-operations-expert/instances/biz-one/')
+})
+
+test('助手创建开发实例时冻结 workspace-write 能力，不能用会话沙箱替代实例挂载', async t => {
+  const digest = 'sha256:' + 'c'.repeat(64)
+  const capability = { workspace_mode: 'workspace-write', permission_mode: 'workspace-write', project_workspace_path: 'dsh/workspace/project' }
+  const f = fixture(t, endpoint => endpoint === 'instances/preview' ? { ok: true, value: {
+    name: 'dev-one', operation: 'create', source_id: 'experiment:EXP-test-agent-001',
+    plan: { source_id: 'experiment:EXP-test-agent-001', port: 18601, business_control: { source_digest: digest } },
+    workspace_capability: capability, access_mode: 'anonymous', identity_mode: 'development',
+    model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64),
+  } } : undefined)
+  const id = (await f.rpc('session', { task: '创建可写开发实例' })).value.session_id
+  const pending = f.execute(id, 'instances', 'run', {
+    name: 'dev-one', operation: 'create', source: 'experiment:EXP-test-agent-001', workspace_mode: 'workspace-write',
+  })
+  const card = await f.operation(id)
+  assert.equal(card.input.workspace_mode, 'workspace-write')
+  assert.equal(card.input.expected_source_digest, digest)
+  await f.rpc('confirm', { session_id: id, proposal_id: card.id })
+  assert.equal((await pending).state, 'completed')
+  const run = f.calls.find(call => call.endpoint === 'instances/run')
+  assert.equal(run.input.workspace_mode, 'workspace-write')
 })
 
 test('实例预览失败、对象变化和批量部分失败均不生成可执行提案', async t => {

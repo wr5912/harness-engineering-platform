@@ -253,6 +253,12 @@ function freezeInstanceOperation(input: MapValue, preview: any): MapValue {
     if (business) {
       const digest = value.plan?.business_control?.source_digest
       if (typeof digest !== 'string' || !digest) throw new Error('业务实例预览缺少来源摘要，请重新核对')
+      if (input.workspace_mode !== undefined) {
+        const capability = value.workspace_capability
+        if (!capability || capability.workspace_mode !== input.workspace_mode || capability.permission_mode !== input.workspace_mode) {
+          throw new Error('实例预览缺少匹配的工作区能力，请重新预览并创建符合权限声明的实例')
+        }
+      }
       const frozen: MapValue = { ...input, business_control: true, expected_source_id: source, port, model_selection: selected,
         expected_model_policy_hash: hash, expected_source_digest: digest }
       if (input.operation === 'create') {

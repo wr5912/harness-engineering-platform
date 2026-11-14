@@ -710,6 +710,30 @@ test('preview uses real sources and rejects invented sources', async () => {
   }
 })
 
+test('workspace-write requires a declared project workspace and exposes the capability', async t => {
+  const { module, cleanup } = await loadModule(), fx = fixture()
+  const previous = process.env.XDG_STATE_HOME
+  process.env.XDG_STATE_HOME = fx.state
+  t.after(() => { fx.cleanup(); cleanup(); previous === undefined ? delete process.env.XDG_STATE_HOME : process.env.XDG_STATE_HOME = previous })
+  const handler = module.createInstancesHandler(fx.root), signal = new AbortController().signal
+  const denied = await handler('preview', {
+    operation: 'start', name: 'running-one', workspace_mode: 'workspace-write',
+  }, signal)
+  assert.equal(denied.ok, false)
+  assert.equal(denied.error.code, 'workspace_write_unavailable')
+  assert.equal(denied.error.details?.workspace_mode, 'read-only')
+
+  const candidate = join(fx.root, 'evolution/experiments/EXP-real-agent-001/candidate/harness.yaml')
+  writeFileSync(candidate, readFileSync(candidate, 'utf8') + '\nproject_workspace:\n  path: dsh/workspace/project\n')
+  const preview = await handler('preview', {
+    operation: 'create', name: 'new-one', source: 'experiment:EXP-real-agent-001', workspace_mode: 'workspace-write',
+  }, signal)
+  assert.equal(preview.ok, true, JSON.stringify(preview))
+  assert.deepEqual(preview.value.workspace_capability, {
+    workspace_mode: 'workspace-write', permission_mode: 'workspace-write', project_workspace_path: 'dsh/workspace/project',
+  })
+})
+
 test('来源候选逐版本解析，个别声明缺失不阻塞其他条目', async t => {
   const { module, cleanup } = await loadModule()
   const fx = fixture()

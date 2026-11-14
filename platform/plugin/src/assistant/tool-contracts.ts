@@ -37,6 +37,7 @@ const fields: MapValue = {
   case_ids: strings, critical_case_ids: strings, cases: strings, inputs: strings, artifacts: strings, parent_run_ids: strings, variant_run_ids: strings, run_ids: strings,
   fast: { type: 'boolean' }, enabled: { type: 'boolean' }, allow_missing_env: { type: 'boolean' },
   business_control: { type: 'boolean', description: '创建业务实例默认且必须经过统一网关；不能用 false 绕过网关。已有实例的生命周期沿用其登记。' },
+  workspace_mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: '实例工作区能力；开发或需要写入项目副本时必须请求 workspace-write，平台仅在 Candidate harness.yaml 声明 project_workspace.path 时允许。' },
   access_mode: { type: 'string', enum: ['authenticated', 'anonymous'], description: '业务实例访问方式；anonymous 为无需登录的局域网匿名访问。' },
   identity_mode: { type: 'string', enum: ['development', 'published'], description: '业务实例身份验证阶段。' },
   min_runs_per_case: { type: 'integer' }, max_pass_rate_drop_pp: { type: 'number' }, min_resource_reduction_pct: { type: 'number' }, allow_model_change: { type: 'boolean' }, generation: object,
@@ -69,7 +70,7 @@ const hints: Record<AssistantDomain, Hint[]> = {
   browser: [['inspect', 'target actions screenshot timeout_ms', '检查已登记的平台页面或业务实例；使用受限的角色、标签、文本、占位符或 test id 定位器，结果包含页面快照、操作记录、截图和失败阶段。截图会作为当前原生会话的图片上下文回传。']],
   instances: [
     ['list', ''], ['detail url', 'name'], ['logs', 'name tail'],
-    ['preview run', 'name operation source port allow_missing_env business_control access_mode identity_mode model_selection apply_source_mcp', 'operation=create/start/stop/restart/reload/delete；reload 只重载运行中实例，内部先预览并绑定资产和运行代次摘要，保留 HOME、会话、端口、模型和网关身份，核验实际加载回执；批量逐项返回结果，不自动重放失败或未知写请求；创建必须传明确的 experiment:<ID> 来源。创建业务实例默认且必须经过统一网关，默认 access_mode=anonymous、identity_mode=development；可明确选择 authenticated 或 published。网关不可用时说明原因并修复配置，禁止省略参数或传 false 改为直连。独立研究评测使用 agents/eval 入口，不用业务实例创建接口绕过网关。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部预览并核对模型、业务来源摘要与访问设置，按 DSH 原生权限执行；无需另调 preview 或额外索取确认。业务实例创建后用 instances/url 取统一网关入口，不要把容器直连端口当作业务链接。'],
+    ['preview run', 'name operation source port allow_missing_env business_control access_mode identity_mode workspace_mode model_selection apply_source_mcp', 'operation=create/start/stop/restart/reload/delete；reload 只重载运行中实例，内部先预览并绑定资产和运行代次摘要，保留 HOME、会话、端口、模型和网关身份，核验实际加载回执；批量逐项返回结果，不自动重放失败或未知写请求；创建必须传明确的 experiment:<ID> 来源。创建业务实例默认且必须经过统一网关，默认 access_mode=anonymous、identity_mode=development；可明确选择 authenticated 或 published。需要开发或写入项目副本时传 workspace_mode=workspace-write；先核对返回的 workspace_capability，若来源没有 project_workspace.path，停止并创建新的开发来源，不得反复调用 eval/start 或切换会话沙箱代替实例挂载。网关不可用时说明原因并修复配置，禁止省略参数或传 false 改为直连。独立研究评测使用 agents/eval 入口，不用业务实例创建接口绕过网关。用户要求最新版本时，先用 agents/detail 的 versions[0].id 确定版本，再作为 source 传入；默认 detail.experiment 可能是已启用版本，不等于最新版本。直接调用 run 即可由平台内部预览并核对模型、业务来源摘要、工作区能力与访问设置，按 DSH 原生权限执行；无需另调 preview 或额外索取确认。业务实例创建后用 instances/url 取统一网关入口，不要把容器直连端口当作业务链接。'],
     ['batch-preview batch', 'items', 'items 为多个与 run 相同的操作对象；逐项核对结果，部分失败不能称为全部完成。'],
   ],
   mcp: [
