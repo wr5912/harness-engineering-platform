@@ -52,11 +52,11 @@ export async function updateAgentRuntime(root: string, programRoot: string, imag
     const currentFile = join(root, 'state/home/standalone/config.json')
     if (existsSync(currentFile)) cpSync(currentFile, join(backup, 'standalone-config.json'))
     // 移动旧文件而非复制大型运行环境；回滚时可以原位恢复。
-    for (const path of ['agent', 'manifest.json', 'SHA256SUMS', 'config', 'images', ...(!native ? ['assets', 'runtime', 'mcp', 'config-seed', 'install.sh', 'README.md'] : [])]) {
+    for (const path of ['agent', 'standalone_agent_launcher', 'manifest.json', 'SHA256SUMS', 'config', 'images', ...(!native ? ['assets', 'runtime', 'mcp', 'config-seed', 'install.sh', 'README.md'] : [])]) {
       if (!existsSync(join(root, path))) continue
       renameSync(join(root, path), join(backup, path)); moved.push(path)
     }
-    for (const path of ['agent', 'config', ...(!native ? ['harness'] : [])]) {
+    for (const path of ['standalone_agent_launcher', 'config', ...(!native ? ['harness'] : [])]) {
       renameSync(join(prepared, path), join(root, path)); installed.push(path)
     }
     if (existsSync(currentFile)) writeFileSync(currentFile, JSON.stringify(migrate(JSON.parse(readFileSync(currentFile, 'utf8'))), null, 2) + '\n', { mode: 0o600 })

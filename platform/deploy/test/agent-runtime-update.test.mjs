@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
@@ -49,6 +49,10 @@ test('旧真实安装布局迁移为平台 MCP 客户端，共用镜像且保留
   assert.equal(readFileSync(join(f.root, 'state/home/sessions/keep.jsonl'), 'utf8'), 'keep conversation bytes')
   assert.equal(readFileSync(join(f.root, 'state/home/settings.json'), 'utf8'), 'keep native model bytes')
   const manifest = JSON.parse(readFileSync(join(f.root, 'manifest.json')))
+  assert.equal(existsSync(join(f.root, 'agent')), false)
+  assert.equal(statSync(join(f.root, 'standalone_agent_launcher')).mode & 0o777, 0o755)
+  assert.match(readFileSync(join(f.root, 'standalone_agent_launcher'), 'utf8'), /standalone_agent_launcher install/)
+  assert.equal(readFileSync(join(result.backup, 'agent'), 'utf8'), 'old launcher')
   assert.equal(manifest.schemaVersion, 2)
   assert.equal(manifest.source.experimentId, 'business:alpha')
   assert.equal(manifest.image.tag, image.tag)
@@ -57,6 +61,8 @@ test('旧真实安装布局迁移为平台 MCP 客户端，共用镜像且保留
   const compose = JSON.parse(readFileSync(join(f.root, 'config/compose.yaml')))
   assert.equal(compose.services.dsh.environment.HOME, '/var/lib/dsh')
   await updateAgentRuntime(f.root, program, image)
+  assert.equal(existsSync(join(f.root, 'agent')), false)
+  assert.equal(statSync(join(f.root, 'standalone_agent_launcher')).mode & 0o777, 0o755)
   assert.equal(readFileSync(join(f.root, 'state/home/sessions/keep.jsonl'), 'utf8'), 'keep conversation bytes')
 })
 

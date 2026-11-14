@@ -2,7 +2,7 @@
 set -euo pipefail
 usage() {
   cat <<'HELP'
-用法：./agent <命令> [参数]
+用法：./standalone_agent_launcher <命令> [参数]
   install [--prefix <空目录>]  导入随包标准镜像，启动 Web 或准备 SDK
   start       启动智能体（首次使用自动导入镜像）
   stop        停止智能体，保留 HOME 和会话
@@ -17,8 +17,8 @@ usage() {
   -h, --help  显示帮助；也可在命令后使用
 
 运行主机需预装 Docker Engine 和 Compose 插件，无需另装 Node、Python 或 DSH。
-解压后：./agent install → ./agent configure → ./agent restart
-维护：./agent status；./agent logs -f；./agent stop；./agent cleanup
+解压后：./standalone_agent_launcher install → ./standalone_agent_launcher configure → ./standalone_agent_launcher restart
+维护：./standalone_agent_launcher status；./standalone_agent_launcher logs -f；./standalone_agent_launcher stop；./standalone_agent_launcher cleanup
 升级前备份 config/ 和 state/；Harness 修改后重启，模型设置和会话仍保留。
 
 install、start、restart、configure、SDK 命令支持：
@@ -30,9 +30,9 @@ start、restart、configure 支持：
   --mcp-server <连接ID>  选择 mcp.servers[].id，可重复执行以配置多个服务
   --mcp-url <HTTP(S)地址>  MCP 服务地址；OpenAPI 连接填写规范文件地址
   --mcp-token <Token>    更新该连接凭据；省略保留，空字符串清除
-  示例：./agent restart --mcp-server ai-soc-master --mcp-url http://host:8000/openapi.json --mcp-token '<Token>'
+  示例：./standalone_agent_launcher restart --mcp-server ai-soc-master --mcp-url http://host:8000/openapi.json --mcp-token '<Token>'
 
-配置文件（修改后执行 ./agent restart）：
+配置文件（修改后执行 ./standalone_agent_launcher restart）：
   config/deployment.env                AGENT_PORT、AGENT_HOST、外部 Harness 等部署设置
   state/home/standalone/config.json     mcp.servers 中的地址和凭据
 Harness：编辑 harness/ 下的原生资产后重启，无需构建镜像。
@@ -89,7 +89,7 @@ if [ -n "$prefix" ]; then
   [ "$harness_changed" = false ] || next+=(--harness-root "$AGENT_HARNESS_ROOT")
   [ -z "${AGENT_PORT:-}" ] || next+=(--port "$AGENT_PORT")
   [ -z "${AGENT_HOST:-}" ] || next+=(--host "$AGENT_HOST")
-  exec "$prefix/agent" "${next[@]}"
+  exec "$prefix/standalone_agent_launcher" "${next[@]}"
 fi
 mcp_server='' mcp_url='' mcp_token='' token_supplied=false
 case "$action" in
@@ -154,7 +154,7 @@ if [ "$deployment_changed" = true ] || [ ! -f "$ROOT/state/deployment.env" ]; th
 fi
 if [ "$action" = open ]; then
   if [ "${AGENT_PROFILE:-web}" = sdk ]; then
-    echo "SDK：./agent prepare-sdk；./agent run --input-file <JSON>；./agent example '输入'。配置说明：$ROOT/config/README.md"
+    echo "SDK：./standalone_agent_launcher prepare-sdk；./standalone_agent_launcher run --input-file <JSON>；./standalone_agent_launcher example '输入'。配置说明：$ROOT/config/README.md"
   else
     entry="http://${AGENT_HOST}:${AGENT_PORT}/assistant/"
     echo "$entry"
@@ -163,7 +163,7 @@ if [ "$action" = open ]; then
   exit 0
 fi
 if [ "$action" = restart ] && [ "${AGENT_PROFILE:-web}" = sdk ]; then
-  echo 'SDK 任务不会自动重放；请显式运行 ./agent run --input-file <JSON文件>' >&2; exit 2
+  echo 'SDK 任务不会自动重放；请显式运行 ./standalone_agent_launcher run --input-file <JSON文件>' >&2; exit 2
 fi
 command -v docker >/dev/null || { echo '请先在主机安装 Docker Engine 和 Compose 插件；本包不安装 Docker。' >&2; exit 2; }
 compose() {
@@ -224,7 +224,7 @@ case "${1:-status}" in
   start)
     configure_mcp
     if [ "${AGENT_PROFILE:-web}" = sdk ]; then
-      [ -f "$ROOT/state/home/standalone/input.json" ] || { echo '请使用 ./agent run --input-file <JSON文件> 提交 SDK 输入' >&2; exit 2; }
+      [ -f "$ROOT/state/home/standalone/input.json" ] || { echo '请使用 ./standalone_agent_launcher run --input-file <JSON文件> 提交 SDK 输入' >&2; exit 2; }
       sdk_run
     else
       if [ -n "$mcp_server" ]; then compose up -d --force-recreate --wait dsh; else compose up -d --wait dsh; fi
@@ -240,7 +240,7 @@ case "${1:-status}" in
     ;;
   run)
     [ "${AGENT_PROFILE:-web}" = sdk ] || { echo '当前运行包不是 SDK 型智能体' >&2; exit 2; }
-    [ "${2:-}" = --input-file ] && [ -n "${3:-}" ] && [ "$#" = 3 ] || { echo '用法：./agent run --input-file <JSON文件>' >&2; exit 2; }
+    [ "${2:-}" = --input-file ] && [ -n "${3:-}" ] && [ "$#" = 3 ] || { echo '用法：./standalone_agent_launcher run --input-file <JSON文件>' >&2; exit 2; }
     sdk_idle
     input_file=$(realpath -- "$3"); test -f "$input_file"
     mkdir -p "$ROOT/state/home/standalone"
@@ -275,7 +275,7 @@ case "${1:-status}" in
       compose run --rm -T init >/dev/null
       compose run --rm --no-deps dsh configure
     else
-      [ "${2:-}" = --config-file ] && [ -n "${3:-}" ] || { echo '用法：./agent configure [--config-file <JSON>]' >&2; exit 2; }
+      [ "${2:-}" = --config-file ] && [ -n "${3:-}" ] || { echo '用法：./standalone_agent_launcher configure [--config-file <JSON>]' >&2; exit 2; }
       config_file=$(realpath -- "$3")
       test -f "$config_file"
       compose run --rm -T init >/dev/null
@@ -289,7 +289,7 @@ case "${1:-status}" in
       trap - EXIT
     fi
     if [ "${AGENT_PROFILE:-web}" = sdk ]; then echo '模型与 MCP 配置已保存，后续 SDK 进程将使用新配置；没有重放任务。'
-    else echo '模型与 MCP 配置已保存；请在当前任务结束后运行 ./agent restart 使配置生效。'; fi
+    else echo '模型与 MCP 配置已保存；请在当前任务结束后运行 ./standalone_agent_launcher restart 使配置生效。'; fi
     ;;
   *) argument_error '未知命令' ;;
 esac

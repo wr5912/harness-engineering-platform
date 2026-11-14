@@ -1,4 +1,4 @@
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { stageManagedProjections } from './projections.mts'
 import { collectEntries, sha256File, writeChecksums } from '../../manifest.mts'
@@ -16,8 +16,16 @@ export async function refreshAgentPreview(root: string, programRoot: string, pre
   if (manifest.source.profile === 'sdk') throw new Error('现有预览运行器刷新仅支持 Web 包；SDK 包请使用正式导出入口')
   if (manifest.schemaVersion === 2) {
     // 镜像承载运行器；预览刷新只更新入口，不改写现场配置或旧包目录。
-    cpSync(join(programRoot, 'platform/deploy/agent/runtime/agent'), join(root, 'agent'))
+    cpSync(join(programRoot, 'platform/deploy/agent/runtime/standalone_agent_launcher'), join(root, 'standalone_agent_launcher'))
+    rmSync(join(root, 'agent'), { force: true })
+    chmodSync(join(root, 'standalone_agent_launcher'), 0o755)
     cpSync(join(programRoot, 'platform/deploy/agent/runtime/config.README.md'), join(root, 'config/README.md'))
+    const refreshed = ['standalone_agent_launcher', 'config/README.md']
+    manifest.files = manifest.files.filter((file: { path: string }) => file.path !== 'agent' && !refreshed.includes(file.path))
+    manifest.files.push(...refreshed.map(path => ({ path, type: 'file', sha256: sha256File(join(root, path)), mode: lstatSync(join(root, path)).mode & 0o777 })))
+    manifest.files.sort((a: { path: string }, b: { path: string }) => a.path.localeCompare(b.path))
+    writeFileSync(join(root, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 })
+    writeChecksums(root, manifest.files)
     return
   }
   const seedFile = join(root, 'config-seed/standalone.json')
@@ -28,8 +36,9 @@ export async function refreshAgentPreview(root: string, programRoot: string, pre
   await writeLegacyRuntimeBundle(root, { programRoot, imageTag: manifest.image.tag, imageId: manifest.image.id,
     imageFingerprint: manifest.image.fingerprint, arch: manifest.package.arch, agentId: config.agentId,
     experimentId: config.experimentId, presetId: config.presetId, profilePatch: config.profilePatch, profile: config.profile })
-  const refreshed = ['agent', 'install.sh', 'README.md', 'config-seed/standalone.json']
-  manifest.files = manifest.files.filter((file: { path: string }) => !file.path.startsWith('runtime/') && !file.path.startsWith('mcp/compositions/') && !refreshed.includes(file.path))
+  rmSync(join(root, 'agent'), { force: true })
+  const refreshed = ['standalone_agent_launcher', 'install.sh', 'README.md', 'config-seed/standalone.json']
+  manifest.files = manifest.files.filter((file: { path: string }) => !file.path.startsWith('runtime/') && !file.path.startsWith('mcp/compositions/') && file.path !== 'agent' && !refreshed.includes(file.path))
   manifest.files.push(...collectEntries(join(root, 'runtime')).map(file => ({ ...file, path: `runtime/${file.path}` })),
     ...refreshed.map(path => ({ path, type: 'file', sha256: sha256File(join(root, path)), mode: lstatSync(join(root, path)).mode & 0o777 })))
   manifest.files.sort((a: { path: string }, b: { path: string }) => a.path.localeCompare(b.path))
@@ -58,7 +67,8 @@ export async function writeLegacyRuntimeBundle(staging: string, options: Runtime
   }
   cpSync(join(programRoot, 'runtime/adapters/dsh-container/runtime-compat'), join(root, 'runtime-compat'), { recursive: true })
   cpSync(join(programRoot, 'platform/deploy/bootstrap-docker.sh'), join(root, 'bootstrap-docker.sh'))
-  for (const name of ['install.sh', 'agent']) cpSync(join(programRoot, 'platform/deploy/agent/runtime', name), join(staging, name), { preserveTimestamps: true })
+  for (const name of ['install.sh', 'standalone_agent_launcher']) cpSync(join(programRoot, 'platform/deploy/agent/runtime', name), join(staging, name), { preserveTimestamps: true })
+  chmodSync(join(staging, 'standalone_agent_launcher'), 0o755)
   cpSync(join(programRoot, 'platform/deploy/agent/runtime/README.md'), join(staging, 'README.md'))
   const projections = stageManagedProjections(staging, programRoot)
   const volume = [

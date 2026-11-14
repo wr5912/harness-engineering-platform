@@ -38,7 +38,7 @@ test('SDK 独立包保留官方运行入口、示例与文档，无业务 Web �
   assert.match(readFileSync(join(root, 'harness/sdk/example.ts'), 'utf8'), /from '@deepseek-ai\/dsh-sdk-client'/)
   assert.match(readFileSync(join(root, 'config/README.md'), 'utf8'), /SDK/)
   assert.equal(JSON.parse(readFileSync(join(root, 'config/seed/standalone.json'), 'utf8')).profile, 'sdk')
-  command('bash', ['-n', join(root, 'agent')])
+  command('bash', ['-n', join(root, 'standalone_agent_launcher')])
 })
 
 test('SDK 版本修改后的示例与指南原字节进入包及来源摘要，装配运行器不覆盖内容', async t => {

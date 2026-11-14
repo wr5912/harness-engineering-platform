@@ -110,13 +110,13 @@ test('单 Agent 包归档、SHA与安装脚本完整，凭据不进入 manifest 
   tarExtract(result.archive, extracted)
   assert.equal(readFileSync(join(extracted, 'harness/dsh/workspace/AGENTS.md'), 'utf8'), '# 当前已保存且未提交的业务规则\n')
   assert.equal(existsSync(join(extracted, 'install.sh')), false)
-  assert.ok(existsSync(join(extracted, 'agent')))
+  assert.ok(existsSync(join(extracted, 'standalone_agent_launcher')))
   const compose = JSON.parse(readFileSync(join(extracted, 'config/compose.yaml'), 'utf8'))
   for (const service of Object.values(compose.services)) { assert.equal(service.environment.HOME, '/var/lib/dsh'); assert.equal(service.environment.DSH_HOME, '/var/lib/dsh') }
   const healthcheck = compose.services.dsh.healthcheck
   assert.equal(healthcheck.start_period, '180s')
   assert.equal(healthcheck.retries, 30)
-  assert.deepEqual(readdirSync(extracted).sort(), ['agent', 'config', 'harness', 'images', 'manifest.json'])
+  assert.deepEqual(readdirSync(extracted).sort(), ['config', 'harness', 'images', 'manifest.json', 'standalone_agent_launcher'])
   assert.ok(result.manifest.source.harnessSha256)
   assert.ok(exportRecord(f, result).sourceFiles.length > 0)
   assert.equal(readFileSync(result.archive + '.sha256', 'utf8').split(' ')[0], result.sha256)

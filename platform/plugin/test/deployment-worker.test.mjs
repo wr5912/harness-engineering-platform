@@ -65,7 +65,7 @@ test('真实构建的导出 Worker 移动位置后通过 IPC 预览和离线打�
   const extracted = join(f.root, 'compiled-worker-package')
   mkdirSync(extracted)
   command('tar', ['-xzf', packed.result.archive, '-C', extracted])
-  assert.equal(readFileSync(join(extracted, 'agent'), 'utf8'), readFileSync(join(f.program, 'platform/deploy/agent/runtime/agent'), 'utf8'))
+  assert.equal(readFileSync(join(extracted, 'standalone_agent_launcher'), 'utf8'), readFileSync(join(f.program, 'platform/deploy/agent/runtime/standalone_agent_launcher'), 'utf8'))
   assert.equal(existsSync(join(extracted, 'install.sh')), false)
   const knowledge = JSON.parse(readFileSync(join(extracted, 'harness/dsh/workspace/knowledge/offline/index.json'), 'utf8'))
   assert.equal(knowledge.sources.length, 1)

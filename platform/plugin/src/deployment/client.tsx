@@ -121,7 +121,7 @@ export function DeploymentDialog({ rpc, active, target, onClose }: Pick<Platform
       </> : <section aria-label="导出任务状态"><h3>{stateLabels[job.state] ?? '导出状态待核对'}</h3>
         {['running', 'submitting'].includes(job.state) && <><LoadingIndicator label="生成安装包" /><p role="status">{typeof job.progress === 'string' ? job.progress : job.progress?.message ?? '正在收集资产、运行依赖和镜像。关闭窗口后任务继续执行。'}</p></>}
         {job.error && <p role="alert">{job.error}</p>}
-        {job.state === 'completed' && <><p>安装包大小：{bytes(job.size ?? 0)}。解包后运行 ./agent install。目标机需预装 Docker 和 Compose；使用 ./agent help 查看启停维护方法，config/README.md 查看配置说明。</p><p className="agent-muted">包内包含连接凭据，请妥善保管。业务效果仍需在目标环境核验。</p><a className="agent-primary agent-deployment-download" href={new URL(job.download ?? `api/harness-platform/agent-deployments/download?job_id=${job.id}`, window.location.href).href}>下载安装包</a></>}
+        {job.state === 'completed' && <><p>安装包大小：{bytes(job.size ?? 0)}。解包后运行 ./standalone_agent_launcher install。目标机需预装 Docker 和 Compose；使用 ./standalone_agent_launcher help 查看启停维护方法，config/README.md 查看配置说明。</p><p className="agent-muted">包内包含连接凭据，请妥善保管。业务效果仍需在目标环境核验。</p><a className="agent-primary agent-deployment-download" href={new URL(job.download ?? `api/harness-platform/agent-deployments/download?job_id=${job.id}`, window.location.href).href}>下载安装包</a></>}
       </section>}
       {error && <p role="alert">{error}</p>}
     </div>

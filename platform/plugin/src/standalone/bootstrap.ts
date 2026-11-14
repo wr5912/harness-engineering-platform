@@ -215,7 +215,7 @@ export async function configureMcpConnection(input: { id: string; url?: string; 
 }
 /** 交互入口只询问业务连接，不要求用户理解 Profile 插件 ID 或内部控制参数。 */
 export async function configureInteractive({ root = runtimeRoot(), home = process.env.DSH_HOME || '/var/lib/dsh' } = {}) {
-  if (!process.stdin.isTTY) throw new Error('交互配置需要终端；自动化可使用 ./agent configure --config-file <JSON>')
+  if (!process.stdin.isTTY) throw new Error('交互配置需要终端；自动化可使用 ./standalone_agent_launcher configure --config-file <JSON>')
   const current = readStandaloneConfig(home)
   const nativePatch = load(readFileSync(join(home, 'profiles/standalone/cordis.patch.yml'), 'utf8'), { schema: patchSchema }) as any[]
   const environment = readEnvironment(join(home, 'standalone/environment.llm-api-key'))
@@ -244,7 +244,7 @@ export async function configureInteractive({ root = runtimeRoot(), home = proces
       }
       if (nextKey) { const key = provider.apiKeyEnv || 'STANDALONE_LLM_API_KEY'; provider.apiKeyEnv = key; environment[key] = nextKey }
       if (defaultRow) defaultRow.config = selected
-    } else console.log(current.profile === 'sdk' ? '当前未配置 API 模型，请使用 ./agent configure --config-file <JSON> 提供模型配置。' : '当前智能体未使用可配置的 API 模型；原生 DSH 设置页面仍可新增模型。')
+    } else console.log(current.profile === 'sdk' ? '当前未配置 API 模型，请使用 ./standalone_agent_launcher configure --config-file <JSON> 提供模型配置。' : '当前智能体未使用可配置的 API 模型；原生 DSH 设置页面仍可新增模型。')
     const mcp = structuredClone(current.mcp)
     for (const server of mcp.servers) {
       const field = server.specUrl ? 'specUrl' : server.url ? 'url' : undefined
@@ -264,7 +264,7 @@ export async function configureInteractive({ root = runtimeRoot(), home = proces
 export async function startStandalone({ root = runtimeRoot(), home = process.env.DSH_HOME || '/var/lib/dsh' } = {}) {
   initializeStandalone({ root, home })
   const config = readStandaloneConfig(home)
-  if (config.profile === 'sdk') throw new Error('SDK 智能体由应用持有运行进程，请使用 ./agent run --input-file <JSON> 或 ./agent example')
+  if (config.profile === 'sdk') throw new Error('SDK 智能体由应用持有运行进程，请使用 ./standalone_agent_launcher run --input-file <JSON> 或 ./standalone_agent_launcher example')
   const environment = readEnvironment(join(home, 'standalone/environment.llm-api-key'))
   const host = Object.values(networkInterfaces()).flat().find(address => address && address.family === 'IPv4' && !address.internal)?.address
   if (!host) throw new Error('容器未取得可用于原生 DSH 的 IPv4 地址')
@@ -284,7 +284,7 @@ export function prepareStandaloneSdk({ root = runtimeRoot(), home = process.env.
   const harness = parseHarnessRuntime(readFileSync(join(nativeRoot(root), 'harness.yaml'), 'utf8'))
   const modelPatch = load(readFileSync(join(home, 'profiles/standalone/cordis.patch.yml'), 'utf8'), { schema: patchSchema }) as any[]
   const selected = harness?.model_bindings?.main ?? modelPatch.find(row => row?.id === 'agent-default-model')?.config
-  if (!selected || typeof selected.provider !== 'string' || typeof selected.model !== 'string') throw new Error('尚未配置 SDK 调用模型，请运行 ./agent configure --config-file <JSON>')
+  if (!selected || typeof selected.provider !== 'string' || typeof selected.model !== 'string') throw new Error('尚未配置 SDK 调用模型，请运行 ./standalone_agent_launcher configure --config-file <JSON>')
   const options = { profile: 'standalone', dshHome: home, dshBin: '/opt/dsh/apps/cli/lib/bin.js',
     cwd: harness?.project_workspace ? join(home, 'standalone/project') : '/work/harness/workspace',
     patches: [join(home, 'standalone/runtime.patch.yml')], provider: selected.provider, model: selected.model,

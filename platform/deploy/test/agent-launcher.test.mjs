@@ -9,21 +9,21 @@ function fixture(t, profile = 'web') {
   const root = mkdtempSync(join(tmpdir(), 'agent-launcher-')), bin = join(root, 'bin'), log = join(root, 'docker.log'), input = join(root, 'mcp-input')
   t.after(() => rmSync(root, { recursive: true, force: true }))
   mkdirSync(join(root, 'runtime')); mkdirSync(join(root, 'state')); mkdirSync(bin)
-  copyFileSync(new URL('../agent/runtime/agent', import.meta.url), join(root, 'agent'))
+  copyFileSync(new URL('../agent/runtime/standalone_agent_launcher', import.meta.url), join(root, 'standalone_agent_launcher'))
   writeFileSync(join(root, 'runtime/bundle.env'), `AGENT_ID=fixture\nAGENT_PROFILE=${profile}\n`)
   writeFileSync(join(root, 'state/deployment.env'), 'AGENT_PORT=28027\nAGENT_HOST=127.0.0.1\nCOMPOSE_PROJECT_NAME=launcher-fixture\n')
   writeFileSync(join(bin, 'docker'), `#!/bin/bash
 printf '%s port=%s\n' "$*" "$AGENT_PORT" >> "$LAUNCHER_LOG"
 if [ "\${*: -1}" = configure-mcp ]; then cat > "$LAUNCHER_INPUT"; exit "$LAUNCHER_CONFIGURE_EXIT"; fi
 `, { mode: 0o755 })
-  const run = (args, extra = {}) => spawnSync('bash', [join(root, 'agent'), ...args], { encoding: 'utf8', env: { ...process.env, PATH: bin + ':' + process.env.PATH, LAUNCHER_LOG: log, LAUNCHER_INPUT: input, LAUNCHER_CONFIGURE_EXIT: '0', ...extra } })
+  const run = (args, extra = {}) => spawnSync('bash', [join(root, 'standalone_agent_launcher'), ...args], { encoding: 'utf8', env: { ...process.env, PATH: bin + ':' + process.env.PATH, LAUNCHER_LOG: log, LAUNCHER_INPUT: input, LAUNCHER_CONFIGURE_EXIT: '0', ...extra } })
   return { root, log, input, run }
 }
 
 test('帮助和错误参数直接显示完整用法，不调用 Docker、不输出 Token', t => {
   const f = fixture(t)
   for (const args of [['-h'], ['--help'], ['start', '-h']]) {
-    const r = f.run(args); assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /--mcp-server/)
+    const r = f.run(args); assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /--mcp-server/); assert.match(r.stdout, /用法：\.\/standalone_agent_launcher /); assert.doesNotMatch(r.stdout, /\.\/agent(?: |$)/)
   }
   for (const args of [['unknown'], ['stop', 'extra'], ['start', '--mcp-url'], ['start', '--mcp-url', 'http://test/mcp'], ['restart', '--mcp-server', 'soc'], ['start', '--mcp-server', 'soc', '--mcp-url', 'bad'], ['configure', '--config-file', '/missing'], ['run', '--input-file'], ['configure', '--mcp-token', 'must-not-echo']]) {
     const r = f.run(args); assert.equal(r.status, 2, r.stderr); assert.match(r.stderr, /用法：/); assert.doesNotMatch(r.stdout + r.stderr, /must-not-echo/)

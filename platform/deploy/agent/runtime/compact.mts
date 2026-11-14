@@ -7,8 +7,8 @@ export async function writeCompactRuntime(staging: string, options: RuntimeBundl
   if (!options.programRoot) throw new Error('运行包需要明确的平台程序根')
   const sdk = options.profile === 'sdk', runtime = '/opt/dsh-standalone'
   mkdirSync(join(staging, 'config/seed'), { recursive: true, mode: 0o700 })
-  copyFileSync(join(options.programRoot, 'platform/deploy/agent/runtime/agent'), join(staging, 'agent'))
-  chmodSync(join(staging, 'agent'), 0o755)
+  copyFileSync(join(options.programRoot, 'platform/deploy/agent/runtime/standalone_agent_launcher'), join(staging, 'standalone_agent_launcher'))
+  chmodSync(join(staging, 'standalone_agent_launcher'), 0o755)
   copyFileSync(join(options.programRoot, 'platform/deploy/agent/runtime/config.README.md'), join(staging, 'config/README.md'))
   const volumes = [
     { type: 'bind', source: '${AGENT_HARNESS_ROOT:-./harness}', target: '/opt/standalone/harness', read_only: true, bind: { create_host_path: false } },
@@ -39,7 +39,7 @@ export async function writeCompactRuntime(staging: string, options: RuntimeBundl
       extra_hosts: ['host.docker.internal:host-gateway'], stop_grace_period: '20s' },
   } }
   writeFileSync(join(staging, 'config/compose.yaml'), JSON.stringify(compose, null, 2) + '\n')
-  writeFileSync(join(staging, 'config/deployment.env'), `# 修改后运行 ./agent restart；首次启动自动导入随包镜像。\nAGENT_ID=${options.agentId}\nAGENT_ARCH=${options.arch}\nAGENT_PROFILE=${options.profile ?? 'web'}\nIMAGE_TAG=${options.imageTag}\nIMAGE_ID=${options.imageId ?? ''}\n# AGENT_PORT=18500\n# AGENT_HOST=192.168.1.10\n# AGENT_HARNESS_ROOT=/absolute/path/to/harness\n# AGENT_UID=1000\n# AGENT_GID=1000\n# COMPOSE_PROJECT_NAME=hep-agent-${options.agentId}\n# HTTP_PROXY=http://host.docker.internal:7897\n# HTTPS_PROXY=http://host.docker.internal:7897\n# NO_PROXY=localhost,127.0.0.1,host.docker.internal\n`)
+  writeFileSync(join(staging, 'config/deployment.env'), `# 修改后运行 ./standalone_agent_launcher restart；首次启动自动导入随包镜像。\nAGENT_ID=${options.agentId}\nAGENT_ARCH=${options.arch}\nAGENT_PROFILE=${options.profile ?? 'web'}\nIMAGE_TAG=${options.imageTag}\nIMAGE_ID=${options.imageId ?? ''}\n# AGENT_PORT=18500\n# AGENT_HOST=192.168.1.10\n# AGENT_HARNESS_ROOT=/absolute/path/to/harness\n# AGENT_UID=1000\n# AGENT_GID=1000\n# COMPOSE_PROJECT_NAME=hep-agent-${options.agentId}\n# HTTP_PROXY=http://host.docker.internal:7897\n# HTTPS_PROXY=http://host.docker.internal:7897\n# NO_PROXY=localhost,127.0.0.1,host.docker.internal\n`)
   const environmentTemplate = join(options.harnessRoot ?? join(staging, 'harness'), 'dsh/workspace/deployment.env.example')
   if (existsSync(environmentTemplate)) appendFileSync(join(staging, 'config/deployment.env'), '\n# 业务 Harness 公开环境配置\n' + readFileSync(environmentTemplate, 'utf8').trimEnd() + '\n')
 }

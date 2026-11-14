@@ -13,11 +13,11 @@ function fixture(t, mappings = '') {
   mkdirSync(join(source, 'runtime'), { recursive: true }); mkdirSync(bin)
   copyFileSync(new URL('../agent/runtime/install.sh', import.meta.url), join(source, 'install.sh'))
   writeFileSync(join(source, 'runtime/bundle.env'), `AGENT_ID=port-fixture\nAGENT_ARCH=${process.arch === 'arm64' ? 'arm64' : 'amd64'}\nIMAGE_TAG=fixture\nIMAGE_ID=sha256:fixture\nIMAGE_FINGERPRINT=fixture\n`)
-  writeFileSync(join(source, 'agent'), '#!/bin/bash\nprintf "%s\\n" "$*" >> "$PORT_TEST_AGENT_LOG"\nexit "${PORT_TEST_START_EXIT:-0}"\n')
+  writeFileSync(join(source, 'standalone_agent_launcher'), '#!/bin/bash\nprintf "%s\\n" "$*" >> "$PORT_TEST_AGENT_LOG"\nexit "${PORT_TEST_START_EXIT:-0}"\n')
   mkdirSync(join(source, 'images')); mkdirSync(join(source, 'offline'))
   writeFileSync(join(source, 'images/dsh-runtime.tar'), 'fixture-image')
   writeFileSync(join(source, 'offline/docker.tgz'), 'fixture-docker')
-  const files = ['install.sh', 'runtime/bundle.env', 'agent']
+  const files = ['install.sh', 'runtime/bundle.env', 'standalone_agent_launcher']
   writeFileSync(join(source, 'SHA256SUMS'), files.map(path => `${createHash('sha256').update(readFileSync(join(source, path))).digest('hex')}  ${path}`).join('\n') + '\n')
   writeFileSync(join(bin, 'docker'), `#!/bin/bash
 printf '%s\\n' "$*" >> "$PORT_TEST_DOCKER_LOG"
