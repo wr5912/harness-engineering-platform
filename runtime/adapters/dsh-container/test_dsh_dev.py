@@ -3026,7 +3026,7 @@ class BindHomeMigrationTests(unittest.TestCase):
     def test_root_business_patch_is_private_and_owned_by_container_user(self):
         with tempfile.TemporaryDirectory() as temporary, mock.patch.object(dev, "STATE_ROOT", Path(temporary)):
             contract = {
-                "source_id": "experiment:EXP-example-agent-001-r0123456789ab", "source_kind": "experiment",
+                "source_id": "business:example-agent", "source_kind": "business",
                 "agent_id": "example-agent", "workspace": "/tmp/workspace", "presets": "/tmp/presets",
                 "managed": "/tmp/managed", "preset_id": "example-agent", "patch": "/opt/dsh-managed/example.patch.yml",
                 "evaluation_patch": "/opt/dsh-adapter/evaluation-registry.patch.yml", "required_env_names": [],
@@ -3056,7 +3056,7 @@ class BindHomeMigrationTests(unittest.TestCase):
     def test_new_instance_bind_home_survives_delete_and_can_be_registered_again(self):
         with tempfile.TemporaryDirectory() as temporary, mock.patch.object(dev, "STATE_ROOT", Path(temporary)):
             contract = {
-                "source_id": "experiment:EXP-example-agent-001-r0123456789ab", "source_kind": "experiment",
+                "source_id": "business:example-agent", "source_kind": "business",
                 "agent_id": "example-agent", "workspace": "/tmp/workspace", "presets": "/tmp/presets",
                 "managed": "/tmp/managed", "preset_id": "example-agent", "patch": "/opt/dsh-managed/example.patch.yml",
                 "evaluation_patch": "/opt/dsh-adapter/evaluation-registry.patch.yml", "required_env_names": [],
@@ -3065,7 +3065,7 @@ class BindHomeMigrationTests(unittest.TestCase):
             with mock.patch.object(os, "geteuid", return_value=0), mock.patch.object(os, "chown") as chown:
                 target = dev.write_instance("probe", mode="verification", contract=contract, port=3081)
             home = target / "dsh-home"
-            self.assertEqual(chown.call_args_list, [mock.call(home / relative, 1000, 1000)
+            self.assertEqual(chown.call_args_list, [mock.call(home / relative, 1000, 1000, follow_symlinks=False)
                                                    for relative in ("", "profiles", "profiles/web")])
             manifest = json.loads((target / "instance.json").read_text())
             directory = Path(manifest["home_directory"])
@@ -3084,6 +3084,32 @@ class BindHomeMigrationTests(unittest.TestCase):
                     dev.write_instance("probe", mode="verification", contract=contract, port=3081)
             self.assertIn("保留原数据并修复目录属主或写权限", errors.getvalue())
             self.assertEqual(json.loads((target / "instance.json").read_text()), manifest)
+            storages = directory / "storages"
+            storages.mkdir(mode=0o700)
+            session_store = storages / "workspace.json"
+            session_store.write_text('{"fixture":true}')
+            session_store.chmod(0o600)
+            external_store = Path(temporary) / "outside-private"
+            external_store.mkdir()
+            (external_store / "untouched.json").write_text('{}')
+            (storages / "external").symlink_to(external_store, target_is_directory=True)
+            with mock.patch.object(os, "geteuid", return_value=0), mock.patch.object(os, "chown") as chown:
+                dev.write_instance("probe", mode="verification", contract=contract, port=3081)
+            chown.assert_any_call(storages, 1000, 1000, follow_symlinks=False)
+            chown.assert_any_call(session_store, 1000, 1000, follow_symlinks=False)
+            self.assertFalse(any(str(external_store) in str(call) or str(storages / "external") in str(call)
+                                 for call in chown.call_args_list))
+            self.assertEqual(storages.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(session_store.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(session_store.read_text(), '{"fixture":true}')
+            errors = io.StringIO()
+            with mock.patch.object(os, "geteuid", return_value=0), \
+                 mock.patch.object(os, "chown", side_effect=PermissionError(13, "Permission denied", str(session_store))), \
+                 contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+                dev.write_instance("probe", mode="verification", contract=contract, port=3081)
+            self.assertIn(str(session_store), errors.getvalue())
+            self.assertIn("Permission denied", errors.getvalue())
+            self.assertEqual(session_store.read_text(), '{"fixture":true}')
             (directory / "profiles/web").rmdir()
             (directory / "profiles").rmdir()
             external = Path(temporary) / "external"

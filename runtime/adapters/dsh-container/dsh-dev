@@ -1165,18 +1165,24 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
             contract["runtime_managed_patch"] = projected_patch
     home_directory = selected_home_directory(name, current, migrate_home=migrate_home)
     if home_directory:
-        # Docker 会在挂载 profiles/node_modules 子卷前创建缺失的父目录，
-        # 提前创建，并在 root 部署时交给 Compose 固定的容器用户写入。
+        # 恢复数据时复制程序以部署用户创建文件；容器仍使用固定的非 root 用户。
+        # 同时恢复私有存储的属主，保留权限和内容，不跟随 HOME 内的链接。
         try:
             for relative in ("", "profiles", "profiles/web"):
                 directory = Path(home_directory) / relative
                 if directory.is_symlink() or directory.exists() and not directory.is_dir():
                     fail(f"实例 HOME 的受控目录不是普通目录，保留原路径：{directory}")
                 directory.mkdir(exist_ok=True)
-                if os.geteuid() == 0:
-                    os.chown(directory, 1000, 1000)
-        except PermissionError:
-            fail(f"实例 HOME 无法写入 profiles/web：{home_directory}；请保留原数据并修复目录属主或写权限后重试。")
+            if os.geteuid() == 0:
+                def walk_error(error):
+                    raise error
+                for current, _, files in os.walk(home_directory, followlinks=False, onerror=walk_error):
+                    for path in (Path(current), *(Path(current) / name for name in files)):
+                        if not path.is_symlink():
+                            os.chown(path, 1000, 1000, follow_symlinks=False)
+        except OSError as error:
+            fail(f"实例 HOME 准备失败：{error.filename or directory}：{error.strerror or error}；"
+                 "请保留原数据并修复目录属主或写权限后重试。")
     template = (ADAPTER / f"{mode}.compose.yaml").read_text(encoding="utf-8")
     rendered = render_compose(
         template,
