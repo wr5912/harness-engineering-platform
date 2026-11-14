@@ -77,7 +77,7 @@ export function resolveRepository(root: string, requestedId?: string): Repositor
   if (inside(data, workspace) || inside(workspace, data)) throw new Error('目标仓库必须与数据仓库独立')
   if (realpathSync(git(workspace, ['rev-parse', '--show-toplevel'])) !== workspace) throw new Error('目标必须是 Git 工作树根目录')
   const remotes = git(workspace, ['remote']).split('\n').filter(Boolean)
-  if (!remotes.some(remote => sameRepositorySource(git(workspace, ['remote', 'get-url', remote]), entry.url))) throw new Error('目标仓库远端与登记来源不一致')
+  if (!remotes.some(remote => sameRepositorySource(git(workspace, ['remote', 'get-url', remote]), entry.url))) throw new Error('目标仓库远端与登记不一致')
   const commit = git(workspace, ['rev-parse', 'HEAD'])
   if (commit !== entry.commit || git(workspace, ['rev-parse', '--verify', `${entry.ref}^{commit}`]) !== commit) throw new Error('目标仓库 HEAD、ref 与锁定提交不一致')
   if (entry.agent_path && !inside(workspace, realpathSync(join(workspace, entry.agent_path)))) throw new Error('agent_path 超出目标仓库')
