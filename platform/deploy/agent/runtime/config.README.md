@@ -12,6 +12,17 @@
 
 `seed/standalone.json` 是首次运行的模型与 MCP 配置种子；`seed/environment.llm-api-key` 是环境键到字符串值的 JSON，仅保存模型等连接凭据。包可能含凭据，应作为私有文件传递。初始化后，修改种子不会覆盖已保存配置。
 
+网络安全运营专家的威胁研判子智能体和取证后推理共用 `deployment.env` 中的模型选择：
+
+```dotenv
+THREAT_ANALYSIS_MODEL_PROVIDER=local-qwen
+THREAT_ANALYSIS_MODEL=Qwen3.8-27B
+# 可选，目标模型支持的思考档位
+THREAT_ANALYSIS_REASONING_EFFORT=off
+```
+
+前两项同时设置；同时留空则继承主智能体本次会话模型。Provider 名称须对应通过 `./agent configure --config-file config/模型配置.json` 导入的原生 `modelPatch`；模型地址与密钥在该 Provider 中统一配置。修改后运行 `./agent restart`，新的研判子任务使用新选择，已经运行的任务保持原选择。
+
 JSON 配置使用 UTF-8、两空格缩进，中文直接保存为可读文字。手工修改后保持合法 JSON 即可。
 
 现场模型、MCP、凭据和会话保存在 `state/home/`。使用 `./agent configure` 交互修改，或 `./agent configure --config-file /路径/config.json` 导入 `modelPatch`、`defaultModel`、`mcp`、`environment`。Web 配置修改后执行 `./agent restart`；SDK 后续任务自动使用新配置。原生设置页保存的模型配置在重启后保留。
