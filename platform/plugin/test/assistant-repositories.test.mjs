@@ -78,7 +78,7 @@ test('business-agents 的 GitLab 登记可核对 GitHub 镜像，回执保留登
   assert.equal(repository.url, f.entry.url)
   assert.equal(repository.commit, f.entry.commit)
   f.git('remote', 'set-url', 'origin', 'git@github.com:someone/business-agents.git')
-  assert.throws(() => resolveRepository(f.root, 'business-agents'), /远端与登记来源不一致/)
+  assert.throws(() => resolveRepository(f.root, 'business-agents'), /远端与登记不一致/)
 })
 
 test('业务工作区只暴露 data 与 business-agents，程序仓和管理 HOME 保持运行时角色', t => {
