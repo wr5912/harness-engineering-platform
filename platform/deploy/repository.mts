@@ -1,4 +1,4 @@
-import { cpSync, existsSync, lstatSync, mkdirSync, readlinkSync, symlinkSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { networkInterfaces } from 'node:os'
 import { run, safeRelative } from './fsutil.mts'
@@ -26,6 +26,9 @@ export function snapshotRepository(source: string, target: string, bundle: strin
     mkdirSync(join(bundle, '..'), { recursive: true })
     // bundle 保留原始历史；工作树快照不会生成提交或带入被忽略的缓存和 HOME。
     run('git', ['-C', source, 'bundle', 'create', bundle, 'HEAD', '--tags'])
+    // bundle 不携带浅克隆边界；离线恢复必须同时保留原始 shallow 信息。
+    const shallow = run('git', ['-C', source, 'rev-parse', '--path-format=absolute', '--git-path', 'shallow']).trim()
+    if (existsSync(shallow)) writeFileSync(`${bundle}.shallow`, readFileSync(shallow))
     restoreRepository(target, bundle, commit, origin, !workingTree)
     if (workingTree) {
       const files = new Set(run('git', ['-C', source, 'ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean))
@@ -51,6 +54,7 @@ export function restoreRepository(target: string, bundle: string, commit: string
   if (existsSync(join(target, '.git'))) throw new Error(`目标已有 Git 元数据：${target}`)
   const git = (args: string[]) => run('git', ['-c', 'core.hooksPath=/dev/null', '-C', target, ...args])
   git(['init', '--quiet', '-b', 'main'])
+  if (existsSync(`${bundle}.shallow`)) writeFileSync(join(target, '.git/shallow'), readFileSync(`${bundle}.shallow`))
   git(['fetch', '--quiet', bundle, 'HEAD', 'refs/tags/*:refs/tags/*'])
   git(['reset', checkout ? '--hard' : '--mixed', commit])
   git(['remote', 'add', 'origin', origin])

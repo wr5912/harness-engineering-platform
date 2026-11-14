@@ -84,6 +84,18 @@ test('部署核对检查唯一绑定的原生工作区，不要求首次使用�
     assert.equal((await check(['bound'], { bound: { path: root } })).status, 'mismatch')
     assert.equal((await check(['bound'], {})).status, 'mismatch')
     assert.equal((await check(['bound', 'other'], { bound: { path: dataRoot }, other: { path: root } })).status, 'mismatch')
+    mkdirSync(join(dataRoot, 'config'), { recursive: true })
+    writeFileSync(join(dataRoot, 'config/assistant-workspace.json'), JSON.stringify({ workspaceRoot: '..' }))
+    assert.equal((await check(['bound'], { bound: { path: root } })).status, 'ok')
+    assert.equal((await check(['bound'], { bound: { path: dataRoot } })).status, 'mismatch')
+    const profile = join(dataRoot, '.local/platform-home/profiles/harness-platform/harness-platform.patch.yml')
+    mkdirSync(join(profile, '..'), { recursive: true })
+    const profileCheck = async skills => {
+      writeFileSync(profile, `customSkillDirs: [${JSON.stringify(skills)}]\n`)
+      return (await verifyDeployment({ prefix: join(root, 'program'), dataRoot })).checks.find(check => check.id === 'profile-skills')
+    }
+    assert.equal((await profileCheck(join(dataRoot, '.local/platform-home/.agents/skills'))).status, 'ok')
+    assert.equal((await profileCheck(join(dataRoot, '.agents/skills'))).status, 'mismatch')
   } finally { close() }
 })
 
@@ -210,15 +222,17 @@ test('manifest 允许显式忽略清单自身', () => {
   } finally { close() }
 })
 
-test('识别真实工作区与夹具数据根', () => {
+test('真实数据工作区不要求持有管理助手的 Skill', () => {
   const { root, close } = workspace()
   try {
     assert.equal(inspectDataRoot(root).kind, 'fixture')
     assert.throws(() => assertRealWorkspace(root), /不是完整工作区/)
     mkdirSync(join(root, 'config'), { recursive: true })
-    mkdirSync(join(root, '.agents', 'skills', 'demo'), { recursive: true })
     writeFileSync(join(root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-test', legacyRoots: [] }))
     writeFileSync(join(root, 'AGENTS.md'), '# test\n')
+    assert.equal(assertRealWorkspace(root).kind, 'workspace')
+    assert.equal(assertRealWorkspace(root).skills, 0)
+    mkdirSync(join(root, '.agents', 'skills', 'demo'), { recursive: true })
     writeFileSync(join(root, '.agents', 'skills', 'demo', 'SKILL.md'), '# demo\n')
     const check = assertRealWorkspace(root)
     assert.equal(check.kind, 'workspace')

@@ -75,3 +75,27 @@ test('当前工作树快照包含增改删、链接和可执行权限，排除�
     assert.equal(run('git', ['-C', target, 'rev-parse', 'HEAD']).trim(), baseline)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
+
+test('浅克隆离线快照保留提交、标签和历史边界，可在无原仓库时恢复', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hep-shallow-repository-'))
+  try {
+    const upstream = join(root, 'upstream'), source = join(root, 'source')
+    mkdirSync(upstream)
+    const git = (...args) => run('git', ['-C', upstream, ...args]).trim()
+    git('init', '-b', 'main'); git('config', 'user.name', 'fixture'); git('config', 'user.email', 'fixture@example.invalid')
+    writeFileSync(join(upstream, 'asset'), 'first'); git('add', '.'); git('commit', '-m', 'first')
+    writeFileSync(join(upstream, 'asset'), 'second'); git('commit', '-am', 'second'); git('tag', 'v2')
+    run('git', ['clone', '--quiet', '--depth', '1', `file://${upstream}`, source])
+    const bundle = join(root, 'repository.bundle'), snapshot = join(root, 'snapshot')
+    const result = snapshotRepository(source, snapshot, bundle)
+    assert.equal(readFileSync(join(snapshot, 'asset'), 'utf8'), 'second')
+    assert.equal(run('git', ['-C', snapshot, 'rev-parse', '--is-shallow-repository']).trim(), 'true')
+    rmSync(source, { recursive: true }); rmSync(upstream, { recursive: true })
+    const installed = join(root, 'installed'); mkdirSync(installed)
+    restoreRepository(installed, bundle, result.commit, result.origin, true)
+    assert.equal(run('git', ['-C', installed, 'rev-parse', 'HEAD']).trim(), result.commit)
+    assert.equal(run('git', ['-C', installed, 'rev-parse', 'v2']).trim(), result.commit)
+    assert.equal(run('git', ['-C', installed, 'rev-list', '--count', 'HEAD']).trim(), '1')
+    run('git', ['-C', installed, 'fsck', '--no-reflogs'])
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})

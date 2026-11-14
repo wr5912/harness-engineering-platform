@@ -50,7 +50,6 @@ export function inspectDataRoot(root: string): DataRootCheck {
     if (!existsSync(join(root, name))) missing.push(name)
   }
   const skills = countSkills(root)
-  if (skills === 0) missing.push('.agents/skills/*/SKILL.md')
   let workspaceId: string | undefined
   try {
     const value = JSON.parse(readFileSync(join(root, 'workspace.json'), 'utf8'))

@@ -56,7 +56,7 @@ import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
 import { materializeEvaluationSource, validateMcpFixture } from '../../../../runtime/adapters/dsh-container/evaluation-source.mts'
 import { createInstancesHandler } from '../instances/index.ts'
 import { inheritedLoadableAssets, assertVersionIdentity, versionIdentity, versionSource, versionSources } from './version-source.ts'
-import { businessList, businessSource, businessDetail, businessRead, businessAsset, businessEdit, businessIdentity, runtimeSource } from './business-source.ts'
+import { businessList, businessListAsync, businessSource, businessDetail, businessRead, businessAsset, businessEdit, businessIdentity, runtimeSource } from './business-source.ts'
 import { inspectLegacy, readResearchReference, validateResearch } from './research.ts'
 import { createVariantIdentityMigrationHandler, currentVariantProjection } from './variant-identity.ts'
 import { applyVersion027Migration, version027MigrationPreview } from './version-migration.ts'
@@ -1915,7 +1915,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
           'details' in result.error ? result.error.details as JsonMap : undefined))
       }
       switch (endpoint) {
-        case 'business/list': return ok(businessList(root))
+        case 'business/list': return ok(await businessListAsync(root, signal))
         case 'business/detail': return ok(businessDetail(root, optionalString(body, 'source') ?? agentIdField(body)))
         case 'business/read': return ok(businessRead(root, optionalString(body, 'source') ?? agentIdField(body), stringField(body, 'path')))
         case 'versions/migration-plan': return ok(version027MigrationPreview(root))

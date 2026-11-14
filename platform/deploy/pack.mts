@@ -156,6 +156,8 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   if (!options.assetsDir || !existsSync(join(options.assetsDir, 'dsh', 'apps', 'cli', 'lib', 'bin.js'))) {
     throw new Error('离线资源缺少已构建的 DSH CLI：--assets-dir dsh/apps/cli/lib/bin.js')
   }
+  const dataRoot = options.includeData && options.dataRoot ? resolve(options.dataRoot) : undefined
+  const dataCheck = dataRoot ? assertRealWorkspace(dataRoot, options.allowFixtureData) : undefined
   const packageName = `harness-engineering-platform-${versionOf(programRoot)}-${commit.slice(0, 12)}-${options.arch}`
   const staging = join(out, '.staging', packageName)
   if (existsSync(staging)) removeTree(staging)
@@ -198,8 +200,6 @@ export function pack(options: PackOptions): { archive: string; size: number } {
     runtime.git = { path: 'offline/git', version: collected.version, source: collected.source }
   }
 
-  const dataRoot = options.includeData && options.dataRoot ? resolve(options.dataRoot) : undefined
-  let dataCheck: ReturnType<typeof assertRealWorkspace> | undefined
   let dataRepository: ReturnType<typeof snapshotRepository> | undefined
   for (const name of ['python', 'dsh']) if (!existsSync(join(offline, name))) throw new Error(`安装包缺少离线 ${name} 资源`)
   console.error('pack: 正在生成程序和数据仓库快照')
@@ -207,7 +207,6 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   copyTree(join(staging, 'program/platform/deploy/install.sh'), join(staging, 'install.sh'))
   const workspace = dataRoot ? packWorkspace(programRoot, dataRoot, staging, options.includeWorkingTree) : undefined
   if (dataRoot) {
-    dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
     dataRepository = copyData(dataRoot, staging, options.assetsDir!, options.includeWorkingTree, Boolean(workspace))
     if (!workspace) copyDataDependencies(join(staging, 'data'), options.assetsDir!)
     const knowledge = collectPlatformKnowledge(staging, options.knowledgeDir ?? join(options.assetsDir!, 'knowledge'))
