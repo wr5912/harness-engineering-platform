@@ -120,7 +120,7 @@ export function launchAddress(dataRoot: string, host?: string, port?: string, pu
   const local = (value: string) => Object.values(networkInterfaces()).flat().some(item => item?.address === value)
   const separate = configured && (configured.protocol === 'https:' || !local(configured.hostname)
     || previous?.publicUrl === configured.href && previous.publicUrl !== previous.url)
-  if (!host && separate && previous && local(previous.host)) host = previous.host
+  if (!host && separate && previous && local(previous.host) && !previous.host.startsWith('127.')) host = previous.host
   if (!host && (!configured || separate)) {
     const route = spawnSync('ip', ['-j', '-4', 'route', 'get', '1.1.1.1'], { encoding: 'utf8', timeout: 5000 })
     try { host = JSON.parse(route.stdout)[0].prefsrc } catch { throw new Error('无法确定本机 IPv4，请指定 --host') }
