@@ -1,4 +1,5 @@
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { assertNoBundledGlibc, copyTree, run } from './fsutil.mts'
 
@@ -137,6 +138,26 @@ export function installRuntime(bundle: string, prefix: string, dataRoot: string)
     'export PATH="$HARNESS_PROGRAM_ROOT/runtime/node/bin:$HARNESS_PROGRAM_ROOT/runtime/pnpm/bin:$HARNESS_PROGRAM_ROOT/runtime/git:$HARNESS_PROGRAM_ROOT/runtime/python/bin:$HARNESS_PROGRAM_ROOT/bin:$PATH"',
   ]
   writeFileSync(envFile, lines.join('\n') + '\n', { mode: 0o644 })
+
+  const lfxDirectory = join(prefix, 'platform/mcp/lfx')
+  const requirements = join(lfxDirectory, 'requirements.txt')
+  if (existsSync(requirements)) {
+    try {
+      run(python, ['-c', 'from importlib.metadata import version; assert version("lfx") == "1.13.1"; import hep_lfx'], { cwd: lfxDirectory, env })
+    } catch {
+      throw new Error('平台离线 Python 资源缺少锁定的 LFX 1.13.1 依赖；请将 requirements.txt 对应的目标架构依赖放入 python/site 后重新打包')
+    }
+    const digest = createHash('sha256').update(readFileSync(requirements)).digest('hex')
+    const directory = join(prefix, '.local/lfx', digest)
+    mkdirSync(join(directory, 'bin'), { recursive: true })
+    writeFileSync(join(directory, 'bin/python'), `#!/bin/sh
+BASE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+HEP_ROOT=$(CDPATH= cd -- "$BASE/../../../.." && pwd)
+. "$HEP_ROOT/bin/hep-env.sh"
+exec "$HEP_PYTHON" "$@"
+`, { mode: 0o755 })
+    writeFileSync(join(directory, '.ready'), digest)
+  }
 
   const dshPath = join(bin, 'dsh')
   const dshWrapper = `#!/bin/sh

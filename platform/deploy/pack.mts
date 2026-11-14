@@ -76,7 +76,7 @@ function copyData(dataRoot: string, staging: string, assets: string, workingTree
   const target = join(staging, 'data')
   const repository = snapshotRepository(dataRoot, target, join(staging, 'repositories/data.bundle'), workingTree)
   removeTree(join(target, '.git'))
-  copyDataState(dataRoot, target, !externalHome)
+  copyDataState(dataRoot, target, !externalHome, ['.local/asset-dependencies', '.local/artifacts/agent-deployments'])
   const profile = externalHome ? '../workspace/platform-manager-dsh-home/profiles/harness-platform' : '.local/platform-home/profiles/harness-platform'
   const resourceProfile = '.local/platform-home/profiles/harness-platform'
   const sourceProfile = join(managerHome(dataRoot), 'profiles/harness-platform')

@@ -110,6 +110,24 @@ test('安装环境不依赖解包目录，特殊路径按原值进入 shell，Gi
   assert.ok(!existsSync(join(root, 'SHOULD_NOT_EXIST')) && !existsSync(join(root, 'ALSO_NOT_EXIST')))
 })
 
+test('离线平台安装装载 LFX，整体迁移后仍使用随包解释器与依赖', () => {
+  const path = bundle('lfx-runtime-bundle'), prefix = join(root, 'lfx-program')
+  const lock = 'lfx==1.13.1\n'
+  write(join(path, 'program/platform/mcp/lfx/requirements.txt'), lock)
+  write(join(path, 'program/platform/mcp/lfx/hep_lfx.py'), 'VALUE = 43\n')
+  copyTree(join(path, 'program'), prefix)
+  assert.throws(() => installRuntime(path, prefix, prefix + '-data'), /缺少锁定的 LFX 1.13.1/)
+  write(join(path, 'offline/python/site/lfx-1.13.1.dist-info/METADATA'), 'Metadata-Version: 2.1\nName: lfx\nVersion: 1.13.1\n')
+  installRuntime(path, prefix, prefix + '-data')
+  const digest = createHash('sha256').update(lock).digest('hex')
+  assert.equal(readFileSync(join(prefix, '.local/lfx', digest, '.ready'), 'utf8'), digest)
+  const moved = prefix + '-moved'
+  renameSync(prefix, moved)
+  const result = spawnSync(join(moved, '.local/lfx', digest, 'bin/python'), ['-c', 'import hep_install_probe; from importlib.metadata import version; print(hep_install_probe.VALUE, version("lfx"))'], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /42 1.13.1/)
+})
+
 test('安装 prepare 使用同一环境；失败清理后可以原命令重试', () => {
   const path = bundle('retry-bundle'), prefix = join(root, 'retry-program')
   writeLauncher(path, 'import hep_install_probe, os, sys\nassert hep_install_probe.VALUE == 42\nsys.exit(int(os.environ.get("HEP_TEST_PREPARE_FAILURE", "0")))\n')

@@ -460,6 +460,15 @@ test('迁移保留数据身份、MCP 配置及外置原生 HOME 文件，缓存�
     for (const path of ['config/mcp-manager.json', '.local/agent-access/state.json', '.local/credentials/models.llm-api-key', 'mcp/.local/runs/one.json']) assert.equal(readFileSync(join(target, path), 'utf8'), path)
     for (const path of ['AGENTS.md', '.agents/skills/sample/SKILL.md', 'profiles/harness-platform/cordis.patch.yml', 'sessions/private', 'storages/workspace.json']) assert.equal(readFileSync(join(target, '.local/platform-home', path), 'utf8'), path)
     for (const path of ['.local/build-cache', 'mcp/.local/cache', '.local/platform-service', '.local/platform-home/profiles/harness-platform/node_modules']) assert.equal(existsSync(join(target, path)), false)
+    write(join(source, '.local/artifacts/agent-deployments/export.tar.gz'), 'installation archive')
+    write(join(source, '.local/asset-dependencies/old/node_modules/cache'), 'dependency cache')
+    copyDataState(source, target, false, ['.local/artifacts/agent-deployments', '.local/asset-dependencies'])
+    assert.equal(existsSync(join(target, '.local/artifacts/agent-deployments')), false)
+    assert.equal(existsSync(join(target, '.local/asset-dependencies')), false)
+    assert.equal(readFileSync(join(target, 'mcp/.local/runs/one.json'), 'utf8'), 'mcp/.local/runs/one.json')
+    // 更新保留现场状态时，不套用打包的介质排除项。
+    copyDataState(source, target, false)
+    assert.equal(readFileSync(join(target, '.local/artifacts/agent-deployments/export.tar.gz'), 'utf8'), 'installation archive')
   } finally {
     if (previous === undefined) delete process.env.HARNESS_MANAGER_DSH_HOME; else process.env.HARNESS_MANAGER_DSH_HOME = previous
     close()
