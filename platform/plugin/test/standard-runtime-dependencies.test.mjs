@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { resolvePreparedAssetDependencies, createAssetDependenciesHandler } from '../src/agents/asset-dependencies.ts'
+import { businessSource } from '../src/agents/business-source.ts'
 import { runtimeDependencies } from '../../deploy/agent/dependencies.mts'
 
 const programRoot = new URL('../../../', import.meta.url).pathname
@@ -32,6 +33,21 @@ test('实例和独立包使用相同标准依赖，无宿主回执时也可运�
   const result = await createAssetDependenciesHandler(f.data, { command: () => assert.fail('不得运行安装器') })({ experiment_id: 'business:demo' })
   assert.equal(result.ok, true, JSON.stringify(result))
   assert.equal(existsSync(join(f.data, '.local/asset-dependencies')), false)
+})
+
+test('固定业务 Candidate 不能因调用方省略版本而回退到当前工作树', t => {
+  const f = fixture(t)
+  const commit = spawnSync('git', ['add', '.'], { cwd: join(f.data, '..', 'business'), encoding: 'utf8' })
+  assert.equal(commit.status, 0, commit.stderr)
+  const saved = spawnSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'fixture'], { cwd: join(f.data, '..', 'business'), encoding: 'utf8' })
+  assert.equal(saved.status, 0, saved.stderr)
+  const hash = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: join(f.data, '..', 'business'), encoding: 'utf8' })
+  assert.equal(hash.status, 0, hash.stderr)
+  const source = businessSource(f.data, 'business:demo'), cached = join(f.data, '.local/business-sources', hash.stdout.trim(), 'demo', 'agents', 'demo')
+  assert.ok(source.repository_root)
+  cpSync(f.candidate, cached, { recursive: true })
+  const result = resolvePreparedAssetDependencies(f.data, 'business:demo', {}, cached)
+  assert.equal(result.status, 'ready', result.reasons.join(';'))
 })
 
 for (const manifest of [{ dependencies: { 'pinyin-pro': '^99.0.0' } }, { optionalDependencies: { 'not-in-standard-runtime': '1.0.0' } }]) {

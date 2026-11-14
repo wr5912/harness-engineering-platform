@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { candidateDigest, candidateFiles, dataPath, sourceInfo as experimentSource } from '../tasks/files.ts'
-import { businessSource } from './business-source.ts'
+import { businessSource, businessSourceSelector } from './business-source.ts'
 import { programRoot } from '../workspace.ts'
 import { assertRuntimeCandidateOrigin } from '../models/harness-runtime.ts'
 import { standardDependencies } from '../../../../runtime/adapters/dsh-container/standard-dependencies.mts'
@@ -71,8 +71,9 @@ function declarationHash(items: Declaration[]) { return hash(JSON.stringify(item
 /** 只读验证，不探测 Docker，也不执行已准备模块。供实例和评测共用。 */
 export function resolvePreparedAssetDependencies(assetRoot: string, experimentId: string, _expected: { image?: string; image_id?: string } = {}, candidatePath?: string): PreparedAssetDependencies {
   try {
-    const source = candidatePath ? { id: experimentId, candidate: assertRuntimeCandidateOrigin(assetRoot, candidatePath) } : sourceInfo(assetRoot, experimentId)
-    if (candidatePath && resolve(sourceInfo(assetRoot, experimentId).candidate) !== resolve(source.candidate)) throw new Error('依赖来源版本不一致')
+    const sourceId = candidatePath && experimentId.startsWith('business:') ? businessSourceSelector(assetRoot, experimentId, candidatePath) : experimentId
+    const source = candidatePath ? { id: sourceId, candidate: assertRuntimeCandidateOrigin(assetRoot, candidatePath) } : sourceInfo(assetRoot, sourceId)
+    if (candidatePath && resolve(sourceInfo(assetRoot, sourceId).candidate) !== resolve(source.candidate)) throw new Error('依赖来源版本不一致')
     const items = declarations(source.candidate)
     if (!items.length) return { status: 'ready', reasons: [], mounts: [], environment: {} }
     const standard = standardDependencies(programRoot())
