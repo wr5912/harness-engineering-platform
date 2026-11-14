@@ -159,11 +159,37 @@ def check_repository_profile(profile):
         required = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@ai-agent-harness/harness-platform"]
         if not all(item in bundles for item in required):
             raise ValueError()
-        for name in ("cordis.patch.yml", "pnpm-workspace.yaml"):
+        for name in ("cordis.patch.yml", "pnpm-workspace.yaml", "pnpm-lock.yaml"):
             if not (profile / name).is_file():
                 raise ValueError()
     except (OSError, KeyError, ValueError, TypeError):
         raise PlatformError("DSH HOME 仓库缺少完整的原生 harness-platform Profile。") from None
+
+
+def check_profile_dependencies(profile):
+    """核对版本化 Profile 的离线依赖闭包，不以平台 bundle 链接代替插件依赖。"""
+    try:
+        manifest = json.loads((profile / "package.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise PlatformError("离线模式无法读取 Profile package.json；请先完成在线 prepare。") from None
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("dependencies", {}), dict):
+        raise PlatformError("离线模式 Profile dependencies 无效；请先完成在线 prepare。")
+    modules = profile / "node_modules"
+    if not modules.is_dir():
+        raise PlatformError(f"离线模式缺少 Profile 依赖目录：{modules}；请先完成在线 prepare。")
+    lock = profile / "pnpm-lock.yaml"
+    installed_lock = modules / ".pnpm" / "lock.yaml"
+    try:
+        if lock.read_bytes() != installed_lock.read_bytes():
+            raise PlatformError("离线模式 Profile 依赖锁与 pnpm-lock.yaml 不一致；请先完成在线 prepare。")
+    except OSError:
+        raise PlatformError("离线模式缺少 Profile 依赖锁；请先完成在线 prepare。") from None
+    for name in manifest["dependencies"]:
+        if not isinstance(name, str) or not name:
+            raise PlatformError("离线模式 Profile 依赖名称无效；请先修复 package.json。")
+        package = modules.joinpath(*name.split("/"))
+        if not package.is_dir() or not (package / "package.json").is_file():
+            raise PlatformError(f"离线模式缺少 Profile 依赖：{name}；请先完成在线 prepare。")
 
 
 def global_dsh(home):
@@ -930,6 +956,14 @@ def prepare(home, offline=False):
         raise PlatformError("PATH 中没有 pnpm；请先安装插件构建工具。")
     if not (PLUGIN / "pnpm-lock.yaml").is_file():
         raise PlatformError(f"缺少插件依赖锁：{PLUGIN / 'pnpm-lock.yaml'}")
+    if versioned:
+        if offline:
+            check_profile_dependencies(profile)
+            print("离线模式：已核对版本化 Profile 的 package/lock 与 node_modules。", flush=True)
+        else:
+            print("安装管理助手 Profile 依赖…", flush=True)
+            build_command("管理助手 Profile 依赖安装", [pnpm, "install", "--frozen-lockfile"],
+                          cwd=profile, env=runtime_environment(home))
     if offline:
         for directory in (PLUGIN, WEB):
             if not (directory / "node_modules").is_dir():
@@ -1038,6 +1072,7 @@ def start(home, host, port, dry_run, public_url=None, applied=False):
         check_artifacts()
         if repository_home(home):
             check_repository_profile(profile)
+            check_profile_dependencies(profile)
             bundle = profile / "node_modules/@ai-agent-harness/harness-platform"
             if not bundle.is_symlink() or bundle.resolve() != PLUGIN:
                 raise PlatformError("原生 Profile 尚未关联当前程序，请运行 prepare。")

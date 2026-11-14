@@ -132,6 +132,35 @@ if sys.argv[1:] == ["run", "build"]:
         result = self.run_cli("prepare")
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def configure_versioned_manager_home(self):
+        """为 Profile 依赖回归测试准备一个独立的版本化管理助手 HOME。"""
+        home = self.root / "platform-manager-dsh-home"
+        (home / ".git").mkdir(parents=True)
+        profile = home / "profiles/harness-platform"
+        profile.mkdir(parents=True)
+        manifest = {
+            "name": "dsh-profile-harness-platform",
+            "private": True,
+            "dependencies": {
+                "dsh-think-zh": "github:Len7183/DSH-Think-zh#fixture-commit",
+            },
+            "dsh": {"profile": {"bundles": [
+                "@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app",
+                "@ai-agent-harness/harness-platform", "dsh-think-zh",
+            ], "patchReload": "startup"}},
+        }
+        (profile / "package.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (profile / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+        (profile / "pnpm-workspace.yaml").write_text("packages: []\n", encoding="utf-8")
+        (profile / "cordis.patch.yml").write_text("[]\n", encoding="utf-8")
+        dependency = profile / "node_modules/dsh-think-zh"
+        dependency.mkdir(parents=True)
+        (dependency / "package.json").write_text(json.dumps({"name": "dsh-think-zh"}), encoding="utf-8")
+        self.home = home
+        self.profile = profile
+        self.env["HARNESS_MANAGER_DSH_HOME"] = str(home)
+        return manifest
+
     def remove_mcp_store(self):
         for path in (self.assets / "config/mcp-manager.json", self.assets / ".local/credentials/mcp-manager.json",
                      self.assets / ".local/credentials/mcp-manager/credentials.json"):
@@ -222,6 +251,53 @@ if sys.argv[1:] == ["run", "build"]:
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(json.loads(path.read_text()), manifest)
                 self.assertEqual((self.profile / "cordis.patch.yml").read_text(), patch)
+
+    def test_versioned_profile_installs_declared_plugin_and_preserves_platform_bundle_link(self):
+        manifest = self.configure_versioned_manager_home()
+        self.prepare()
+        calls = [json.loads(line) for line in self.pnpm_trace.read_text().splitlines()]
+        self.assertEqual([call["args"] for call in calls], [
+            ["install", "--frozen-lockfile"],
+            ["install", "--frozen-lockfile"],
+            ["run", "build"],
+        ])
+        self.assertEqual(calls[0]["cwd"], str(self.profile))
+        self.assertEqual(calls[1]["cwd"], str(self.plugin))
+        self.assertEqual(json.loads((self.profile / "package.json").read_text()), manifest)
+        self.assertTrue((self.profile / "node_modules/dsh-think-zh/package.json").is_file())
+        bundle = self.profile / "node_modules/@ai-agent-harness/harness-platform"
+        self.assertTrue(bundle.is_symlink())
+        self.assertEqual(bundle.resolve(), self.plugin)
+
+    def test_versioned_profile_offline_requires_resolved_profile_dependencies(self):
+        self.configure_versioned_manager_home()
+        result = self.run_cli("prepare", "--offline")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("缺少 Profile 依赖锁", result.stderr)
+        installed_lock = self.profile / "node_modules/.pnpm/lock.yaml"
+        installed_lock.parent.mkdir(parents=True)
+        installed_lock.write_text((self.profile / "pnpm-lock.yaml").read_text(), encoding="utf-8")
+        (self.plugin / "node_modules").mkdir()
+        (self.web / "node_modules").mkdir()
+        result = self.run_cli("prepare", "--offline")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = [json.loads(line) for line in self.pnpm_trace.read_text().splitlines()]
+        self.assertEqual([call["args"] for call in calls], [["run", "build"]])
+        bundle = self.profile / "node_modules/@ai-agent-harness/harness-platform"
+        self.assertTrue(bundle.is_symlink())
+        self.assertEqual(bundle.resolve(), self.plugin)
+
+    def test_versioned_profile_start_rejects_unmaterialized_dependencies(self):
+        self.configure_versioned_manager_home()
+        (self.plugin / "lib").mkdir()
+        for name in ("index.js", "client.js", "mcp-manager.js", "platform-mcp-manager.js"):
+            (self.plugin / "lib" / name).write_text("export {}\n", encoding="utf-8")
+        (self.web / "lib").mkdir(parents=True)
+        (self.web / "lib/platform-webserver.mjs").write_text("export {}\n", encoding="utf-8")
+        result = self.run_cli("start", "--dry-run", "--port", str(self.free_port()))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("缺少 Profile 依赖锁", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
 
     def test_prepare_restores_required_bundles_without_enabling_disabled_plugins(self):
         self.prepare()
