@@ -1,7 +1,7 @@
 import { assetText } from '../agents/asset-text.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import { assistantWorkspaceScope, workspaceIdentity, workspaceOwnsCwd } from '../workspace.ts'
-import { listRepositories, resolveRepository } from './repositories.ts'
+import { currentRepositorySource, listRepositories, resolveRepository } from './repositories.ts'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -314,7 +314,14 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
       context_id: contextId,
       workspace_id: workspaceIdentity(root).id,
       ...(repository?.id ? { repository_id: repository.id } : inherited?.repository_id ? { repository_id: inherited.repository_id } : {}),
+      ...(currentRepositorySource(root, repository?.id === 'data' ? 'data' : 'business-agents') ? { source_policy: currentRepositorySource(root, repository?.id === 'data' ? 'data' : 'business-agents') } : {}),
     }
+  }
+  function sourceNotice(repositoryId: string | undefined) {
+    const policy = currentRepositorySource(root, repositoryId === 'data' ? 'data' : 'business-agents')
+    if (!policy) return ''
+    const fallback = policy.transport_candidates.slice(1).join('、') || '无'
+    return `当前来源事实（优先于历史 Session、registry source_repository 和 remote 名称）：有效传输地址为 ${policy.effective_transport_url}；备用地址为 ${fallback}。当前有效地址才是推送和评测目标。`
   }
   async function inspect(id: string, signal?: AbortSignal, readOnly = false) {
     if (!id) throw new Error('缺少 Session ID')
@@ -695,7 +702,8 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
             if (body.task) {
               await inspect(id, signal)
               // 锁定版 DSH 按 requestId 核对收件箱和 user/message，重试沿用原生去重身份。
-              await services.controller.prompt({ sessionId: id, requestId, mode: 'queue', content: [{ type: 'text', text: String(body.task) }, ...(body.context ? [{ type: 'text', text: `平台任务上下文：${JSON.stringify(redactAssistant(normalizeManagementContext(object(body.context))))}` }] : [])] }, signal)
+              const notice = sourceNotice(repository.id)
+              await services.controller.prompt({ sessionId: id, requestId, mode: 'queue', content: [{ type: 'text', text: String(body.task) }, ...(notice ? [{ type: 'text', text: notice }] : []), ...(body.context ? [{ type: 'text', text: `平台任务上下文：${JSON.stringify(redactAssistant(normalizeManagementContext(object(body.context))))}` }] : [])] }, signal)
             }
             await record(id, { kind: 'submission', owner_session_id: id, request_id: requestId, operation_id: previous?.operation_id ?? requestId, context_id: frozenContext.context_id, frozen_context: redactAssistant(frozenContext), fingerprint, state: 'accepted' })
           } catch (error) {
@@ -721,7 +729,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
           if (accepted) submission = { ...submission, state: 'accepted' }
           else if (submission.state === 'pending') submission = { ...submission, state: 'unknown' }
         }
-        return result(true, { ...state, ...(submission ? { submission } : {}), workspace: { ...workspaceIdentity(root), session_cwd: session.header.cwd }, business_workspace: assistantWorkspaceScope(root),
+        return result(true, { ...state, ...(submission ? { submission } : {}), current_repository_source: currentRepositorySource(root, state.repository?.id === 'data' ? 'data' : 'business-agents'), historical_repository: state.repository ?? null, workspace: { ...workspaceIdentity(root), session_cwd: session.header.cwd }, business_workspace: assistantWorkspaceScope(root),
           proposals: state.proposals.map(proposal => proposal.state === 'running' && !busy.has(proposal.id)
             ? { ...proposal, state: 'unknown', error: '原进程已中断，未收到完整回执，请核对实际状态。' } : proposal),
           running: services.running ? services.running(id) : state.running }) as any
@@ -771,7 +779,7 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
         if (args.action === 'context') {
           const modelCatalog = domain === 'agents'
             ? await assistantModelCatalog(() => platform('models/list', {}, exec.signal, managementPeer), exec.signal) : undefined
-          return wireValue({ ok: true, value: { workspace: workspaceIdentity(root), business_workspace: assistantWorkspaceScope(root), ...(state.repository ? { repository: state.repository } : {}), assistant: { session_id: id, model: state.model ?? null }, context: state.context, task_context: state.task_context,
+          return wireValue({ ok: true, value: { workspace: workspaceIdentity(root), business_workspace: assistantWorkspaceScope(root), ...(state.repository ? { repository: state.repository } : {}), current_repository_source: currentRepositorySource(root, state.repository?.id === 'data' ? 'data' : 'business-agents'), historical_repository: state.repository ?? null, assistant: { session_id: id, model: state.model ?? null }, context: state.context, task_context: state.task_context,
             ...(modelCatalog ? { model_catalog: modelCatalog } : {}), available_actions: actions[domain], next: state.task_context.skill === 'decision-sample-extraction' ? 'datasets/source 读取固定 Run 的来源目录与 extraction_contract' : 'describe(input.action=操作名)可读取单个动作的参数合同' } })
         }
         if (!actions[domain].includes(args.action)) throw new Error('未知的领域操作')

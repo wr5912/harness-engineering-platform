@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { assistantWorkspaceScope } from '../workspace.ts'
-import { sameRepositorySource } from '../../../repository-remotes.mjs'
+import { sameRepositorySource, transportCandidates } from '../../../repository-remotes.mjs'
 
 export interface RepositorySnapshot {
   id: string
@@ -13,6 +13,9 @@ export interface RepositorySnapshot {
   agent_path?: string
   dirty: boolean
   kind?: 'workspace' | 'repository'
+  canonical_url?: string | null
+  effective_transport_url?: string | null
+  transport_candidates?: string[]
 }
 export type RepositoryChoice = Partial<RepositorySnapshot> & { id: string; available: boolean; error?: string }
 interface Declaration { id: string; url: string; ref: string; commit: string; path: string; agent_path?: string }
@@ -31,6 +34,11 @@ function publicRepositoryUrl(value: string | null): string | null {
   } catch { return null }
 }
 function optionalGit(path: string, args: string[]) { try { return git(path, args) || null } catch { return null } }
+function sourceFields(url: string | null) {
+  if (!url) return { canonical_url: null, effective_transport_url: null, transport_candidates: [] as string[] }
+  const candidates = transportCandidates(url)
+  return { canonical_url: url, effective_transport_url: candidates[0] ?? url, transport_candidates: candidates }
+}
 function declarations(root: string): Declaration[] {
   const path = join(root, 'config/repositories.json')
   if (!existsSync(path)) return []
@@ -63,8 +71,8 @@ export function resolveRepository(root: string, requestedId?: string): Repositor
   if (!scope.allowed_repository_ids.includes(id)) throw new Error('目标仓库不在管理助手业务工作区')
   if (id === 'data') {
     const repository = optionalGit(data, ['rev-parse', '--show-toplevel']) === data
-    return { id, workspace: data,
-      url: repository ? publicRepositoryUrl(optionalGit(data, ['remote', 'get-url', 'origin'])) : null,
+    const url = repository ? publicRepositoryUrl(optionalGit(data, ['remote', 'get-url', 'origin'])) : null
+    return { id, workspace: data, ...sourceFields(url), url,
       ref: repository ? optionalGit(data, ['symbolic-ref', '--short', '-q', 'HEAD']) : null,
       commit: repository ? optionalGit(data, ['rev-parse', 'HEAD']) : null,
       dirty: repository && Boolean(git(data, ['status', '--porcelain'])) }
@@ -81,7 +89,21 @@ export function resolveRepository(root: string, requestedId?: string): Repositor
   const commit = git(workspace, ['rev-parse', 'HEAD'])
   if (commit !== entry.commit || git(workspace, ['rev-parse', '--verify', `${entry.ref}^{commit}`]) !== commit) throw new Error('目标仓库 HEAD、ref 与锁定提交不一致')
   if (entry.agent_path && !inside(workspace, realpathSync(join(workspace, entry.agent_path)))) throw new Error('agent_path 超出目标仓库')
-  return { id, url: entry.url, ref: entry.ref, commit, workspace, ...(entry.agent_path ? { agent_path: entry.agent_path } : {}), dirty: Boolean(git(workspace, ['status', '--porcelain'])) }
+  return { id, url: entry.url, ...sourceFields(entry.url), ref: entry.ref, commit, workspace, ...(entry.agent_path ? { agent_path: entry.agent_path } : {}), dirty: Boolean(git(workspace, ['status', '--porcelain'])) }
+}
+
+/** 当前来源策略独立于历史 Session 中冻结的 repository 快照。 */
+export function currentRepositorySource(root: string, requestedId = 'business-agents') {
+  const data = realpathSync(root)
+  const scope = assistantWorkspaceScope(data)
+  if (requestedId === 'manager-workspace' || !scope.allowed_repository_ids.includes(requestedId)) return null
+  if (requestedId === 'data') {
+    const repository = optionalGit(data, ['rev-parse', '--show-toplevel']) === data
+    const url = repository ? publicRepositoryUrl(optionalGit(data, ['remote', 'get-url', 'origin'])) : null
+    return url ? { repository_id: requestedId, ...sourceFields(url) } : null
+  }
+  const entry = declarations(data).find(item => item.id === requestedId)
+  return entry ? { repository_id: requestedId, ...sourceFields(entry.url) } : null
 }
 export function listRepositories(root: string): { repositories: RepositoryChoice[]; default_repository_id: string } {
   const defaultRepository = resolveRepository(root)
@@ -89,7 +111,7 @@ export function listRepositories(root: string): { repositories: RepositoryChoice
   if (defaultRepository.id !== 'data') repositories.push({ ...resolveRepository(root, 'data'), available: true })
   for (const entry of declarations(root)) {
     try { repositories.push({ ...resolveRepository(root, entry.id), available: true }) }
-    catch (error) { repositories.push({ id: entry.id, workspace: resolve(root, entry.path), available: false, error: error instanceof Error ? error.message : '目标仓库不可用' }) }
+    catch (error) { repositories.push({ id: entry.id, workspace: resolve(root, entry.path), ...sourceFields(entry.url), available: false, error: error instanceof Error ? error.message : '目标仓库不可用' }) }
   }
   return { repositories, default_repository_id: defaultRepository.id }
 }

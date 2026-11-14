@@ -8,7 +8,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { SessionStore, appendPluginRecord } from '@deepseek-ai/dsh-session'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { assistantWorkspaceScope } from '../src/workspace.ts'
-import { resolveRepository, listRepositories } from '../src/assistant/repositories.ts'
+import { currentRepositorySource, resolveRepository, listRepositories } from '../src/assistant/repositories.ts'
 import { createAssistant } from '../src/assistant/index.ts'
 import { bindConversationWorkspace } from '../src/conversation-workspace.ts'
 
@@ -81,6 +81,15 @@ test('business-agents 的 GitLab 登记可核对 GitHub 镜像，回执保留登
   assert.throws(() => resolveRepository(f.root, 'business-agents'), /远端与登记不一致/)
 })
 
+test('当前来源策略独立于历史仓库快照，非 172.16 环境优先 GitHub', t => {
+  const f = fixture(t)
+  f.entry.url = 'http://172.16.138.233/ai-soc/business-agents.git'; f.save()
+  const policy = currentRepositorySource(f.root, 'business-agents')
+  assert.equal(policy.repository_id, 'business-agents')
+  assert.equal(policy.effective_transport_url, 'git@github.com:wr5912/business-agents.git')
+  assert.deepEqual(policy.transport_candidates, ['git@github.com:wr5912/business-agents.git', 'http://172.16.138.233/ai-soc/business-agents.git'])
+})
+
 test('业务工作区只暴露 data 与 business-agents，程序仓和管理 HOME 保持运行时角色', t => {
   const f = fixture(t), scope = assistantWorkspaceScope(f.root)
   assert.deepEqual(scope.allowed_repository_ids, ['data', 'business-agents'])
@@ -147,6 +156,8 @@ test('目标仓库预备会话只创建不投递，续接固定来源且冷恢�
   assert.deepEqual(status.value.business_workspace.excluded_repository_ids, ['harness-engineering-platform', 'platform-manager-dsh-home'])
   const task = { session_id: id, request_id: 'fixed-request', task: '读取仓库项目规则' }
   assert.equal((await call('session', task)).ok, true)
+  assert.match(prompts[0].content[1].text, /当前来源事实/)
+  assert.match(prompts[0].content[1].text, /github\.com:fixture\/business/)
   assert.equal((await call('session', task)).ok, true); assert.equal(prompts.length, 1)
   assert.equal((await call('session', { ...task, repository_id: 'data' })).ok, false)
   assert.equal((await call('session', { cwd: '/tmp' })).ok, false)
