@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""将业务仓工作树或 Git tag 解析为 DSH 运行合同，保留历史证据读取。"""
+"""将 business-agents 来源解析为 DSH 运行合同。
+
+旧 Experiment/Candidate 资产已经从当前数据工作区移除，运行时不再提供
+兼容读取或路径回退。历史来源必须在上游迁移后改写为 ``business:``。
+"""
 
 from __future__ import annotations
 
@@ -158,15 +162,12 @@ def _agent_asset_roots(repo: Path, agent_id: str) -> dict:
             candidates.append((repo / entry["path"]).resolve())
     except (OSError, ValueError, TypeError):
         pass
-    candidates.extend([repo.parent / "business-agents", repo])
     for base in candidates:
         agent_dir = base / "agents" / agent_id
         if agent_dir.is_dir() and not agent_dir.is_symlink() and real_file_below(agent_dir, Path("evaluation.md")):
             return {"reference_root": str(agent_dir), "business_root": str(base)}
-    agent_dir = repo / "agents" / agent_id
-    valid = agent_dir.is_dir() and not agent_dir.is_symlink() \
-        and real_file_below(agent_dir, Path("evaluation.md"))
-    return {"reference_root": str(agent_dir) if valid else None, "business_root": str(repo) if valid else None}
+    # 配置缺失时必须失败关闭；不能把 data 根或 sibling 目录猜成业务来源。
+    return {"reference_root": None, "business_root": None}
 
 
 def _experiment_contract(
@@ -350,16 +351,11 @@ def _resolve_release(release_name: str, *, repo: Path) -> dict:
 
 
 def instance_desired_source(manifest: dict, *, repo: Path = REPO) -> str:
-    """历史装载记录保持原样；下一次装载改用业务仓当前资产。"""
+    """返回当前实例唯一允许的 business source。"""
     source = manifest["source_id"]
-    if not source.startswith("experiment:"):
+    if source.startswith("business:"):
         return source
-    identity = source.removeprefix("experiment:")
-    match = EXPERIMENT.fullmatch(identity)
-    agent_id = manifest.get("agent_id") or (match[1] if match else None)
-    if not isinstance(agent_id, str) or not NAME.fullmatch(agent_id):
-        raise ValueError("实例来源缺少业务智能体身份")
-    return f"business:{agent_id}"
+    raise ValueError("incompatible legacy source: experiment/Candidate 来源已停用，请使用 business:<agent-id>")
 
 
 def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path | None = None,
@@ -377,37 +373,20 @@ def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path
             contract["evaluation_path"] = str(Path(contract["business_repository"]) / "agents" / contract["agent_id"] / "evaluation.md")
         return contract
     if source_ref:
-        experiment_id = source_id.removeprefix("experiment:")
-        try:
-            result = subprocess.run(["node", str(ADAPTER / "evaluation-source.mts"), "source", str(repo), experiment_id, source_ref],
-                                    capture_output=True, text=True, timeout=120)
-        except (OSError, subprocess.TimeoutExpired) as error:
-            raise ValueError("固定评测来源读取未完成，请核对运行环境后重试") from error
-        if result.returncode:
-            raise ValueError(result.stderr.strip() or "固定评测来源物化失败")
-        selected = json.loads(result.stdout)
-        frozen = Path(selected["root"])
-        contract = resolve(source_id, repo=frozen, lock_path=lock_path, require_assets=require_assets, web_bootstrap=web_bootstrap)
-        contract.update({"source_ref": source_ref, "source_snapshot_root": str(frozen),
-                         "candidate_source_root": str(Path(contract["candidate_root"]).parent),
-                         "evaluation_path": str((repo if evaluation_source == "current" else frozen) / "agents" / contract["agent_id"] / "evaluation.md"),
-                         "change_path": str(frozen / "evolution/experiments" / experiment_id / "change.yaml"),
-                         "experiment_root": str(repo / "evolution/experiments" / experiment_id),
-                         "asset_root": str(repo), "workspace_id": workspace_id(repo)})
-        return contract
+        raise ValueError("source_ref 只能用于 business:<agent-id> 来源；旧 Experiment 评测来源已停用")
     sources = sources if sources is not None else source_catalog(repo)
     if not source_id:
         return resolve("business:security-operations-expert", repo=repo, lock_path=lock_path,
                        require_assets=require_assets, web_bootstrap=web_bootstrap)
     if source_id.startswith("experiment:"):
-        return _resolve_experiment(source_id[len("experiment:"):], repo=repo, sources=sources, lock_path=lock_path, require_assets=require_assets, web_bootstrap=web_bootstrap)
+        raise ValueError("incompatible legacy source: experiment/Candidate 来源已停用")
     if source_id.startswith("business:"):
         return _resolve_experiment(source_id, repo=repo, sources=sources, lock_path=lock_path, require_assets=require_assets, web_bootstrap=web_bootstrap)
     if source_id.startswith("release:"):
         return _resolve_release(source_id[len("release:"):], repo=repo)
     if ":" in source_id:
         raise ValueError(f"unknown source selector: {source_id}")
-    return _resolve_experiment(source_id, repo=repo, sources=sources, lock_path=lock_path, require_assets=require_assets, web_bootstrap=web_bootstrap)
+    raise ValueError("source selector 必须使用 business:<agent-id>")
 
 
 def mount_plan(contract: dict, role: str, *, task_dir: str = None, output_dir: str = None,

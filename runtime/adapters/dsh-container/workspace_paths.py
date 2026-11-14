@@ -60,8 +60,11 @@ def workspace_id(root: Path) -> str | None:
 
 
 def instance_belongs_to_workspace(root: Path, manifest: dict) -> bool:
-    """登记身份优先；旧登记只通过当前根或明确迁移别名下的 Candidate 挂载确认。"""
+    """只接受当前 business source，拒绝旧 Experiment/Candidate 实例。"""
     if not isinstance(manifest, dict):
+        return False
+    source = manifest.get("source_id", "")
+    if not isinstance(source, str) or not re.fullmatch(r"business:[a-z0-9]+(?:-[a-z0-9]+)*(?:@[^/\\s]+)?", source):
         return False
     descriptor = workspace_descriptor(root)
     roots = [root.resolve(), *(Path(value).resolve() for value in (descriptor or {}).get("legacyRoots", []))]
@@ -72,11 +75,8 @@ def instance_belongs_to_workspace(root: Path, manifest: dict) -> bool:
             or not Path(recorded_root).is_absolute() or Path(recorded_root).resolve() not in roots):
         return False
     if recorded_root is not None:
-        return True  # UUID 可随 Git 克隆；只有 ID 的旧登记仍须核对挂载路径。
+        return True
     if descriptor is None:
-        return True  # 尚无描述符的历史工作区保持原合同，不接纳其他已绑定身份。
-    source = manifest.get("source_id", "")
-    if not isinstance(source, str) or not re.fullmatch(r"experiment:(?!VAR-.*-\d{3}-[mf]-r[0-9a-f]{12}$)(?:EXP|VAR)-[a-z0-9]+(?:-[a-z0-9]+)*-\d{3}(?:-[mf]-r[0-9a-f]{12}|(?:-r[0-9a-f]{12})?)", source):
         return False
     mounts = manifest.get("mounts") or {}
     if not isinstance(mounts, dict):
@@ -85,8 +85,10 @@ def instance_belongs_to_workspace(root: Path, manifest: dict) -> bool:
     if any(value is not None and (not isinstance(value, str) or not Path(value).is_absolute()) for value in paths):
         return False
     paths = [Path(value).resolve() for value in paths if isinstance(value, str) and Path(value).is_absolute()]
-    return bool(paths) and any(all(path.is_relative_to(base / "evolution/experiments" / source[11:] / "candidate")
-                                   for path in paths) for base in roots)
+    if not paths:
+        return False
+    # 新来源可以来自独立 business-agents 工作树；只禁止已删除的旧 evolution 路径。
+    return not any("evolution" in path.parts and "experiments" in path.parts for path in paths)
 
 
 def instances_root(root: Path) -> Path:
