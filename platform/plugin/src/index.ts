@@ -232,6 +232,7 @@ export function applyTools(ctx: Context) {
     instances: wrap('instances', createInstancesHandler(assetRoot, modelProjection)), mcp: wrap('mcp', mcpManagement),
     models: wrap('models', createModelsHandler(assetRoot, {
       modelCatalog: () => ctx.sessionController.modelCatalog(),
+      settingsNamespaces: () => ctx.settingsController.describe().namespaces,
       modelIssues: catalog => modelCompatibilityIssues(catalog, ctx.settingsController),
       providerReadiness: providers => modelProviderReadiness(providers, {
         settingsController: ctx.settingsController, credentials: ctx.credentials, llm: ctx.llm,

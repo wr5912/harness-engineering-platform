@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import type { ConnectionRpcHandler, ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import type { ModelCatalog, ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { ProviderReadiness } from './projection.ts'
-import { businessCatalogRoutes } from './catalog.ts'
+import { businessCatalogRoutes, configuredModelCatalog } from './catalog.ts'
 import { openModelLock, tryModelLock } from './file-lock.ts'
 import { BusinessDefaultError, businessPolicyLockFile, readBusinessDefault, saveBusinessDefault } from './business-default.ts'
 
@@ -12,6 +12,7 @@ type MapValue = Record<string, unknown>
 
 export interface ModelsDependencies {
   modelCatalog(): Promise<ModelCatalog>
+  settingsNamespaces?(): readonly { ns: string; value: unknown }[]
   providerReadiness(providers: readonly string[]): Promise<Record<string, ProviderReadiness>>
   modelIssues?(catalog: ModelCatalog): Record<string, string>
   currentSelection(): ModelSelection
@@ -88,7 +89,7 @@ export function createModelsHandler(assetRoot: string, deps: ModelsDependencies)
     try {
       const body = object(payload ?? {}, '请求参数')
       if (endpoint === 'list') {
-        const catalog = await deps.modelCatalog()
+        const catalog = configuredModelCatalog(await deps.modelCatalog(), deps.settingsNamespaces?.() ?? [])
         const providerReadiness = await deps.providerReadiness(catalog.groups.map(group => group.id))
         const business = readBusinessDefault(root)
         const issues = deps.modelIssues?.(catalog) ?? {}
@@ -100,7 +101,7 @@ export function createModelsHandler(assetRoot: string, deps: ModelsDependencies)
       }
       if (endpoint === 'saveDefault') {
         const selected = selection(body.selection)
-        requireSelection(await deps.modelCatalog(), selected)
+        requireSelection(configuredModelCatalog(await deps.modelCatalog(), deps.settingsNamespaces?.() ?? []), selected)
         if (signal?.aborted) throw new ModelsError('aborted', '模型操作已取消')
         try { await deps.saveSelection(selected) } catch { throw new ModelsError('model_save_failed', '平台助手默认模型保存失败') }
         return ok({ platform_default: deps.currentSelection() })
@@ -109,7 +110,7 @@ export function createModelsHandler(assetRoot: string, deps: ModelsDependencies)
         const selected = selection(body.selection)
         if (typeof body.revision !== 'string' || !/^[a-f0-9]{64}$/.test(body.revision)) throw new ModelsError('invalid_request', '业务默认模型配置修订摘要无效')
         if (selected) {
-          const catalog = await deps.modelCatalog()
+          const catalog = configuredModelCatalog(await deps.modelCatalog(), deps.settingsNamespaces?.() ?? [])
           const issues = deps.modelIssues?.(catalog) ?? {}
           if (issues[JSON.stringify([selected.provider, selected.model])]) throw new ModelsError('model_unavailable', issues[JSON.stringify([selected.provider, selected.model])])
           const readiness = await deps.providerReadiness(catalog.groups.map(group => group.id))

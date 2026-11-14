@@ -179,7 +179,7 @@ def _model_policy(raw: object, agent_id: str, *, source: str, manifest_sha256: s
     if source == "platform" and (not isinstance(raw.get("manifest_sha256"), str)
                                  or not re.fullmatch(r"[0-9a-f]{64}", raw["manifest_sha256"])
                                  or raw["manifest_sha256"] != manifest_sha256):
-        fail("模型策略对应的 Agent manifest 已变化，请刷新设置后重新启动")
+        fail("模型策略对应的来源身份声明已变化，请刷新设置后重新启动")
     revision = raw.get("business_model_revision")
     if source == "platform" and (not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{64}", revision)):
         fail("平台模型策略缺少业务默认模型配置修订摘要")
@@ -327,20 +327,53 @@ def read_business_model_policy(repo: Path) -> dict:
     return {"default": default, "revision": revision, "migration_required": False}
 
 
+def agent_identity_path(repo: Path, agent_id: str) -> Path | None:
+    """定位当前来源的身份声明，并让业务 Harness 成为唯一业务事实源。
+
+    业务来源使用 business-agents/agents/<id>/harness.yaml；测试用的普通
+    数据根测试来源仍可提供 manifest.yaml。两者只按实际存在的来源选择，
+    不做旧 Experiment/Candidate 路径回退。
+    """
+    roots: list[Path] = []
+    explicit = os.environ.get("HARNESS_BUSINESS_AGENTS_ROOT")
+    if explicit:
+        roots.append(Path(explicit).expanduser().resolve())
+    repositories = repo / "config" / "repositories.json"
+    try:
+        value = json.loads(repositories.read_text(encoding="utf-8"))
+        entry = next((item for item in value.get("repositories", [])
+                      if isinstance(item, dict) and item.get("id") == "business-agents"), None)
+        if isinstance(entry, dict) and isinstance(entry.get("path"), str) and entry["path"]:
+            candidate = Path(entry["path"])
+            roots.append((repo / candidate).resolve() if not candidate.is_absolute() else candidate.resolve())
+    except (OSError, UnicodeError, ValueError, TypeError):
+        pass
+    sibling = repo.parent / "business-agents"
+    roots.append(sibling.resolve())
+    for root in dict.fromkeys(roots):
+        harness = root / "agents" / agent_id / "harness.yaml"
+        if harness.is_file() and not harness.is_symlink() and not harness.parent.is_symlink():
+            return harness
+    manifest = repo / "agents" / agent_id / "manifest.yaml"
+    if manifest.is_file() and not manifest.is_symlink() and not manifest.parent.is_symlink():
+        return manifest
+    return None
+
+
 def read_model_policy(path: str | None, agent_id: str, *, repo: Path = REPO,
                       selected: dict | None = None) -> dict:
     """Host JSON 是同步投影；直连启动只读取统一业务默认模型。"""
-    manifest = repo / "agents" / agent_id / "manifest.yaml"
+    manifest = agent_identity_path(repo, agent_id)
     manifest_bytes = None
-    if manifest.is_file():
+    if manifest is not None and manifest.is_file():
         if manifest.is_symlink() or manifest.parent.is_symlink() or manifest.stat().st_size > 128 * 1024:
-            fail("Agent manifest 不是可读取的普通文件")
+            fail("来源身份声明不是可读取的普通文件")
         manifest_bytes = manifest.read_bytes()
     manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest() if manifest_bytes is not None else None
     business = read_business_model_policy(repo)
     if path:
         if manifest_bytes is None:
-            fail("平台模型策略需要当前 Agent manifest")
+            fail("平台模型策略需要当前来源身份声明")
         policy_path = Path(path)
         if not policy_path.is_absolute() or policy_path != policy_path.resolve() or not policy_path.is_file() \
                 or policy_path.is_symlink() or not stat.S_ISREG(policy_path.stat().st_mode) \
@@ -430,13 +463,13 @@ def assert_direct_model_available(contract: dict, policy: dict) -> None:
 def assert_model_policy_current(policy: dict, *, repo: Path = REPO) -> None:
     if policy["source"] == "analysis-runtime":
         return
-    manifest = repo / "agents" / policy["agent_id"] / "manifest.yaml"
+    manifest = agent_identity_path(repo, policy["agent_id"])
     if policy["manifest_sha256"] is None:
-        if manifest.exists():
-            fail("Agent manifest 已在启动过程中创建，请重新预览实例计划")
-    elif not manifest.is_file() or manifest.is_symlink() or manifest.parent.is_symlink() \
+        if manifest is not None and manifest.exists():
+            fail("来源身份声明已在启动过程中创建，请重新预览实例计划")
+    elif manifest is None or not manifest.is_file() or manifest.is_symlink() or manifest.parent.is_symlink() \
             or hashlib.sha256(manifest.read_bytes()).hexdigest() != policy["manifest_sha256"]:
-        fail("Agent manifest 已在启动过程中变化，请重新预览实例计划")
+        fail("来源身份声明已在启动过程中变化，请重新预览实例计划")
     business = read_business_model_policy(repo)
     if (business["migration_required"] and not policy.get("harness_runtime", {}).get("model_bindings")) or policy.get("business_model_revision") != business["revision"]:
         fail("业务默认模型配置已在启动过程中变化，请重新预览实例计划")
@@ -1388,7 +1421,7 @@ def require_up_arguments(args: argparse.Namespace) -> None:
         return
     print("dsh-dev up 缺少必填参数：" + "、".join(f"--{option}" for option in missing), file=sys.stderr)
     if "source" in missing:
-        print("可用 --source：business:<agent-id> 或 business:<agent-id>@<tag>（以 business-agents/manifest.yaml 为准）", file=sys.stderr)
+        print("可用 --source：business:<agent-id> 或 business:<agent-id>@<tag>（以 business-agents/agents/<agent-id>/harness.yaml 为准）", file=sys.stderr)
     if "mode" in missing:
         print("可用 --mode：eval", file=sys.stderr)
     raise SystemExit(2)
