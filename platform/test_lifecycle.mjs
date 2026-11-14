@@ -105,6 +105,33 @@ test('地址配置只读校验，允许已有多级站点基址', () => {
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
+test('换环境时旧 HTTP IP 和失效 state 不再作为显式入口，显式域名与 HTTPS 继续保留', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hep-address-migration-'))
+  try {
+    mkdirSync(join(root, 'config'), { recursive: true })
+    writeFileSync(join(root, 'config/sites.json'), '{"platform":"/hep/"}')
+    const file = join(root, 'config/business-access.json')
+    writeFileSync(file, JSON.stringify({ schemaVersion: 1, enabled: true, agents: [], gateway: {
+      managementUrl: 'http://172.16.138.228:18121/hep/', managementUrlMode: 'explicit',
+      publicOrigin: 'http://172.16.138.228:53106', publicOriginMode: 'auto', port: 53106,
+    }}))
+    mkdirSync(join(root, '.local/platform-service'), { recursive: true })
+    writeFileSync(join(root, '.local/platform-service/state.json'), JSON.stringify({
+      pid: 1, birth: 'stale', dataRoot: root, programRoot: root, host: '172.16.138.228', port: 18121,
+      url: 'http://172.16.138.228:18121/hep/', publicUrl: 'http://172.16.138.228:18121/hep/', phase: 'stopped', detached: true,
+    }))
+    const migrated = launchAddress(root, '127.0.0.1', '18120')
+    assert.deepEqual(migrated, { host: '127.0.0.1', port: 18120, url: 'http://127.0.0.1:18120/hep/', publicUrl: 'http://127.0.0.1:18120/hep/' })
+
+    writeFileSync(file, JSON.stringify({ schemaVersion: 1, enabled: true, agents: [], gateway: {
+      managementUrl: 'https://proxy.example/hep/', managementUrlMode: 'explicit',
+      publicOrigin: 'https://business.example', publicOriginMode: 'explicit', port: 53106,
+    }}))
+    const explicit = launchAddress(root, '127.0.0.1', '18120')
+    assert.equal(explicit.publicUrl, 'https://proxy.example/hep/')
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
 test('过期 PID 不归属服务；活动记录必须匹配程序和数据根', () => {
   const root = mkdtempSync(join(tmpdir(), 'hep-state-'))
   try {
@@ -248,7 +275,12 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     for (const explicit of ['http://platform.example/hep/', 'http://192.0.2.1:18121/hep/']) {
       const changed = cli('restart', '--public-url', explicit)
       assert.equal(changed.status, 0, changed.stderr || changed.stdout)
-      assert.equal(cli('restart').status, 0)
+      // HTTP NAT 地址只有在本次启动明确提供 --public-url 时才保留；
+      // 无参数重启会按当前机器入口重新派生，避免复制旧 state 后继续指向旧环境。
+      const restarted = explicit.startsWith('http://192.0.2.1')
+        ? cli('restart', '--public-url', explicit)
+        : cli('restart')
+      assert.equal(restarted.status, 0, restarted.stderr || restarted.stdout)
       assert.equal(state().publicUrl, explicit, '显式 HTTP 域名和 NAT IP 在重启后保持')
       assert.equal(state().host, '127.0.0.1')
     }

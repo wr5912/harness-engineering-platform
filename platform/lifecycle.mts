@@ -8,7 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { defaultAssetRoot } from './plugin/src/workspace.ts'
 import { platformEntryUrl, validatePlatformEntryUrl } from './plugin/src/business-control/group-link.ts'
 import { initializeBusinessGateway } from './plugin/src/business-control/configuration.ts'
-import { automaticAddress, platformAddressArgs, processBirth } from './plugin/src/business-control/runtime-address.ts'
+import { addressRequiresMigration, automaticAddress, platformAddressArgs, processBirth } from './plugin/src/business-control/runtime-address.ts'
 import { prepareBusinessRuntimeFile } from './plugin/src/business-control/secret-file.ts'
 import { reportBusinessReadiness } from './business-readiness.mts'
 import { managerHome } from './manager-home.mts'
@@ -134,7 +134,8 @@ export function launchAddress(dataRoot: string, host?: string, port?: string, pu
   if (typeof base !== 'string' || !/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(base)) throw new Error('config/sites.json 的平台基址无效')
   const url = `http://${host}:${number}${base}`
   if (publicUrl && new URL(publicUrl).hash) throw new Error('--public-url 不能包含片段')
-  const entry = validatePlatformEntryUrl(dataRoot, publicUrl ?? (configured && (!autoConfigured || configured.protocol === 'https:') ? configured.href : url))
+  const migrateSaved = !publicUrl && configured && addressRequiresMigration(configured.href, gateway?.managementUrlMode, host)
+  const entry = validatePlatformEntryUrl(dataRoot, publicUrl ?? (configured && !autoConfigured && !migrateSaved ? configured.href : url))
   if (new URL(entry).pathname !== base) throw new Error('平台管理入口与站点基址不一致')
   return { host, port: number, url, publicUrl: entry }
 }
@@ -493,7 +494,8 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     let saved: string | undefined
     // 数据尚未初始化时由浏览器引导建立配置，不能预先制造不完整数据根。
     if (existsSync(join(dataRoot, 'workspace.json'))) {
-      initializeBusinessGateway(dataRoot, address!.publicUrl, address!.host, undefined, flags.has('--public-url') ? 'explicit' : undefined)
+      const managementMode = flags.has('--public-url') || address!.publicUrl !== address!.url ? 'explicit' : 'auto'
+      initializeBusinessGateway(dataRoot, address!.publicUrl, address!.host, undefined, managementMode)
       rewritePlatformOwnedUrls(accessPath, before ? JSON.parse(before).gateway?.managementUrl : undefined, address!.publicUrl)
       rewritePlatformOwnedUrls(join(dataRoot, 'mcp/manager.json'), before ? JSON.parse(before).gateway?.managementUrl : undefined, address!.publicUrl)
       saved = readFileSync(accessPath, 'utf8')

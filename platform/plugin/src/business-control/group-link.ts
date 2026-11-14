@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { workspaceConfigPath } from '../workspace.ts'
 import { initializeBusinessGateway } from './configuration.ts'
-import { automaticAddress, bindPlatformEntry, runningPlatformEntry } from './runtime-address.ts'
+import { addressRequiresMigration, automaticAddress, bindPlatformEntry, runningPlatformEntry } from './runtime-address.ts'
 
 /** 公开入口与站点基址共用校验；不写配置或访问网络。 */
 export function validatePlatformEntryUrl(assetRoot: string, configured: string): string {
@@ -22,7 +22,9 @@ export function platformEntryUrl(assetRoot: string, startup?: { fallback: string
   const path = join(assetRoot, 'config', 'business-access.json')
   const access = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : { schemaVersion: 1, enabled: false, agents: [] }
   const saved = access.gateway?.managementUrl
+  const startupHost = startup?.host
   const automatic = automaticAddress(saved, access.gateway?.managementUrlMode)
+    || addressRequiresMigration(saved, access.gateway?.managementUrlMode, startupHost)
   const configured = startup
     ? automatic ? startup.publicUrl ?? startup.fallback : saved ?? startup.publicUrl ?? startup.fallback
     : runningPlatformEntry(assetRoot) ?? saved
@@ -32,7 +34,7 @@ export function platformEntryUrl(assetRoot: string, startup?: { fallback: string
     throw new Error('DSH publicUrl 与 config/business-access.json 的 gateway.managementUrl 不一致，请统一平台入口')
   }
   if (startup) {
-    initializeBusinessGateway(assetRoot, entry, startup.host)
+    initializeBusinessGateway(assetRoot, entry, startup.host, undefined, startup.publicUrl !== undefined ? 'explicit' : automatic ? 'auto' : undefined)
     bindPlatformEntry(assetRoot, entry)
   }
   return entry

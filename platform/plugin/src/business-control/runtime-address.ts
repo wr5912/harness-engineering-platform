@@ -30,8 +30,12 @@ export function bindPlatformEntry(assetRoot: string, entry: string): void { entr
 /** 内部重启复用监听参数；只有独立的公开入口才需覆盖配置。 */
 export function platformAddressArgs(address: { host: string; port: number; url?: string; publicUrl?: string }, explicit = false): string[] {
   const direct = address.url ?? (address.publicUrl ? `http://${address.host}:${address.port}${new URL(address.publicUrl).pathname}` : undefined)
+  const publicHost = address.publicUrl ? (() => { try { return new URL(address.publicUrl).hostname.replace(/^\[|\]$/g, '') } catch { return '' } })() : ''
+  const interfaces = process.getBuiltinModule?.('node:os')?.networkInterfaces?.() ?? {}
+  const staleIp = !!address.publicUrl && process.getBuiltinModule?.('node:net')?.isIP?.(publicHost) === 4
+    && !Object.values(interfaces).flat().some((item: any) => item?.address === address.host)
   return ['--host', address.host, '--port', String(address.port),
-    ...(address.publicUrl && (explicit || address.publicUrl !== direct) ? ['--public-url', address.publicUrl] : [])]
+    ...(address.publicUrl && !staleIp && (explicit || address.publicUrl !== direct) ? ['--public-url', address.publicUrl] : [])]
 }
 
 /** 未标注模式的历史 HTTP IP 是自动地址；域名、HTTPS 和显式入口仍由用户管理。 */
@@ -40,6 +44,19 @@ export function automaticAddress(value: unknown, mode?: unknown): boolean {
   if (mode === 'auto' || value === undefined) return true
   const url = new URL(String(value))
   return url.protocol === 'http:' && (isIP(url.hostname.replace(/^\[|\]$/g, '')) !== 0 || url.hostname === 'localhost')
+}
+
+/** 判断已保存的入口是否来自另一台部署主机。 */
+export function addressRequiresMigration(value: unknown, mode: unknown, currentHost?: string): boolean {
+  if (value === undefined) return true
+  if (automaticAddress(value, mode)) return true
+  let url: URL
+  try { url = new URL(String(value)) } catch { return true }
+  const hostname = url.hostname.replace(/^\[|\]$/g, '')
+  if (url.protocol !== 'http:' || isIP(hostname) !== 4) return false
+  if (!currentHost || isIP(currentHost) !== 4 || currentHost === '0.0.0.0' || currentHost === '255.255.255.255') return false
+  if (hostname === currentHost) return false
+  return true
 }
 
 type Access = { gateway?: { publicOrigin?: string; publicOriginMode?: string; port?: number; managementUrl?: string; managementUrlMode?: string }; operations?: Array<{ target: string }> }

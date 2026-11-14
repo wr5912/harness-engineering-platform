@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { isIP } from 'node:net'
 import type { BusinessGatewayConfig } from './gateway.ts'
 import { ensureBusinessSecret, prepareBusinessRuntimeFile } from './secret-file.ts'
-import { automaticAddress, rebasePlatformOperations } from './runtime-address.ts'
+import { addressRequiresMigration, automaticAddress, rebasePlatformOperations } from './runtime-address.ts'
 
 export function validateBusinessGateway(value: unknown): asserts value is BusinessGatewayConfig {
   const gateway = value as BusinessGatewayConfig | undefined
@@ -42,9 +42,10 @@ export function initializeBusinessGateway(assetRoot: string, managementUrl: stri
     || legacyOrigin.username || legacyOrigin.password || legacyOrigin.pathname !== '/' || legacyOrigin.search || legacyOrigin.hash)) {
     throw new Error('业务网关 publicOrigin 必须是无路径和凭据的 HTTP(S) 地址')
   }
-  const legacyExplicitOrigin = gateway.publicOriginMode === undefined && legacyOrigin !== undefined
+  const staleExplicitOrigin = legacyOrigin !== undefined && addressRequiresMigration(legacyOrigin.href, gateway.publicOriginMode, host)
+  const legacyExplicitOrigin = gateway.publicOriginMode === undefined && legacyOrigin !== undefined && !staleExplicitOrigin
     && (legacyOrigin.protocol === 'https:' || (isIP(legacyOrigin.hostname) === 0 && !['localhost'].includes(legacyOrigin.hostname)))
-  const explicitOrigin = gateway.publicOriginMode === 'explicit' || legacyExplicitOrigin
+  const explicitOrigin = gateway.publicOriginMode === 'explicit' && !staleExplicitOrigin || legacyExplicitOrigin
   if (!explicitOrigin) gateway.publicOrigin = `http://${entry.hostname}:${gateway.port}`
   // 保留旧版自定义入口的文件形状，避免仅为补充模式字段产生无意义配置漂移。
   if (!legacyExplicitOrigin) {
@@ -53,7 +54,9 @@ export function initializeBusinessGateway(assetRoot: string, managementUrl: stri
   }
   gateway.sharedSecretFile ??= '.local/credentials/business-shared.key'
   gateway.instances ??= []
-  if (automaticAddress(gateway.managementUrl, gateway.managementUrlMode)) rebasePlatformOperations(access, gateway.managementUrl, managementUrl)
+  if (managementMode === 'auto' || automaticAddress(gateway.managementUrl, gateway.managementUrlMode)) {
+    rebasePlatformOperations(access, gateway.managementUrl, managementUrl)
+  }
   gateway.managementUrl = managementUrl
   if (managementMode) gateway.managementUrlMode = managementMode
   validateBusinessGateway(gateway)
