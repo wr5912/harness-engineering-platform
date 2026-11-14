@@ -79,7 +79,12 @@ export function createMountedWebServer(NativeWebServer: any, basePath: string, p
     }
 
     register(route: any): () => void {
-      if (route.resource) return super.register({ ...route, path: this.publicPath(route.path), resource: this.resource(route.resource) })
+      if (route.resource) {
+        const resource = route.kind === 'prefix' && route.path === '/plugins'
+          ? async (request: Request, peer?: any) => this.clientResponse(request, await route.resource(request, peer))
+          : route.resource
+        return super.register({ ...route, path: this.publicPath(route.path), resource: this.resource(resource) })
+      }
       const handler: Handler = route.kind === 'prefix' && route.path === '/plugins'
         ? (req, res) => this.serveClients(req, res)
         : route.handler
@@ -123,34 +128,39 @@ export function createMountedWebServer(NativeWebServer: any, basePath: string, p
       })
     }
 
-    private async serveClients(req: IncomingMessage, res: ServerResponse): Promise<void> {
-      const registry = this.siteContext.get('clientModules')
-      if (!registry?.fetchBundle) throw new Error('当前 Runtime 缺少 clientModules.fetchBundle')
-      const response: Response = await registry.fetchBundle(new Request(new URL(req.url ?? '/', 'http://dsh.invalid'), { method: req.method }))
+    /** 原生 Fetch 与旧 Node 路由共用客户端出口，其他资源与失败响应保持原合同。 */
+    private async clientResponse(request: Request, response: Response): Promise<Response> {
+      if (!response.ok || !/(?:javascript|ecmascript)/.test(response.headers.get('content-type') ?? '')) return response
       const headers = new Headers(response.headers)
       // 新入口不复用旧 immutable 响应，转换器重启或 HMR 后均重新取实际字节。
       headers.set('cache-control', 'no-store')
-      let body: Buffer | undefined
-      if (req.method !== 'HEAD' && response.body) {
-        body = Buffer.from(await response.arrayBuffer())
-        if (response.ok && /(?:javascript|ecmascript)/.test(headers.get('content-type') ?? '')) {
-          const key = req.url ?? ''
-          let code = this.clientSources.get(key)
-          if (code === undefined) {
-            code = this.transformClient(body.toString('utf8')).then(code => {
+      headers.delete('content-length')
+      let body: string | undefined
+      if (request.method !== 'HEAD' && response.body) {
+        const source = await response.text()
+        const url = new URL(request.url), key = url.pathname + url.search
+        let code = this.clientSources.get(key)
+        if (code === undefined) {
+          code = this.transformClient(source).then(code => {
             // 当前原生布局在构建时固定产品名；平台沿原有标题投影更换品牌。
-              return productTitle === undefined ? code : code.replace('const productTitle = "DeepSeek Harness";', `const productTitle = ${JSON.stringify(productTitle)};`)
-            })
-            this.clientSources.set(key, code)
-            void code.catch(() => { if (this.clientSources.get(key) === code) this.clientSources.delete(key) })
-            if (this.clientSources.size > 16) this.clientSources.delete(this.clientSources.keys().next().value!)
-          }
-          body = Buffer.from(await code)
-          headers.delete('content-length')
+            return productTitle === undefined ? code : code.replace('const productTitle = "DeepSeek Harness";', `const productTitle = ${JSON.stringify(productTitle)};`)
+          })
+          this.clientSources.set(key, code)
+          void code.catch(() => { if (this.clientSources.get(key) === code) this.clientSources.delete(key) })
+          if (this.clientSources.size > 16) this.clientSources.delete(this.clientSources.keys().next().value!)
         }
+        body = await code
       }
-      res.writeHead(response.status, Object.fromEntries(headers))
-      res.end(body)
+      return new Response(body, { status: response.status, statusText: response.statusText, headers })
+    }
+
+    private async serveClients(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const registry = this.siteContext.get('clientModules')
+      if (!registry?.fetchBundle) throw new Error('当前 Runtime 缺少 clientModules.fetchBundle')
+      const request = new Request(new URL(req.url ?? '/', 'http://dsh.invalid'), { method: req.method })
+      const response = await this.clientResponse(request, await registry.fetchBundle(request))
+      res.writeHead(response.status, Object.fromEntries(response.headers))
+      res.end(req.method === 'HEAD' || !response.body ? undefined : Buffer.from(await response.arrayBuffer()))
     }
   }
 }

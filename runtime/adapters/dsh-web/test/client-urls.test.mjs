@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict'
 import vm from 'node:vm'
 import { readFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { createRequire } from 'node:module'
 import { transformClientUrls } from '../lib/index.mjs'
 
 const require = createRequire(new URL('../../../../platform/plugin/package.json', import.meta.url))
-const yaml = require('js-yaml')
 
 test('仅适配原生中文运行文案，保留耗时占位、英文和业务正文', () => {
   const source = `globalThis.copy = {
@@ -145,14 +142,30 @@ test('保留原脚本严格模式，URL helper 不受原脚本局部变量遮蔽
   assert.equal(calls[0].input, 'http://fixture.local/assistant/api/global')
 })
 
-test('当前三个业务客户端制品可转换并作为浏览器脚本解析', () => {
-  const assetRoot = resolve(process.env.HARNESS_ASSET_ROOT || join(homedir(), 'harness-engineering-platform-data'))
-  const { active_experiment } = yaml.load(readFileSync(join(assetRoot, 'agents/security-operations-expert/manifest.yaml'), 'utf8'))
-  const root = join(assetRoot, 'evolution/experiments', active_experiment, 'candidate/dsh/managed')
-  for (const file of ['security-operations-ui/client.js', 'mcp-manager/client.js', 'dsh-voice-hub/lib/client.js']) {
-    const source = readFileSync(join(root, file), 'utf8')
-    const transformed = transformClientUrls(source)
-    assert.notEqual(transformed, source)
-    new vm.Script(transformed, { filename: file })
+test('业务客户端组合制品中的模块工厂共享站点基址，不依赖本机业务仓库', () => {
+  const source = `
+    window.__ModuleLoader__.load({id:'business-ui',factory:require=>({
+      run(){const path='/api/business/summary';return fetch(path)}
+    })});
+    window.__ModuleLoader__.load({id:'mcp-ui',factory:require=>({
+      run(){return fetch(new Request('http://fixture.local/api/mcp/resources',{method:'POST',body:'{}'}))}
+    })});
+    window.__ModuleLoader__.load({id:'voice-ui',factory:require=>({
+      run(){new Worker('/voice-mode/kws/worker.js');return context.audioWorklet.addModule('/voice-mode/worklet.js')}
+    })});`
+  const transformed = transformClientUrls(source), modules = [], requests = []
+  assert.notEqual(transformed, source)
+  new vm.Script(transformed)
+  const context = {
+    URL, Request, document: { baseURI: 'http://fixture.local/agents/example/instances/test/' },
+    __ModuleLoader__: { load({ factory }) { modules.push(factory(() => ({}))) } },
+    fetch(input) { requests.push(input instanceof Request ? input.url : input) },
+    Worker: class { constructor(input) { requests.push(input) } },
+    context: { audioWorklet: { addModule(input) { requests.push(input) } } },
   }
+  context.window = context
+  vm.runInNewContext(transformed, context)
+  modules.forEach(module => module.run())
+  assert.deepEqual(requests, ['api/business/summary', 'api/mcp/resources', 'voice-mode/kws/worker.js', 'voice-mode/worklet.js']
+    .map(path => 'http://fixture.local/agents/example/instances/test/' + path))
 })

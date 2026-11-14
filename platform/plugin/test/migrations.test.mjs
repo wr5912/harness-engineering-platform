@@ -10,6 +10,7 @@ import test from 'node:test'
 import { build } from 'esbuild'
 import { zipSync, strToU8 } from 'fflate'
 import { dump, load } from 'js-yaml'
+import { transportCandidates } from '../../repository-remotes.mjs'
 
 const program = resolve(new URL('../../../', import.meta.url).pathname)
 process.env.HARNESS_PROGRAM_ROOT = program
@@ -32,6 +33,49 @@ function fixture(t) {
   return { root, source, handler: createMigrationsHandler(root) }
 }
 const cases = [{ id: 'U-MIGRATION-001', title: '保留工作职责', inputs: '请说明分析步骤。', expected_behavior: '先读取用户提供的材料，再给出分析步骤。', fast: true }]
+
+test('业务镜像清点按环境尝试来源，保留登记 URL，提交解析失败不切源', async t => {
+  const fx = fixture(t)
+  git(fx.source, ['init']); git(fx.source, ['config', 'user.name', 'Fixture']); git(fx.source, ['config', 'user.email', 'fixture@example.invalid'])
+  write(fx.source, 'role.md', '读取用户材料并给出摘要。')
+  git(fx.source, ['add', '.']); git(fx.source, ['commit', '-m', '固定镜像内容'])
+  const commit = git(fx.source, ['rev-parse', 'HEAD'])
+  const url = 'http://172.16.138.233/ai-soc/business-agents.git'
+  const candidates = transportCandidates(url)
+  const originalPath = process.env.PATH
+  const realGit = spawnSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).stdout.trim()
+  const bin = join(fx.root, 'bin'), log = join(fx.root, 'mirror-attempts.jsonl'), failMarker = join(fx.root, 'fail-first')
+  mkdirSync(bin); writeFileSync(failMarker, '')
+  writeFileSync(join(bin, 'git'), `#!${process.execPath}
+const fs = require('node:fs'), cp = require('node:child_process')
+const args = process.argv.slice(2)
+if (args.includes('clone')) {
+  const source = args.at(-2), target = args.at(-1)
+  fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(source) + '\\n')
+  if (fs.existsSync(${JSON.stringify(failMarker)}) && source === ${JSON.stringify(candidates[0])}) {
+    fs.mkdirSync(target, { recursive: true }); fs.writeFileSync(target + '/partial', '失败的本次临时目录')
+    process.stderr.write('mirror unavailable'); process.exit(1)
+  }
+  args[args.length - 2] = ${JSON.stringify(fx.source)}
+}
+const result = cp.spawnSync(${JSON.stringify(realGit)}, args, { stdio: 'inherit' })
+process.exit(result.status ?? 1)
+`)
+  chmodSync(join(bin, 'git'), 0o755)
+  process.env.PATH = bin + ':' + originalPath
+  t.after(() => { if (originalPath === undefined) delete process.env.PATH; else process.env.PATH = originalPath })
+  const attempts = () => readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse)
+  const fixed = success(await fx.handler('inspect', { source: { kind: 'git', url, ref: commit } }))
+  assert.deepEqual(attempts(), candidates)
+  assert.equal(fixed.provenance.url, url)
+  assert.equal(fixed.provenance.transport_url ?? fixed.provenance.url, candidates[1])
+  assert.equal(fixed.provenance.commit, commit)
+  rmSync(failMarker); writeFileSync(log, '')
+  const failed = await fx.handler('inspect', { source: { kind: 'git', url, ref: 'missing-ref' } })
+  assert.equal(failed.error.code, 'source_read_failed')
+  assert.match(failed.error.message, /解析提交/)
+  assert.deepEqual(attempts(), [candidates[0]], '成功取回后的错误 ref 不能通过换源掩盖')
+})
 
 test('远程 Git 清点一次取回正文，不逐文件联网补取，失败说明具体阶段', async t => {
   const fx = fixture(t)
@@ -342,6 +386,48 @@ test('部分发布后可凭持久回执恢复；并行修改不被回滚或覆�
   writeFileSync(current, '用户并行修改。')
   assert.equal(success(await fx.handler('apply', preview.apply_input)).already_applied, true)
   assert.equal(readFileSync(current, 'utf8'), '用户并行修改。')
+})
+
+test('双仓迁移中断后继续发布评测定义，保留并行修改且不在数据仓重复保存', async t => {
+  const fx = fixture(t), business = mkdtempSync(join(tmpdir(), 'migration-business-'))
+  t.after(() => rmSync(business, { recursive: true, force: true }))
+  write(fx.root, 'config/repositories.json', JSON.stringify({ schemaVersion: 1, repositories: [{ id: 'business-agents', path: business }] }))
+  const { preview } = await sourceAndPreview(fx)
+  const targetAgent = join(fx.root, 'agents/migrated-agent'), evaluation = join(business, 'agents/migrated-agent/evaluation.md')
+  const original = fs.linkSync
+  fs.linkSync = (from, to) => { if (to === evaluation) throw new Error('模拟业务仓发布中断'); return original(from, to) }
+  syncBuiltinESMExports()
+  try { assert.equal((await fx.handler('apply', preview.apply_input)).ok, false) }
+  finally { fs.linkSync = original; syncBuiltinESMExports() }
+  assert.equal(existsSync(join(targetAgent, 'manifest.yaml')), true)
+  assert.equal(existsSync(join(targetAgent, 'evaluation.md')), true)
+  write(business, 'agents/migrated-agent/evaluation.md', '用户并行维护的验收定义。')
+  const resumed = createMigrationsHandler(fx.root)
+  const conflict = await resumed('apply', preview.apply_input)
+  assert.equal(conflict.ok, false)
+  assert.match(conflict.error.message, /不同的评测定义/)
+  assert.equal(readFileSync(evaluation, 'utf8'), '用户并行维护的验收定义。')
+  rmSync(evaluation)
+  fs.linkSync = (from, to) => {
+    if (to === evaluation) {
+      writeFileSync(evaluation, '发布瞬间创建的用户验收定义。')
+      throw Object.assign(new Error('destination exists'), { code: 'EEXIST' })
+    }
+    return original(from, to)
+  }
+  syncBuiltinESMExports()
+  let raced
+  try { raced = await resumed('apply', preview.apply_input) }
+  finally { fs.linkSync = original; syncBuiltinESMExports() }
+  assert.equal(raced.ok, false)
+  assert.match(raced.error.message, /发布期间业务评测定义变化/)
+  assert.equal(readFileSync(evaluation, 'utf8'), '发布瞬间创建的用户验收定义。')
+  assert.match(readFileSync(join(targetAgent, 'evaluation.md'), 'utf8'), /U-MIGRATION-001/)
+  rmSync(evaluation)
+  assert.equal(success(await resumed('apply', preview.apply_input)).state, 'published')
+  assert.match(readFileSync(evaluation, 'utf8'), /U-MIGRATION-001/)
+  assert.equal(existsSync(join(targetAgent, 'evaluation.md')), false)
+  assert.equal(success(await resumed('apply', preview.apply_input)).already_applied, true)
 })
 
 test('已有Agent从固定EXP创建同号f，保持active；VAR和已变化暂存资产拒绝继承/发布', async t => {
@@ -799,7 +885,11 @@ test('标准创建及迁移的初始无Decision版本可预览冻结，新增未
   assert.equal(existsSync(join(fx.root, `evolution/experiments/${applied.experiment_id}/decision.md`)), false)
   const frozen = success(await handler('compute-variants/freeze-preview', { experiment_id: applied.experiment_id, case_ids: ['U-MIGRATION-001'] }))
   assert.ok(!frozen.files.some(item => item.path.endsWith('/decision.md')))
+  assert.ok(!frozen.files.some(item => item.path === 'agents/migrated-agent/evaluation.md'))
+  assert.deepEqual(Object.keys(frozen.case_hashes), ['U-MIGRATION-001'])
   assert.equal((await handler('compute-variants/freeze', frozen.freeze_input)).ok, true)
+  const current = readFileSync(join(fx.root, 'agents/migrated-agent/evaluation.md'), 'utf8')
+  assert.match(current, /U-MIGRATION-001/);assert.doesNotMatch(current, /^## /m)
   const fixed = git(fx.root, ['show', 'HEAD:agents/migrated-agent/evaluation.md'])
-  assert.match(fixed, /U-MIGRATION-001/);assert.doesNotMatch(fixed, /^## /m)
+  assert.doesNotMatch(fixed, /U-MIGRATION-001/, '研究版本冻结不代替业务评测定义所属仓的提交')
 })

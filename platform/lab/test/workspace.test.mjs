@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { delimiter, join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import test from 'node:test'
 import { doctorLab, initializeLab, planUpdate, readLab, repositoryNames, repositoryPaths, statusLab } from '../workspace.mts'
+import { repositoryIdentity, transportCandidates } from '../../repository-remotes.mjs'
 
 const git = (root, ...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 function fixture(t) {
@@ -27,6 +28,56 @@ function fixture(t) {
   git(data, 'add', '.'); git(data, 'commit', '-qm', 'registry')
   repositories.data.commit = git(data, 'rev-parse', 'HEAD')
   return { root, destination, repositories }
+}
+function mirrorFixture(t, options = {}) {
+  const f = fixture(t), localSource = f.repositories.business_agents.url
+  const github = 'git@github.com:wr5912/business-agents.git', gitlab = 'http://172.16.138.233/ai-soc/business-agents.git'
+  const canonical = options.locked ? gitlab : github
+  f.repositories.business_agents.url = github
+  const data = f.repositories.data.url
+  writeFileSync(join(data, 'registry/agents/demo.yaml'), `agent_id: demo\nsource_repository: ${canonical}\nsource_commit: ${f.repositories.business_agents.commit}\nagent_path: agents/demo\n`)
+  if (options.locked) {
+    mkdirSync(join(data, 'locks'))
+    writeFileSync(join(data, 'locks/repositories.yaml'), `repositories:\n  business_agents:\n    url: ${canonical}\n    ref: main\n    commit: ${f.repositories.business_agents.commit}\n`)
+  }
+  git(data, 'add', '.'); git(data, 'commit', '-qm', 'mirror provenance')
+  f.repositories.data.commit = git(data, 'rev-parse', 'HEAD')
+  const preferred = transportCandidates(github)[0]
+  const binary = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
+  const directory = join(f.root, 'bin'), calls = join(f.root, 'git-calls.jsonl')
+  mkdirSync(directory)
+  const configuration = { ...options, urls: [github, gitlab], preferred, localSource, binary, calls, businessPath: join(f.destination, repositoryPaths.business_agents) }
+  writeFileSync(join(directory, 'git'), `#!/usr/bin/env node
+const {spawnSync}=require('node:child_process');
+const {appendFileSync,mkdirSync,writeFileSync}=require('node:fs');
+const {join}=require('node:path');
+const config=${JSON.stringify(configuration)};
+let args=process.argv.slice(2);
+const command=args.find(value=>['clone','fetch','ls-remote','cat-file'].includes(value));
+const url=args.find(value=>config.urls.includes(value));
+if(command==='cat-file'&&config.forceFetch&&args.includes(config.businessPath))process.exit(1);
+if(url&&['clone','fetch','ls-remote'].includes(command)){
+ appendFileSync(config.calls,JSON.stringify({command,url})+'\\n');
+ if(command==='ls-remote'&&config.emptyLookup)process.exit(0);
+ if(config.failPreferred&&url===config.preferred){
+  if(command==='clone'){const path=args.at(-1);mkdirSync(path,{recursive:true});writeFileSync(join(path,'partial-clone'),'fixture');}
+  process.stderr.write('fixture transport unavailable');process.exit(1);
+ }
+ if(command==='fetch'&&config.fakeFetchSuccess)process.exit(0);
+ args=args.map(value=>value===url?config.localSource:value);
+}
+const result=spawnSync(config.binary,args,{stdio:'inherit'});
+if(command==='clone'&&url&&result.status===0){
+ const remote=spawnSync(config.binary,['-C',args.at(-1),'remote','set-url','origin',url],{stdio:'inherit'});
+ if(remote.status!==0)process.exit(remote.status??1);
+ if(config.concurrentTargetFile){mkdirSync(config.businessPath,{recursive:true});writeFileSync(join(config.businessPath,'user.txt'),'用户并行文件');}
+}
+process.exit(result.status??1);
+`, { mode: 0o755 })
+  const previous = process.env.PATH
+  process.env.PATH = directory + delimiter + previous
+  t.after(() => { process.env.PATH = previous })
+  return { ...f, canonical, preferred, alternate: transportCandidates(github)[1], calls: () => existsSync(calls) ? readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : [] }
 }
 test('四仓固定SHA按业务目录检出、重复执行幂等，check-only完全不落盘', t => {
   const f = fixture(t)
@@ -190,6 +241,76 @@ test('复用 gitlab 远端并接受 HTTP 来源，检查过程不修改已有仓
   assert.equal(readLab(f.destination).repositories.business_agents.url, repositories.business_agents.url)
   git(business, 'remote', 'remove', 'gitlab')
   assert.throws(() => initializeLab({ ...f, repositories, reuse: true, checkOnly: true }), /来源不匹配/)
+})
+test('镜像传输失败按候选顺序回退，来源保持原值且更新计划只读', t => {
+  const f = mirrorFixture(t, { failPreferred: true, forceFetch: true })
+  delete f.repositories.business_agents.commit
+  const result = initializeLab({ ...f, allowFloatingRef: true })
+  assert.equal(result.validation.valid, true, JSON.stringify(result.validation))
+  assert.equal(result.manifest.repositories.business_agents.url, f.canonical)
+  const business = result.manifest.repositories.business_agents.path
+  assert.equal(git(business, 'remote', 'get-url', 'origin'), f.alternate)
+  const remotes = git(business, 'remote').split('\n').map(name => git(business, 'remote', 'get-url', name))
+  assert.deepEqual(new Set(remotes.map(repositoryIdentity)), new Set(transportCandidates(f.canonical).map(repositoryIdentity)))
+  assert.deepEqual(f.calls(), ['ls-remote', 'clone', 'fetch'].flatMap(command => [{ command, url: f.preferred }, { command, url: f.alternate }]))
+  const before = readFileSync(join(f.destination, 'hep-lab.yaml'), 'utf8'), observed = f.calls().length
+  assert.equal(planUpdate(f.destination).repositories.every(item => !item.changed), true)
+  assert.deepEqual(f.calls().slice(observed), [{ command: 'ls-remote', url: f.preferred }, { command: 'ls-remote', url: f.alternate }])
+  assert.equal(readFileSync(join(f.destination, 'hep-lab.yaml'), 'utf8'), before)
+  assert.equal(existsSync(join(business, 'partial-clone')), false)
+})
+test('已有空目录中克隆失败仍可换源，自有临时文件完整清理', t => {
+  const f = mirrorFixture(t, { failPreferred: true })
+  const business = join(f.destination, repositoryPaths.business_agents)
+  mkdirSync(business, { recursive: true })
+  const result = initializeLab(f)
+  assert.equal(result.validation.valid, true, JSON.stringify(result.validation))
+  assert.equal(git(business, 'remote', 'get-url', 'origin'), f.alternate)
+  assert.deepEqual(f.calls(), [{ command: 'clone', url: f.preferred }, { command: 'clone', url: f.alternate }])
+  assert.equal(existsSync(join(business, 'partial-clone')), false)
+  assert.deepEqual(readdirSync(dirname(business)).filter(name => name.startsWith('.hep-lab-clone-')), [])
+})
+test('克隆期间出现用户文件时拒绝发布，不清理目标或重新换源', t => {
+  const f = mirrorFixture(t, { concurrentTargetFile: true })
+  const business = join(f.destination, repositoryPaths.business_agents)
+  mkdirSync(business, { recursive: true })
+  assert.throws(() => initializeLab(f), /ENOTEMPTY|EEXIST/)
+  assert.equal(readFileSync(join(business, 'user.txt'), 'utf8'), '用户并行文件')
+  assert.equal(existsSync(join(business, '.git')), false)
+  assert.deepEqual(f.calls(), [{ command: 'clone', url: f.preferred }])
+  assert.deepEqual(readdirSync(dirname(business)).filter(name => name.startsWith('.hep-lab-clone-')), [])
+})
+test('已知镜像输入可匹配锁，清单及 Agent 来源各自保留地址，复用不改 origin', t => {
+  const f = mirrorFixture(t, { locked: true })
+  const data = f.repositories.data.url
+  const registry = join(data, 'registry/agents/demo.yaml')
+  writeFileSync(registry, readFileSync(registry, 'utf8').replace(f.canonical, f.repositories.business_agents.url))
+  git(data, 'add', '.'); git(data, 'commit', '-qm', 'preserve mirrored provenance')
+  f.repositories.data.commit = git(data, 'rev-parse', 'HEAD')
+  const result = initializeLab(f)
+  assert.equal(result.validation.valid, true, JSON.stringify(result.validation))
+  assert.equal(result.manifest.repositories.business_agents.url, f.canonical)
+  const business = result.manifest.repositories.business_agents.path
+  const origin = git(business, 'remote', 'get-url', 'origin')
+  assert.equal(origin, f.preferred)
+  assert.ok(readFileSync(join(result.manifest.repositories.data.path, 'registry/agents/demo.yaml'), 'utf8').includes(`source_repository: ${f.repositories.business_agents.url}`))
+  assert.equal(initializeLab({ ...f, reuse: true }).validation.valid, true)
+  assert.equal(git(business, 'remote', 'get-url', 'origin'), origin)
+})
+test('远端成功但 ref 不存在时立即拒绝，不尝试另一镜像或创建目录', t => {
+  const f = mirrorFixture(t, { emptyLookup: true })
+  delete f.repositories.business_agents.commit
+  assert.throws(() => initializeLab({ ...f, allowFloatingRef: true }), /ref 不存在/)
+  assert.deepEqual(f.calls(), [{ command: 'ls-remote', url: f.preferred }])
+  assert.equal(existsSync(f.destination), false)
+})
+test('clone 与 fetch 成功后的提交语义错误保留现场，不换源掩盖错误', t => {
+  const f = mirrorFixture(t, { fakeFetchSuccess: true })
+  f.repositories.business_agents.commit = 'a'.repeat(40)
+  assert.throws(() => initializeLab(f), /Git checkout 失败/)
+  assert.deepEqual(f.calls(), [{ command: 'clone', url: f.preferred }, { command: 'fetch', url: f.preferred }])
+  assert.equal(existsSync(join(f.destination, repositoryPaths.business_agents, '.git')), true)
+  assert.equal(existsSync(join(f.destination, 'hep-lab.yaml')), false)
 })
 test('浮动分支冻结实际 SHA，固定提交不受来源分支后续移动影响', t => {
   const f = fixture(t)

@@ -4,6 +4,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { delimiter, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
+import { repositoryIdentity, sameRepositorySource, transportCandidates } from '../repository-remotes.mjs'
 
 const require = createRequire(new URL('../plugin/package.json', import.meta.url))
 const yaml = () => require('js-yaml') as { load(text: string, options?: object): any; dump(value: unknown, options?: object): string; DEFAULT_SCHEMA: { extend(types: unknown[]): unknown }; Type: new (name: string, options: object) => unknown }
@@ -41,6 +42,40 @@ function git(cwd: string | undefined, args: string[]): string {
     fail(`Git ${args[0]} 失败${detail ? '：' + detail : '，请核对仓库地址、认证和版本'}`)
   }
   return result.stdout.trim()
+}
+function withTransport<T>(url: string, operation: (candidate: string) => T): T {
+  let failure: unknown
+  for (const candidate of transportCandidates(url)) {
+    try { return operation(candidate) }
+    catch (error) { failure = error }
+  }
+  throw failure
+}
+function cloneRepository(url: string, path: string) {
+  const directory = mkdtempSync(join(dirname(path), '.hep-lab-clone-')), repository = join(directory, 'repository')
+  try {
+    withTransport(url, candidate => {
+      try { return git(undefined, ['clone', '--no-checkout', '--', candidate, repository]) }
+      catch (error) { rmSync(repository, { recursive: true, force: true }); throw error }
+    })
+    const candidates = transportCandidates(url)
+    if (candidates.length > 1) {
+      const names = new Set(git(repository, ['remote']).split('\n').filter(Boolean))
+      const identities = new Set([...names].map(name => repositoryIdentity(git(repository, ['remote', 'get-url', name]))))
+      for (const candidate of candidates) {
+        if (identities.has(repositoryIdentity(candidate))) continue
+        let name = 'business-mirror', suffix = 2
+        while (names.has(name)) name = `business-mirror-${suffix++}`
+        git(repository, ['remote', 'add', name, candidate])
+        names.add(name); identities.add(repositoryIdentity(candidate))
+      }
+    }
+    // 同一文件系统内原子发布；目标期间出现用户文件时 rename 拒绝，不清理目标。
+    renameSync(repository, path)
+  } finally { rmSync(directory, { recursive: true, force: true }) }
+}
+function fetchCommit(path: string, url: string, commit: string) {
+  withTransport(url, candidate => git(path, ['fetch', '--no-tags', candidate, commit]))
 }
 function clean(root: string) {
   if (git(root, ['status', '--porcelain', '--untracked-files=all'])) fail(`工作树存在未提交修改：${root}`)
@@ -91,6 +126,9 @@ function normalizeLock(value: any): Partial<RepositoryInput> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('仓库锁定格式无效')
   return { url: value.url ?? value.repository ?? value.source_repository, ref: value.ref ?? value.source_ref, commit: value.commit ?? value.source_commit }
 }
+function sameInputField(field: string, left: unknown, right: unknown): boolean {
+  return field === 'url' ? typeof left === 'string' && typeof right === 'string' && sameRepositorySource(left, right) : left === right
+}
 export function repositoryLocks(dataRoot: string): Partial<Record<RepositoryKey, Partial<RepositoryInput>>> {
   const result: Partial<Record<RepositoryKey, Partial<RepositoryInput>>> = {}
   const combined = join(dataRoot, 'locks/repositories.yaml')
@@ -102,7 +140,7 @@ export function repositoryLocks(dataRoot: string): Partial<Record<RepositoryKey,
     const path = join(dataRoot, 'locks', `${repositoryNames[key]}.yaml`)
     if (existsSync(path)) {
       const item = normalizeLock(readYaml(path))
-      if (result[key] && Object.entries(item).some(([field, value]) => value !== undefined && result[key]?.[field as keyof RepositoryInput] !== undefined && result[key]?.[field as keyof RepositoryInput] !== value)) fail(`仓库锁定内容冲突：${key}`)
+      if (result[key] && Object.entries(item).some(([field, value]) => value !== undefined && result[key]?.[field as keyof RepositoryInput] !== undefined && !sameInputField(field, result[key]?.[field as keyof RepositoryInput], value))) fail(`仓库锁定内容冲突：${key}`)
       result[key] = { ...result[key], ...Object.fromEntries(Object.entries(item).filter(([, value]) => value !== undefined)) }
     }
   }
@@ -110,7 +148,8 @@ export function repositoryLocks(dataRoot: string): Partial<Record<RepositoryKey,
 }
 function withLock(input: RepositoryInput, lock?: Partial<RepositoryInput>): RepositoryInput {
   if (!lock) return input
-  for (const field of ['url', 'ref', 'commit'] as const) if (lock[field] !== undefined && input[field] !== undefined && lock[field] !== input[field]) fail(`输入与仓库锁定的 ${field} 不一致`)
+  for (const field of ['url', 'ref', 'commit'] as const) if (lock[field] !== undefined && input[field] !== undefined
+    && !sameInputField(field, lock[field], input[field])) fail(`输入与仓库锁定的 ${field} 不一致`)
   return inputOf({ ...input, ...Object.fromEntries(Object.entries(lock).filter(([, value]) => value !== undefined)) })
 }
 function inspectRepository(root: string, input: RepositoryInput, reuse: boolean): RepositoryState | undefined {
@@ -121,8 +160,7 @@ function inspectRepository(root: string, input: RepositoryInput, reuse: boolean)
   if (!reuse) fail(`已有仓库需要 --reuse：${root}`)
   if (realpathSync(git(root, ['rev-parse', '--show-toplevel'])) !== realpathSync(root)) fail(`仓库根目录不匹配：${root}`)
   clean(root)
-  const identity = (url: string) => url.replace(/^git@([^:]+):/, 'https://$1/').replace(/^ssh:\/\/git@/, 'https://').replace(/\.git\/?$/, '').replace(/\/$/, '')
-  const matches = git(root, ['remote']).split('\n').filter(Boolean).some(remote => identity(git(root, ['remote', 'get-url', remote])) === identity(input.url))
+  const matches = git(root, ['remote']).split('\n').filter(Boolean).some(remote => sameRepositorySource(git(root, ['remote', 'get-url', remote]), input.url))
   if (!matches) fail(`已有仓库来源不匹配：${root}`)
   const commit = git(root, ['rev-parse', 'HEAD'])
   if (input.commit && input.commit !== commit) fail(`已有仓库提交不同，请先查看 update --plan-only：${root}`)
@@ -135,7 +173,7 @@ function inspectRepository(root: string, input: RepositoryInput, reuse: boolean)
 function resolveRemote(input: RepositoryInput): string {
   if (input.commit) return input.commit
   const ref = input.ref ?? 'HEAD'
-  const rows = git(undefined, ['ls-remote', input.url, ref, `refs/heads/${ref}`, `refs/tags/${ref}`, `refs/tags/${ref}^{}`]).split('\n').filter(Boolean).map(line => line.split(/\s+/))
+  const rows = withTransport(input.url, candidate => git(undefined, ['ls-remote', candidate, ref, `refs/heads/${ref}`, `refs/tags/${ref}`, `refs/tags/${ref}^{}`])).split('\n').filter(Boolean).map(line => line.split(/\s+/))
   const peeled = rows.find(row => row[1]?.endsWith('^{}'))
   const found = peeled?.[0] ?? rows[0]?.[0]
   if (!found || !commitPattern.test(found)) fail('仓库 ref 不存在或仓库尚无提交')
@@ -146,11 +184,12 @@ function remoteRepositoryLocks(input: RepositoryInput): Partial<Record<Repositor
   const temporary = mkdtempSync(join(tmpdir(), 'hep-lab-lock-'))
   try {
     const commit = resolveRemote(input)
-    git(undefined, ['clone', '--no-checkout', '--', input.url, temporary])
-    try { git(temporary, ['cat-file', '-e', `${commit}^{commit}`]) }
-    catch { git(temporary, ['fetch', '--no-tags', 'origin', commit]) }
-    git(temporary, ['checkout', '--detach', commit])
-    return repositoryLocks(temporary)
+    const repository = join(temporary, 'repository')
+    cloneRepository(input.url, repository)
+    try { git(repository, ['cat-file', '-e', `${commit}^{commit}`]) }
+    catch { fetchCommit(repository, input.url, commit) }
+    git(repository, ['checkout', '--detach', commit])
+    return repositoryLocks(repository)
   } finally { rmSync(temporary, { recursive: true, force: true }) }
 }
 function completeInputs(root: string, provided: Partial<Record<RepositoryKey, RepositoryInput>>, allowFloatingRef: boolean, checkOnly: boolean) {
@@ -284,11 +323,11 @@ export function inspectLab(manifest: LabManifest) {
       const item = readYaml(join(registry, file)), id = item?.agent_id, path = item?.agent_path ?? item?.source_path
       if (typeof id !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) || ids.has(id)) fail('Agent ID 无效或重复')
       ids.add(id)
-      if (item.source_repository !== business.url || item.source_commit !== business.commit) fail('Agent 来源仓库或提交与锁定不一致')
+      if (typeof item.source_repository !== 'string' || !sameRepositorySource(item.source_repository, business.url) || item.source_commit !== business.commit) fail('Agent 来源仓库或提交与锁定不一致')
       if (typeof path !== 'string' || !(path === `agents/${id}` || path.startsWith(`agents/${id}/`)) || path.includes('..') || path.includes('\\') || !existsSync(join(business.path, path, 'harness.yaml'))) fail('Agent 源码路径无效或不存在')
       const source = item.evaluation_source, manifestEntry = businessManifest?.get(id)
       if (manifestEntry?.status === 'active') {
-        if (!source || source.repository !== business.url || source.commit !== business.commit || source.path !== `agents/${id}/evaluation.md`
+        if (!source || typeof source.repository !== 'string' || !sameRepositorySource(source.repository, business.url) || source.commit !== business.commit || source.path !== `agents/${id}/evaluation.md`
           || !existsSync(join(business.path, source.path))) fail('Agent 当前验收定义未锁定到 business-agents 当前提交')
       } else if (source !== undefined) fail('archived Agent 不应保留当前 evaluation_source')
     } catch (error) { issues.push({ code: 'agent_reference', path: join(registry, file), message: (error as Error).message }) }
@@ -387,9 +426,9 @@ export function initializeLab(options: InitOptions) {
     if (!states[key]) {
       const path = join(root, repositoryPaths[key])
       mkdirSync(dirname(path), { recursive: true })
-      git(undefined, ['clone', '--no-checkout', '--', inputs[key].url, path])
+      cloneRepository(inputs[key].url, path)
       try { git(path, ['cat-file', '-e', `${inputs[key].commit}^{commit}`]) }
-      catch { git(path, ['fetch', '--no-tags', 'origin', inputs[key].commit!]) }
+      catch { fetchCommit(path, inputs[key].url, inputs[key].commit!) }
       git(path, ['checkout', '--detach', inputs[key].commit!])
       states[key] = { ...inputs[key], path, commit: inputs[key].commit! }
     }

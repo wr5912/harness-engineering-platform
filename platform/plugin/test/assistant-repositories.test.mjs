@@ -70,6 +70,17 @@ test('HTTP GitLab 主源与 GitHub 镜像并存时，按登记地址解析而不
   }
 })
 
+test('business-agents 的 GitLab 登记可核对 GitHub 镜像，回执保留登记 URL', t => {
+  const f = fixture(t)
+  f.entry.url = 'http://172.16.138.233/ai-soc/business-agents.git'; f.save()
+  f.git('remote', 'set-url', 'origin', 'git@github.com:wr5912/business-agents.git')
+  const repository = resolveRepository(f.root, 'business-agents')
+  assert.equal(repository.url, f.entry.url)
+  assert.equal(repository.commit, f.entry.commit)
+  f.git('remote', 'set-url', 'origin', 'git@github.com:someone/business-agents.git')
+  assert.throws(() => resolveRepository(f.root, 'business-agents'), /远端与登记来源不一致/)
+})
+
 test('业务工作区只暴露 data 与 business-agents，程序仓和管理 HOME 保持运行时角色', t => {
   const f = fixture(t), scope = assistantWorkspaceScope(f.root)
   assert.deepEqual(scope.allowed_repository_ids, ['data', 'business-agents'])

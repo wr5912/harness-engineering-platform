@@ -7,6 +7,7 @@ import { gunzipSync } from 'node:zlib'
 import { strFromU8, unzipSync } from 'fflate'
 import { assetText } from './asset-text.ts'
 import { dataPath, sha256 } from '../tasks/files.ts'
+import { transportCandidates } from '../../../repository-remotes.mjs'
 
 export type MigrationMap = Record<string, any>
 export class MigrationError extends Error { constructor(readonly code: string, message: string) { super(message) } }
@@ -229,10 +230,21 @@ export async function inspectMigrationSource(root: string, body: MigrationMap, s
       const local = isAbsolute(url) && existsSync(url)
       if (local) repository = realSourcePath(url)
       else {
-        if (!/^(?:https?:\/\/|ssh:\/\/|git@)/.test(url)) migrationFail('远程 Git 仅接受 HTTPS/SSH 仓库')
+        if (!/^(?:https?:\/\/|ssh:\/\/|git@)/.test(url)) migrationFail('远程 Git 仅接受 HTTP/HTTPS/SSH 仓库')
         mkdirSync(directory, { recursive: true }); repository = join(directory, 'repository.git')
         // 清点需要文件大小和正文，完整取回对象，避免逐文件触发联网补取。
-        await git(root, ['clone', '--bare', '--', url, repository], signal, 1024 * 1024)
+        const candidates = transportCandidates(url)
+        for (let index = 0; index < candidates.length; index++) {
+          const transport = candidates[index]
+          try {
+            await git(root, ['clone', '--bare', '--', transport, repository], signal, 1024 * 1024)
+            if (transport !== url) provenance.transport_url = transport
+            break
+          } catch (error) {
+            rmSync(repository, { recursive: true, force: true })
+            if (signal?.aborted || index === candidates.length - 1) throw error
+          }
+        }
       }
       const commit = (await git(repository, ['rev-parse', '--verify', `${ref}^{commit}`], signal)).toString().trim()
       if (!/^[0-9a-f]{40}$/.test(commit)) migrationFail('Git 来源无法固定到提交')

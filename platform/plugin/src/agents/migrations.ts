@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { DEFAULT_SCHEMA, Type, dump, load } from 'js-yaml'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
@@ -287,6 +287,11 @@ export function createMigrationsHandler(rootPath: string) {
       if (operation.target_kind === 'new-agent') {
         if (existsSync(targetAgent)) { if (treeDigest(targetAgent, true) !== operation.agent_tree_sha256) fail('目标 Agent 已存在或已变化，未覆盖', 'conflict') }
         else if (!existsSync(stagedAgent) || treeDigest(stagedAgent, true) !== operation.agent_tree_sha256) fail('暂存 Agent 发生变化', 'conflict')
+        const sourceEvaluation = join(existsSync(targetAgent) ? targetAgent : stagedAgent, 'evaluation.md')
+        const digest = (file: string) => existsSync(file) ? sha256(readFileSync(file)) : null
+        if (existsSync(evaluation) && digest(evaluation) !== operation.evaluation_after_sha256) fail('业务仓库已有不同的评测定义，未覆盖', 'conflict')
+        if (existsSync(sourceEvaluation) && digest(sourceEvaluation) !== operation.evaluation_after_sha256) fail('暂存评测定义已变化', 'conflict')
+        if (!existsSync(evaluation) && !existsSync(sourceEvaluation)) fail('迁移目标缺少业务评测定义', 'conflict')
       } else {
         if (sha256(readFileSync(dataPath(root, `agents/${operation.agent_id}/manifest.yaml`))) !== operation.manifest_sha256) fail('目标 Agent 当前版本或登记已变化，请重新预览', 'conflict')
         if (operation.evaluation_before_sha256 !== undefined) {
@@ -303,10 +308,28 @@ export function createMigrationsHandler(rootPath: string) {
       if (!existsSync(targetExperiment)) { mkdirSync(dirname(targetExperiment), { recursive: true }); renameSync(stagedExperiment, targetExperiment) }
       if (operation.target_kind === 'new-agent' && !existsSync(targetAgent)) {
         mkdirSync(dirname(targetAgent), { recursive: true }); renameSync(stagedAgent, targetAgent)
-        const stagedEvaluation = join(targetAgent, 'evaluation.md'), targetEvaluation = businessAgentPath(root, operation.agent_id, 'evaluation.md')
-        if (!existsSync(stagedEvaluation)) fail('迁移目标缺少业务评测定义', 'conflict')
-        if (existsSync(targetEvaluation)) fail('业务仓库已有同名评测定义，未覆盖', 'conflict')
-        mkdirSync(dirname(targetEvaluation), { recursive: true }); renameSync(stagedEvaluation, targetEvaluation)
+      }
+      if (operation.target_kind === 'new-agent') {
+        const stagedEvaluation = join(targetAgent, 'evaluation.md')
+        if (stagedEvaluation !== evaluation) {
+          if (!existsSync(evaluation)) {
+            const content = readFileSync(stagedEvaluation)
+            if (sha256(content) !== operation.evaluation_after_sha256) fail('暂存评测定义已变化', 'conflict')
+            mkdirSync(dirname(evaluation), { recursive: true })
+            const temporary = `${evaluation}.${randomUUID()}.tmp`
+            writeFileSync(temporary, content, { flag: 'wx' })
+            try {
+              // 临时文件位于目标文件系统；link 不覆盖并行创建的业务定义。
+              try { linkSync(temporary, evaluation) }
+              catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error }
+            } finally { rmSync(temporary, { force: true }) }
+          }
+          if (sha256(readFileSync(evaluation)) !== operation.evaluation_after_sha256) fail('发布期间业务评测定义变化，保留已发布资产等待处理', 'conflict')
+          if (existsSync(stagedEvaluation)) {
+            if (sha256(readFileSync(stagedEvaluation)) !== operation.evaluation_after_sha256) fail('暂存评测定义已变化', 'conflict')
+            rmSync(stagedEvaluation)
+          }
+        }
       }
       if (operation.target_kind === 'new-version' && operation.evaluation_after_sha256 && (existsSync(evaluation) ? sha256(readFileSync(evaluation)) : null) !== operation.evaluation_after_sha256) {
         const temporary = `${evaluation}.${operation.operation_id}.tmp`

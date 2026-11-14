@@ -5,6 +5,7 @@ import { request as httpRequest } from 'node:http'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import vm from 'node:vm'
 import { sitePath } from '../src/sites.ts'
 import test from 'node:test'
 import { createMountedWebServer, legacyLanConfig } from '../lib/index.mjs'
@@ -50,20 +51,24 @@ test('既有 LAN 仅兼容明确的 IPv4 wildcard，其他原生配置校验保�
   assert.throws(() => schema({ host: '0.0.0.0', port: 3080, compression: 'invalid' }))
 })
 
-for (const basePath of ['/assistant/', '/hep/', '/agents/security-operations-expert/', '/agents/security-operations-expert/instances/business-test/']) test(`${basePath} 原生 HTTP、插件资源、SSE 和 upgrade 共同挂载且旧入口拒绝`, async t => {
+for (const routeMode of ['resource', 'handler'])
+for (const basePath of ['/assistant/', '/hep/', '/agents/security-operations-expert/', '/agents/security-operations-expert/instances/business-test/']) test(`${basePath} ${routeMode} 原生 HTTP、插件资源、SSE 和 upgrade 共同挂载且旧入口拒绝`, async t => {
   const root = new Context()
   t.after(() => root.fiber.dispose())
   const productTitle = basePath === '/hep/' ? 'Harness工程平台' : undefined
   await root.plugin(createMountedWebServer(NativeWebServer, basePath, productTitle), { host: '127.0.0.1', port: 0, compression: 'gzip', compressionThresholdBytes: 0 })
-  root.provide('clientModules', { async fetchBundle(request) {
+  const clientModules = { async fetchBundle(request) {
     if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405 })
     if (!request.url.includes('rev=current')) return new Response(null, { status: 404 })
-    return new Response(request.method === 'HEAD' ? null : `const productTitle = "DeepSeek Harness";\nfetch('/api/echo');\n//# sourceMappingURL=old.map`, {
+    return new Response(request.method === 'HEAD' ? null : `const productTitle = "DeepSeek Harness";\nfetch('/api/echo');\nfetch('/openai-codex/update');\nfetch('/plugins/dsh-codex-connect/task?sessionId=fixture');\n//# sourceMappingURL=old.map`, {
       headers: { 'content-type': 'application/javascript', 'cache-control': 'public,max-age=31536000,immutable' },
     })
-  } })
+  } }
+  root.provide('clientModules', clientModules)
   const server = root.webServer
-  server.register({ kind: 'prefix', path: '/plugins', handler() { throw new Error('未使用公开 fetchBundle') } })
+  server.register({ kind: 'prefix', path: '/plugins', ...(routeMode === 'resource'
+    ? { resource: request => clientModules.fetchBundle(request) }
+    : { handler() { throw new Error('未使用公开 fetchBundle') } }) })
   server.register({ kind: 'exact', path: '/plugins/events', handler(req, res) {
     res.writeHead(200, { 'content-type': 'text/event-stream' })
     res.write('data: first\n\n')
@@ -107,6 +112,9 @@ for (const basePath of ['/assistant/', '/hep/', '/agents/security-operations-exp
   assert.ok(!code.includes('sourceMappingURL'))
   assert.ok(code.includes(`const productTitle = ${JSON.stringify(productTitle ?? 'DeepSeek Harness')};`))
   if (productTitle) assert.ok(!code.includes('DeepSeek Harness'))
+  const requests = []
+  vm.runInNewContext(code, { URL, Request, document: { baseURI: base }, fetch: input => requests.push(input) })
+  assert.deepEqual(requests, [base + 'api/echo', base + 'openai-codex/update', base + 'plugins/dsh-codex-connect/task?sessionId=fixture'])
   assert.equal((await fetch(base + 'plugins/example/client.js?rev=wrong')).status, 404)
   assert.equal((await fetch(base + 'plugins/example/client.js?rev=current', { method: 'POST' })).status, 405)
   assert.equal((await (await fetch(base + 'plugins/example/client.js?rev=current', { method: 'HEAD' })).text()), '')
@@ -120,6 +128,57 @@ for (const basePath of ['/assistant/', '/hep/', '/agents/security-operations-exp
     request.on('error', reject)
     request.end()
   })
+})
+
+test('原生插件 resource 保留请求与 Peer，只有成功脚本经过转换，资源及错误缓存原样返回', async t => {
+  const root = new Context()
+  t.after(() => root.fiber.dispose())
+  await root.plugin(createMountedWebServer(NativeWebServer, '/hep/'), { host: '127.0.0.1', port: 0 })
+  const server = root.webServer, origin = `http://127.0.0.1:${server.port}`
+  const peer = { fixture: true }, requests = []
+  const source = "fetch('/plugins/dsh-codex-connect/task?sessionId=fixture')"
+  server.register({ kind: 'prefix', path: '/plugins', resource: async (request, admitted) => {
+    requests.push({ request, peer: admitted })
+    const path = new URL(request.url).pathname
+    const headers = { 'x-resource': 'native', 'cache-control': 'public,max-age=31536000,immutable' }
+    if (path.endsWith('/rejected')) return new Response('method', { status: 405, headers: { ...headers, allow: 'GET, HEAD' } })
+    if (path.endsWith('/missing')) return new Response('missing', { status: 404, headers })
+    if (path.endsWith('/cached')) return new Response(null, { status: 304, headers: { ...headers, etag: 'fixture' } })
+    if (path.endsWith('/data')) return new Response(Uint8Array.of(0, 255, 123), { headers: { ...headers, 'content-type': 'application/octet-stream', 'content-length': '3' } })
+    return new Response(request.method === 'HEAD' ? null : source, { headers: { ...headers, 'content-type': 'application/javascript', 'content-length': String(Buffer.byteLength(source)) } })
+  } })
+  const script = await server.readResource(new Request(origin + '/hep/plugins/client.js?rev=fixture', { headers: { 'x-fixture': 'kept' } }), peer)
+  assert.equal(requests[0].peer, peer)
+  assert.equal(new URL(requests[0].request.url).pathname, '/plugins/client.js')
+  assert.equal(new URL(requests[0].request.url).search, '?rev=fixture')
+  assert.equal(requests[0].request.headers.get('x-fixture'), 'kept')
+  assert.equal(script.status, 200)
+  assert.equal(script.headers.get('x-resource'), 'native')
+  assert.equal(script.headers.get('cache-control'), 'no-store')
+  assert.equal(script.headers.get('content-length'), null)
+  assert.match(await script.text(), /__harnessSiteUrl/)
+  const head = await fetch(origin + '/hep/plugins/client.js?rev=fixture', { method: 'HEAD' })
+  assert.equal(head.status, 200)
+  assert.equal(head.headers.get('cache-control'), 'no-store')
+  assert.equal(await head.text(), '')
+  for (const [path, status, body] of [['missing', 404, 'missing'], ['cached', 304, ''], ['rejected', 405, 'method']]) {
+    const response = await fetch(origin + '/hep/plugins/' + path)
+    assert.equal(response.status, status)
+    assert.equal(response.headers.get('x-resource'), 'native')
+    assert.equal(response.headers.get('cache-control'), 'public,max-age=31536000,immutable')
+    assert.equal(await response.text(), body)
+    if (status === 304) assert.equal(response.headers.get('etag'), 'fixture')
+    if (status === 405) assert.equal(response.headers.get('allow'), 'GET, HEAD')
+  }
+  const data = await fetch(origin + '/hep/plugins/data')
+  assert.equal(data.headers.get('cache-control'), 'public,max-age=31536000,immutable')
+  assert.equal(data.headers.get('content-length'), '3')
+  assert.deepEqual(new Uint8Array(await data.arrayBuffer()), Uint8Array.of(0, 255, 123))
+  const observed = requests.length
+  const post = await fetch(origin + '/hep/plugins/client.js', { method: 'POST' })
+  assert.equal(post.status, 405)
+  assert.equal(post.headers.get('allow'), 'GET, HEAD')
+  assert.equal(requests.length, observed, '原生资源方法限制先于 owner 执行')
 })
 
 
