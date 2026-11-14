@@ -183,13 +183,20 @@ ensure_image() {
   done
   [ -n "${IMAGE_TAG:-}" ] || { echo '标准 Runtime 镜像身份 IMAGE_TAG 缺失；请重新导出安装包。' >&2; exit 2; }
   [ -f "$ROOT/manifest.json" ] || { printf '标准 Runtime 包清单不存在：%s/manifest.json；请重新导出安装包。\n' "$ROOT" >&2; exit 2; }
-  local host_arch actual actual_id actual_os actual_arch actual_fingerprint
+  local host_arch actual actual_id actual_os actual_arch actual_fingerprint inspect_error='' docker_error
   case "$(uname -m)" in aarch64|arm64) host_arch=arm64 ;; x86_64|amd64) host_arch=amd64 ;; *) printf '标准 Runtime 不支持当前主机架构 %s；请使用 AMD64/ARM64 主机。\n' "$(uname -m)" >&2; exit 2 ;; esac
   [ "$(uname -s)" = Linux ] || { printf '标准 Runtime 主机系统不符：期望 Linux，实际 %s。\n' "$(uname -s)" >&2; exit 2; }
   [ "${AGENT_ARCH:-}" = "$host_arch" ] || { printf '标准 Runtime 包架构不符：主机需要 %s，包内 AGENT_ARCH 为 %s；请导出匹配架构的包。\n' "$host_arch" "${AGENT_ARCH:-缺失}" >&2; exit 2; }
-  actual=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}|{{.Os}}|{{.Architecture}}|{{index .Config.Labels "org.ai-agent-harness.dsh.image-build-fingerprint"}}' 2>/dev/null || true)
+  if ! actual=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}|{{.Os}}|{{.Architecture}}|{{index .Config.Labels "org.ai-agent-harness.dsh.image-build-fingerprint"}}' 2>&1); then
+    inspect_error=$actual
+    actual=''
+    if ! docker_error=$(docker info --format '{{.ServerVersion}}' 2>&1); then
+      printf '无法查询标准 Runtime 镜像 %s：%s\nDocker 服务检查失败：%s\n请先恢复 Docker 服务或当前用户的 Docker 访问权限。\n' "$IMAGE_TAG" "$inspect_error" "$docker_error" >&2
+      exit 2
+    fi
+  fi
   if [ "${actual%%|*}" != "$IMAGE_ID" ]; then
-    [ -f "$ROOT/images/dsh-runtime.tar" ] || { printf '标准镜像 %s 不可用：期望 ID %s，实际 %s，且镜像归档 %s/images/dsh-runtime.tar 不存在；请恢复安装介质。\n' "$IMAGE_TAG" "$IMAGE_ID" "${actual%%|*}" "$ROOT" >&2; exit 2; }
+    [ -f "$ROOT/images/dsh-runtime.tar" ] || { printf '标准镜像 %s 不可用：期望 ID %s，实际 %s；查询原因：%s。镜像归档 %s/images/dsh-runtime.tar 不存在；请恢复安装介质。\n' "$IMAGE_TAG" "$IMAGE_ID" "${actual%%|*}" "${inspect_error:-镜像 ID 不匹配}" "$ROOT" >&2; exit 2; }
     docker load -i "$ROOT/images/dsh-runtime.tar"
     actual=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}|{{.Os}}|{{.Architecture}}|{{index .Config.Labels "org.ai-agent-harness.dsh.image-build-fingerprint"}}')
   fi

@@ -18,7 +18,11 @@ function fixture(t, profile = 'web') {
   writeFileSync(join(root, 'state/deployment.env'), 'AGENT_PORT=28027\nAGENT_HOST=127.0.0.1\nCOMPOSE_PROJECT_NAME=launcher-fixture\n')
   writeFileSync(join(bin, 'docker'), `#!/bin/bash
 if [ "$1" = run ]; then printf 'run verify-runtime port=%s\n' "$AGENT_PORT" >> "$LAUNCHER_LOG"; else printf '%s port=%s\n' "$*" "$AGENT_PORT" >> "$LAUNCHER_LOG"; fi
-if [ "$1 $2" = 'image inspect' ]; then printf '%s\n' "$LAUNCHER_IMAGE_META"; exit 0; fi
+if [ "$1 $2" = 'image inspect' ]; then
+  if [ -n "$LAUNCHER_INSPECT_ERROR" ]; then printf '%s\n' "$LAUNCHER_INSPECT_ERROR" >&2; exit 1; fi
+  printf '%s\n' "$LAUNCHER_IMAGE_META"; exit 0
+fi
+if [ "$1" = info ] && [ -n "$LAUNCHER_DOCKER_ERROR" ]; then printf '%s\n' "$LAUNCHER_DOCKER_ERROR" >&2; exit 1; fi
 if [ "\${*: -3}" = 'config --format json' ]; then cat "$LAUNCHER_COMPOSE"; exit 0; fi
 if [ "$1" = run ]; then
   while [ "$1" != -e ]; do shift; done
@@ -89,6 +93,21 @@ test('校验失败指明具体字段、服务、期望值与实际值', t => {
   assert.ok(f.run(['start']).stderr.includes(`manifest.json 的 image.id 不符：期望 ${imageId}，实际 wrong`))
   writeFileSync(join(f.root, 'runtime/bundle.env'), 'IMAGE_ID=bad\n')
   assert.match(f.run(['start']).stderr, /IMAGE_ID 期望 sha256:.*实际 bad/)
+  assert.doesNotMatch(readFileSync(f.log, 'utf8'), /(?: up | run --rm -T init| load )/)
+})
+
+test('Docker 服务故障与镜像缺失分别保留原始原因，不启动或载入镜像', t => {
+  const f = fixture(t)
+  const daemon = f.run(['start'], { LAUNCHER_INSPECT_ERROR: 'permission denied while trying to connect to /var/run/docker.sock', LAUNCHER_DOCKER_ERROR: 'Docker daemon is not running' })
+  assert.equal(daemon.status, 2)
+  assert.match(daemon.stderr, /无法查询标准 Runtime 镜像 fixture\/runtime/)
+  assert.match(daemon.stderr, /permission denied.*docker\.sock/)
+  assert.match(daemon.stderr, /Docker 服务检查失败：Docker daemon is not running/)
+  assert.doesNotMatch(daemon.stderr, /请恢复安装介质/)
+  const missing = f.run(['start'], { LAUNCHER_INSPECT_ERROR: 'Error: No such image: fixture/runtime' })
+  assert.equal(missing.status, 2)
+  assert.match(missing.stderr, /查询原因：Error: No such image: fixture\/runtime/)
+  assert.match(missing.stderr, /images\/dsh-runtime\.tar 不存在/)
   assert.doesNotMatch(readFileSync(f.log, 'utf8'), /(?: up | run --rm -T init| load )/)
 })
 
