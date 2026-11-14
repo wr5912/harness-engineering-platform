@@ -137,7 +137,7 @@ export function launchAddress(dataRoot: string, host?: string, port?: string, pu
   const url = `http://${host}:${number}${base}`
   if (publicUrl && new URL(publicUrl).hash) throw new Error('--public-url 不能包含片段')
   // 配置中的非本机地址属于旧的自动生成结果；只有显式 --public-url 才保留 NAT/反向代理入口。
-  const entry = validatePlatformEntryUrl(dataRoot, publicUrl ?? (configured && configured.protocol === 'https:' ? configured.href : separate && configured && local(configured.hostname) ? configured.href : url))
+  const entry = validatePlatformEntryUrl(dataRoot, publicUrl ?? (configured && configured.protocol === 'https:' ? configured.href : !autoConfigured && separate && configured && local(configured.hostname) ? configured.href : url))
   if (new URL(entry).pathname !== base) throw new Error('平台管理入口与站点基址不一致')
   return { host, port: number, url, publicUrl: entry }
 }
