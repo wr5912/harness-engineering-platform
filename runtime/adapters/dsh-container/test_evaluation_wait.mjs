@@ -10,6 +10,31 @@ test('只等待已有根Agent，不创建或恢复Session，无子任务时按�
   await assert.rejects(waitForEvaluationTree({ agents: { get: () => undefined } }, 'absent', new AbortController().signal), /not-live/)
 })
 
+test('session 已创建但 Agent 尚未注册时等待注册窗口，不误报 task-tree-wait-failed', async () => {
+  const agent = { session: { seq: 1 }, status: 'idle', whenIdle: async () => {} }
+  let live
+  const session = {}
+  const ctx = { agents: { get: () => live }, sessions: { get: () => session }, get: () => undefined }
+  const waiting = waitForEvaluationTree(ctx, 'root', AbortSignal.timeout(500))
+  await new Promise(resolve => setTimeout(resolve, 35))
+  live = agent
+  await waiting
+})
+
+test('HTTP evaluation.wait 覆盖 prompt accepted 后的 Agent 注册竞态', async () => {
+  let agent
+  const session = {}
+  const ctx = { agents: { get: () => agent }, sessions: { get: () => session }, get: () => undefined,
+    connection: { fetch: { register: value => { ctx.route = value } } } }
+  apply(ctx)
+  const response = ctx.route.fetch(new Request('http://runtime/api/evaluation.wait?sessionId=root'))
+  await new Promise(resolve => setTimeout(resolve, 35))
+  agent = { session: { seq: 1 }, status: 'idle', whenIdle: async () => {} }
+  const result = await response
+  assert.equal(result.status, 200)
+  assert.deepEqual(await result.json(), { session_id: 'root', settled: true })
+})
+
 test('子任务完成回报后必须再等根后续回合，不能用根首次idle提前返回', async () => {
   const child = deferred(), root = deferred()
   let idleCalls = 0, childCalls = 0, done = false

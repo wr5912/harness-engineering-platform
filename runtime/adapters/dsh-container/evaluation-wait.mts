@@ -1,6 +1,6 @@
 /** Web 评测复用官方 SDK 的任务树等待语义；会话、输入与任务归属由原生服务维护。 */
 export const name = 'harness-evaluation-wait'
-export const inject = ['agents', 'connection']
+export const inject = ['agents', 'connection', 'sessions']
 export const EVALUATION_WAIT_PATH = '/api/evaluation.wait'
 
 export interface EvaluationWaitConnection { baseUrl: string | URL; cookie?: string }
@@ -51,10 +51,25 @@ async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   } finally { signal.removeEventListener('abort', abort) }
 }
 
+async function liveAgent(ctx: any, sessionId: string, signal: AbortSignal): Promise<any> {
+  const agent = ctx.agents?.get(sessionId)
+  if (agent) return agent
+  // session/create/session/prompt 的成功回执可能先于 Agent 注册发布；等待
+  // 这段原生注册窗口，避免把可恢复的启动竞态误报为 task-tree-wait-failed。
+  const session = ctx.sessions?.get?.(sessionId)
+  if (!session) throw new Error('evaluation-session-not-live')
+  while (true) {
+    signal.throwIfAborted()
+    const current = ctx.agents?.get(sessionId)
+    if (current) return current
+    if (!ctx.sessions?.get?.(sessionId)) throw new Error('evaluation-session-replaced')
+    await abortable(new Promise<void>(resolve => setTimeout(resolve, 25)), signal)
+  }
+}
+
 /** 与锁定版 SDK session/wait 一致，子任务回报后重新等待根会话和事件序列稳定。 */
 export async function waitForEvaluationTree(ctx: any, sessionId: string, signal: AbortSignal): Promise<void> {
-  const agent = ctx.agents.get(sessionId)
-  if (!agent) throw new Error('evaluation-session-not-live')
+  const agent = await liveAgent(ctx, sessionId, signal)
   const assertLive = () => {
     signal.throwIfAborted()
     if (ctx.agents.get(sessionId) !== agent) throw new Error('evaluation-session-replaced')
