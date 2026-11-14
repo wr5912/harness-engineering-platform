@@ -18,7 +18,7 @@ test('内部恢复自动入口不把地址标成显式；反代和用户指定�
   assert.deepEqual(platformAddressArgs(state, true), [...local, '--public-url', state.publicUrl])
   const nat = { ...state, publicUrl: 'http://192.0.2.1:18121/hep/' }
   assert.deepEqual(platformAddressArgs(nat), [...local, '--public-url', nat.publicUrl])
-  const copiedState = { ...state, host: '172.16.138.228', url: 'http://172.16.138.228:18121/hep/', publicUrl: 'http://172.16.138.228:53106/' }
+  const copiedState = { ...state, host: '192.0.2.254', url: 'http://192.0.2.254:18121/hep/', publicUrl: 'http://192.0.2.254:53106/' }
   assert.deepEqual(platformAddressArgs(copiedState), ['--host', copiedState.host, '--port', '18121'], '复制到新环境的旧 HTTP IP 不得作为公开入口复用')
   assert.deepEqual(platformAddressArgs({ ...copiedState, publicUrl: 'https://proxy.example/hep/' }), ['--host', copiedState.host, '--port', '18121', '--public-url', 'https://proxy.example/hep/'], '域名和 HTTPS 公开入口继续保留')
 })
