@@ -5,7 +5,7 @@ import { collectEntries, sha256File, writeChecksums } from '../../manifest.mts'
 import { writeCompactRuntime } from './compact.mts'
 import { migrateStandaloneConnections } from '../../../plugin/src/standalone/connections.ts'
 
-export interface RuntimeBundleOptions { programRoot: string; imageTag: string; imageId?: string; imageFingerprint?: string; arch: 'amd64' | 'arm64'; agentId: string; experimentId: string; presetId: string; profilePatch: string; profile?: 'web' | 'sdk'; harnessRuntime?: any }
+export interface RuntimeBundleOptions { programRoot: string; imageTag: string; imageId?: string; imageFingerprint?: string; arch: 'amd64' | 'arm64'; agentId: string; experimentId: string; presetId: string; profilePatch: string; profile?: 'web' | 'sdk'; harnessRuntime?: any; harnessRoot?: string }
 
 /** 已有预览沿用冻结资产，只刷新同一版本的运行器，不生成归档。 */
 export async function refreshAgentPreview(root: string, programRoot: string, preview: { agentId: string; experimentId: string; candidateSha256: string; arch: string }) {

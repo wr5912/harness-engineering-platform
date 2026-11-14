@@ -53,11 +53,17 @@ test('单 Agent 快照读取实际未提交字节、保留来源身份，排除�
 
 test('仅配置模型的独立包生成可初始化的空 MCP 配置，不要求调用方补齐可选字段', async t => {
   const f = fixture(t)
-  const modelPatch = [{ name: 'fixture-model' }]
+  const modelPatch = [{ name: '本地验收模型' }]
+  write(join(f.candidate, 'dsh/workspace/deployment.env.example'), '# 通知服务\nBUSINESS_NATS_URL=nats://notifications.test:4222\n')
   const result = await packAgent({ ...f.input, seed: { modelPatch } })
   const extracted = join(f.root, 'model-only')
   tarExtract(result.archive, extracted)
-  const seed = JSON.parse(readFileSync(join(extracted, 'config/seed/standalone.json'), 'utf8'))
+  const json = readFileSync(join(extracted, 'config/seed/standalone.json'), 'utf8')
+  const seed = JSON.parse(json)
+  assert.equal(json, JSON.stringify(seed, null, 2) + '\n')
+  assert.ok(json.includes('本地验收模型'))
+  assert.equal(/\\u[0-9a-f]{4}/i.test(json), false)
+  assert.match(readFileSync(join(extracted, 'config/deployment.env'), 'utf8'), /# 通知服务\nBUSINESS_NATS_URL=nats:\/\/notifications\.test:4222/)
   const config = validateStandaloneConfig(seed)
   assert.deepEqual(config.modelPatch, modelPatch)
   assert.deepEqual(config.mcp.servers, [])

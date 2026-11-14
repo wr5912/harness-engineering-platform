@@ -48,6 +48,17 @@ export function remoteConnection(server: any, version: 1 | 2 = 2) {
   return { url: url.href, headers: Object.fromEntries((server.headers || []).map((header: any) => [header.name, header.value])) as Record<string, string> }
 }
 
+/** 分组身份随 Harness 保存，平台地址使用当前运行环境。 */
+export function bindPlatformGroupConnection(server: any, groupUrl: (id: string) => string) {
+  if (!server.url) return undefined
+  const path = new URL(server.url).pathname
+  const base = `/mcp/groups/${server.id}`
+  if (!path.endsWith(`${base}/v2`) && !path.endsWith(base)) return undefined
+  const url = new URL(groupUrl(server.id))
+  if (path.endsWith(base)) url.pathname = url.pathname.replace(/\/v2$/, '')
+  return { ...server, url: url.href }
+}
+
 /** 更新已有安装时移除内嵌执行配置，保留用户调整过的连接和凭据。 */
 export function migrateStandaloneConnections(value: any, managed: string) {
   if (!['compositions', 'extensions', 'fixedBindings'].some(key => key in value)) return value

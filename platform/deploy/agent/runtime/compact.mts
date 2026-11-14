@@ -1,4 +1,4 @@
-import { chmodSync, copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { RuntimeBundleOptions } from './index.mts'
 
@@ -40,4 +40,6 @@ export async function writeCompactRuntime(staging: string, options: RuntimeBundl
   } }
   writeFileSync(join(staging, 'config/compose.yaml'), JSON.stringify(compose, null, 2) + '\n')
   writeFileSync(join(staging, 'config/deployment.env'), `# 修改后运行 ./agent restart；首次启动自动导入随包镜像。\nAGENT_ID=${options.agentId}\nAGENT_ARCH=${options.arch}\nAGENT_PROFILE=${options.profile ?? 'web'}\nIMAGE_TAG=${options.imageTag}\nIMAGE_ID=${options.imageId ?? ''}\n# AGENT_PORT=18500\n# AGENT_HOST=192.168.1.10\n# AGENT_HARNESS_ROOT=/absolute/path/to/harness\n# AGENT_UID=1000\n# AGENT_GID=1000\n# COMPOSE_PROJECT_NAME=hep-agent-${options.agentId}\n# HTTP_PROXY=http://host.docker.internal:7897\n# HTTPS_PROXY=http://host.docker.internal:7897\n# NO_PROXY=localhost,127.0.0.1,host.docker.internal\n`)
+  const environmentTemplate = join(options.harnessRoot ?? join(staging, 'harness'), 'dsh/workspace/deployment.env.example')
+  if (existsSync(environmentTemplate)) appendFileSync(join(staging, 'config/deployment.env'), '\n# 业务 Harness 公开环境配置\n' + readFileSync(environmentTemplate, 'utf8').trimEnd() + '\n')
 }

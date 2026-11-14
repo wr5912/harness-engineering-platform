@@ -184,7 +184,7 @@ export async function configureStandalone(file: string | Record<string, unknown>
   validateConfiguration({ ...next.mcp, servers: configuredServers(next) })
   if (supplied.environment) {
     if (Object.entries(supplied.environment).some(([key, value]) => !/^[A-Z][A-Z0-9_]*$/.test(key) || typeof value !== 'string')) throw new Error('模型环境凭据格式无效')
-    write(join(home, 'standalone/environment.llm-api-key'), JSON.stringify({ ...readEnvironment(join(home, 'standalone/environment.llm-api-key')), ...supplied.environment }) + '\n')
+    write(join(home, 'standalone/environment.llm-api-key'), JSON.stringify({ ...readEnvironment(join(home, 'standalone/environment.llm-api-key')), ...supplied.environment }, null, 2) + '\n')
   }
   writeStandaloneConfig(next, home)
   generateProfile(next, home, root, supplied.modelPatch !== undefined || supplied.defaultModel !== undefined)
@@ -255,7 +255,7 @@ export async function configureInteractive({ root = runtimeRoot(), home = proces
       updateMcpConnection(server, { ...(address ? { url: address } : {}), ...(key ? { token: key } : {}) })
     }
     const temporary = join(home, 'standalone/.interactive-config.llm-api-key')
-    write(temporary, JSON.stringify({ modelPatch: nativePatch, mcp, environment }))
+    write(temporary, JSON.stringify({ modelPatch: nativePatch, mcp, environment }, null, 2) + '\n')
     try { return await configureStandalone(temporary, { home, root }) }
     finally { const { unlinkSync } = await import('node:fs'); unlinkSync(temporary) }
   } finally { reader.close(); output.end() }

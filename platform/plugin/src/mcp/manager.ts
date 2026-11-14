@@ -17,6 +17,7 @@ import { loadOpenApi } from 'harness-mcp-manager-openapi'
 import { McpConfigStore, type McpConfigurationView } from './store.ts'
 import type { BusinessContext } from '../business-control/contracts.ts'
 import { inspectDraftBinding, withDraftInstance } from './draft-bindings.ts'
+import { bindPlatformGroupConnection } from '../standalone/connections.ts'
 
 export const { name, Config, validateConfiguration } = manager
 export const inject = manager.inject
@@ -61,9 +62,8 @@ function businessServers(assetRoot: string, candidateServers: any[], platformSer
   const platformById = new Map(platformServers.map(server => [server.id, server]))
   return candidateServers.map(candidate => {
     // Candidate 保留分组身份；部署入口由当前工作区解析，不沿用种子中的宿主地址。
-    if (candidate.url && new URL(candidate.url).pathname.endsWith(`/mcp/groups/${candidate.id}/v2`)) {
-      return { ...candidate, url: platformGroupUrl(assetRoot, candidate.id) }
-    }
+    const bound = bindPlatformGroupConnection(candidate, id => platformGroupUrl(assetRoot, id))
+    if (bound) return bound
     const current = platformById.get(candidate.id)
     const server = { ...candidate }
     for (const field of connectionFields) delete server[field]

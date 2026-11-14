@@ -16,6 +16,7 @@ function fixture(t) {
   for (const directory of ['workspace', 'managed', 'presets']) mkdirSync(join(harness, 'dsh', directory), { recursive: true })
   put(join(harness, 'harness.yaml'), 'agent: {id: alpha}\nloadable_assets:\n  preset_id: alpha\n  profile_patch: dsh/managed/main.yml\n')
   put(join(harness, 'dsh/managed/main.yml'), '- id: mcp-session-manager\n  config:\n    servers:\n    - {id: platform, url: "http://platform.test/hep/mcp/groups/inspection/v2"}\n    groups: []\n')
+  put(join(harness, 'dsh/workspace/deployment.env.example'), '# 通知地址\nNOTIFICATIONS_URL=nats://default.test:4222\n')
   mkdirSync(join(root, 'assets'), { recursive: true })
   symlinkSync(join(harness, 'harness.yaml'), join(root, 'assets/harness.yaml'))
   put(join(root, 'runtime/lfx/server.py'), 'legacy local executor')
@@ -23,7 +24,7 @@ function fixture(t) {
   put(join(root, 'agent'), 'old launcher')
   put(join(root, 'manifest.json'), JSON.stringify({ kind: 'standalone-agent', schemaVersion: 1,
     package: { arch: 'amd64' }, source: { agentId: 'alpha', experimentId: 'EXP-alpha-001', profile: 'web' }, extensions: ['old'] }))
-  put(join(root, 'state/deployment.env'), 'AGENT_PORT=18506\nCOMPOSE_PROJECT_NAME=keep-project\nAGENT_UID=1012\n')
+  put(join(root, 'state/deployment.env'), 'AGENT_PORT=18506\nCOMPOSE_PROJECT_NAME=keep-project\nAGENT_UID=1012\nNOTIFICATIONS_URL=nats://onsite.test:4222\n')
   const config = { agentId: 'alpha', profilePatch: 'main.yml', compositions: [{ flow: 'local' }], extensions: ['local'],
     fixedBindings: ['local'], mcp: { servers: [{ id: 'platform-compositions', url: 'http://local' }, { id: 'own', url: 'http://own.test/mcp', headers: [{name: 'Authorization', value: 'keep-secret'}] }], groups: [] } }
   put(join(root, 'config-seed/standalone.json'), JSON.stringify(config))
@@ -42,6 +43,9 @@ test('旧真实安装布局迁移为平台 MCP 客户端，共用镜像且保留
   assert.deepEqual(config.mcp.servers.map(server => server.id), ['own', 'platform'])
   assert.equal(config.mcp.servers[0].headers[0].value, 'keep-secret')
   assert.match(readFileSync(join(f.root, 'config/deployment.env'), 'utf8'), /AGENT_PORT=18506\nCOMPOSE_PROJECT_NAME=keep-project/)
+  const deployment = readFileSync(join(f.root, 'config/deployment.env'), 'utf8')
+  assert.match(deployment, /# 通知地址\nNOTIFICATIONS_URL=nats:\/\/default.test:4222/)
+  assert.ok(deployment.lastIndexOf('NOTIFICATIONS_URL=nats://onsite.test:4222') > deployment.indexOf('NOTIFICATIONS_URL=nats://default.test:4222'))
   assert.equal(readFileSync(join(f.root, 'state/home/sessions/keep.jsonl'), 'utf8'), 'keep conversation bytes')
   assert.equal(readFileSync(join(f.root, 'state/home/settings.json'), 'utf8'), 'keep native model bytes')
   const manifest = JSON.parse(readFileSync(join(f.root, 'manifest.json')))

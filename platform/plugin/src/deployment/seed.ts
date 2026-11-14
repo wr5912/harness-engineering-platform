@@ -5,7 +5,7 @@ import { McpConfigStore } from '../mcp/store.ts'
 import { assertStandaloneVersionSupported } from '../agents/version-source.ts'
 import { runtimeSource } from '../agents/business-source.ts'
 import { workspaceConfigPath } from '../workspace.ts'
-import { harnessMcpConnections } from '../standalone/connections.ts'
+import { bindPlatformGroupConnection, harnessMcpConnections } from '../standalone/connections.ts'
 
 type ModelProjection = (agentId: string, selection?: { provider: string; model: string; reasoningEffort?: string }, candidatePath?: string) => Promise<{ policy: any; environment: Record<string, string> }>
 
@@ -31,6 +31,7 @@ export function createDeploymentSeed(assetRoot: string, modelProjection: ModelPr
       notices.push('当前模型连接未能完整导出，可在目标环境通过 agent configure 配置；本地业务 Provider 仍保留。')
     }
     const mcp = harnessMcpConnections(join(candidate, 'managed'), source.patch)
+    if (platformGroupUrl) mcp.servers = mcp.servers.map(server => bindPlatformGroupConnection(server, platformGroupUrl) ?? server)
     // 只提供 Harness 已声明的平台入口凭据，不复制平台连接拓扑或下游密钥。
     const platformToken = existsSync(workspaceConfigPath(assetRoot, 'mcp-manager.json'))
       ? new McpConfigStore(assetRoot, () => {}).view().value.sharedToken : ''

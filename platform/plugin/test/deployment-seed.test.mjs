@@ -25,7 +25,7 @@ test('独立种子只导出 Harness 原生连接与工具选择，不读取平�
   for (const key of ['compositions', 'extensions', 'fixedBindings']) assert.equal(key in seed, false)
 })
 
-test('只为当前平台的已声明入口补充凭据，不向其他主机或前缀转发平台 Token', async t => {
+test('原生分组统一绑定当前平台，只向绑定后的平台入口补充凭据', async t => {
   const f = fixture(t), token = 'a'.repeat(64)
   write(join(f.data, 'config/mcp-manager.json'), JSON.stringify({ schemaVersion: 1, servers: [], groups: [] }))
   write(join(f.data, '.local/credentials/mcp-manager.json'), JSON.stringify({ schemaVersion: 1, sharedToken: token, servers: {} }))
@@ -35,9 +35,18 @@ test('只为当前平台的已声明入口补充凭据，不向其他主机或�
     { id: 'other', url: 'http://other.test/hep/mcp/groups/other/v2' },
     { id: 'prefix', url: 'http://platform.test/other/mcp/groups/prefix/v2' },
     { id: 'configured', url: 'http://platform.test/hep/mcp/groups/configured/v2', headers: [{ name: 'Authorization', value: 'Bearer own' }] },
+    { id: 'external', url: 'http://other.test/external/mcp', tools: { mode: 'selected', names: ['query'] } },
+    { id: 'disabled', enabled: false, url: 'http://old.test/hep/mcp/groups/disabled/v2' },
   ])
   const result = await invoke(f, project, id => `http://platform.test/hep/mcp/groups/${id}/v2`)
-  assert.deepEqual(result.seed.mcp.servers.map(server => server.headers?.[0]?.value), [`Bearer ${token}`, `Bearer ${token}`, undefined, undefined, 'Bearer own'])
+  const servers = result.seed.mcp.servers
+  assert.deepEqual(servers.map(server => server.headers?.[0]?.value), [`Bearer ${token}`, `Bearer ${token}`, `Bearer ${token}`, `Bearer ${token}`, 'Bearer own', undefined, undefined])
+  assert.equal(servers[1].url, 'http://platform.test/hep/mcp/groups/legacy-link')
+  assert.equal(servers[2].url, 'http://platform.test/hep/mcp/groups/other/v2')
+  assert.equal(servers[3].url, 'http://platform.test/hep/mcp/groups/prefix/v2')
+  assert.equal(servers[5].url, 'http://other.test/external/mcp')
+  assert.deepEqual(servers[5].tools, { mode: 'selected', names: ['query'] })
+  assert.equal(servers[6].enabled, false)
 })
 
 test('业务代码和 Profile 中的 JS 表达式只作为资产数据读取，不执行', async t => {

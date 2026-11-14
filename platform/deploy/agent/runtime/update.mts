@@ -37,7 +37,7 @@ export async function updateAgentRuntime(root: string, programRoot: string, imag
   try {
     await writeCompactRuntime(prepared, { programRoot, imageTag: image.tag, imageId: image.id, imageFingerprint: image.fingerprint,
       arch: manifest.package.arch, agentId: manifest.source.agentId, experimentId: sourceId,
-      presetId: assets.preset_id, profilePatch: assets.profile_patch.slice('dsh/managed/'.length), profile: 'web' })
+      presetId: assets.preset_id, profilePatch: assets.profile_patch.slice('dsh/managed/'.length), profile: 'web', harnessRoot })
     cpSync(seedRoot, join(prepared, 'config/seed'), { recursive: true })
     const migrate = (value: any) => ({ ...migrateStandaloneConnections(value, join(harnessRoot, 'dsh/managed')),
       experimentId: sourceId, presetId: assets.preset_id, profilePatch: assets.profile_patch.slice('dsh/managed/'.length) })
