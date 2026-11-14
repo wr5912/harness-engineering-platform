@@ -95,6 +95,16 @@ if os.environ.get("FAKE_PNPM_FAIL") == "build" and sys.argv[1:] == ["run", "buil
     sys.exit(1)
 if os.environ.get("FAKE_PNPM_FAIL") not in (None, "", "build"):
     sys.exit(1)
+if sys.argv[1:] == ["install", "--frozen-lockfile"] and os.environ.get("FAKE_PROFILE_INSTALL"):
+    manifest = json.loads(pathlib.Path("package.json").read_text())
+    if manifest.get("name") == "dsh-profile-harness-platform":
+        for name in manifest.get("dependencies", {}):
+            package = pathlib.Path("node_modules", *name.split("/"))
+            package.mkdir(parents=True, exist_ok=True)
+            (package / "package.json").write_text(json.dumps({"name": name}))
+        lock = pathlib.Path("node_modules/.pnpm/lock.yaml")
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        lock.write_bytes(pathlib.Path("pnpm-lock.yaml").read_bytes())
 if sys.argv[1:] == ["run", "build"]:
     pathlib.Path("lib").mkdir(exist_ok=True)
     pathlib.Path("lib/index.js").write_text("export function apply() {}\n")
@@ -254,6 +264,8 @@ if sys.argv[1:] == ["run", "build"]:
 
     def test_versioned_profile_installs_declared_plugin_and_preserves_platform_bundle_link(self):
         manifest = self.configure_versioned_manager_home()
+        shutil.rmtree(self.profile / "node_modules/dsh-think-zh")
+        self.env["FAKE_PROFILE_INSTALL"] = "1"
         self.prepare()
         calls = [json.loads(line) for line in self.pnpm_trace.read_text().splitlines()]
         self.assertEqual([call["args"] for call in calls], [
