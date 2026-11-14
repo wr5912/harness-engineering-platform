@@ -126,7 +126,7 @@ export function install(options: InstallOptions): InstallReport {
       if (!existsSync(join(bundleRoot, 'data'))) throw new Error('安装包声明包含数据根，但缺少 data/ 目录')
       copyTree(join(bundleRoot, 'data'), dataRoot)
       dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
-      if (dataCheck.kind === 'fixture') warnings.push('安装的是夹具数据根；管理助手工作区和管理 Skill 不完整')
+      if (dataCheck.kind === 'fixture') warnings.push('安装的是夹具数据根；工作区配置不完整')
     }
     if (manifest.source.programRoot !== prefix || manifest.source.dataRoot !== dataRoot || manifest.source.home !== homedir() || manifest.source.managerDshHome) {
       const mappings = [{ from: manifest.source.home, to: homedir() }]
@@ -214,10 +214,6 @@ export function install(options: InstallOptions): InstallReport {
       if (prepared.status !== 0) throw new Error(`离线 prepare 失败（退出码 ${prepared.status}）`)
       report.prepare = 'ok'
       if (dataCheck?.kind === 'workspace') {
-        const patch = join(managerHome(dataRoot), 'profiles', 'harness-platform', 'harness-platform.patch.yml')
-        if (!existsSync(patch) || !readFileSync(patch, 'utf8').includes(join(dataRoot, '.agents', 'skills'))) {
-          throw new Error('平台 Profile 未装载数据工作区的 .agents/skills；管理助手工作区不完整')
-        }
         const locator = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'harness-engineering-platform', 'workspace.json')
         if (!existsSync(locator)) {
           mkdirSync(join(locator, '..'), { recursive: true })

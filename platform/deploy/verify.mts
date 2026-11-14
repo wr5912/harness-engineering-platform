@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { inspectDataRoot } from './data.mts'
 import { managedState, ownsPort } from '../lifecycle.mts'
-import { workspaceIdentity } from '../plugin/src/workspace.ts'
+import { managerWorkspaceRoot, workspaceIdentity } from '../plugin/src/workspace.ts'
 import { sha256File, type Manifest } from './manifest.mts'
 import { validateBusinessGateway } from '../plugin/src/business-control/configuration.ts'
 import { resolveBusinessSecretFile } from '../plugin/src/business-control/secret-file.ts'
@@ -58,7 +58,7 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
     checks.push({ id: 'profile', status: 'missing', detail: profile })
   } else {
     const patch = readFileSync(profile, 'utf8')
-    const expected = join(dataRoot, '.agents', 'skills')
+    const expected = join(home, '.agents', 'skills')
     checks.push({
       id: 'profile-skills',
       status: patch.includes(expected) ? 'ok' : 'mismatch',
@@ -70,13 +70,14 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
     checks.push({ id: 'default-workspace', status: 'missing', detail: storage })
   } else {
     const value = JSON.parse(readFileSync(storage, 'utf8')) as any
-    // defaultWorkspaceId 仅标记原生首次使用；平台通过 registry.create 绑定唯一数据工作区。
+    // defaultWorkspaceId 仅标记原生首次使用；原生会话绑定管理工作区。
+    const expected = managerWorkspaceRoot(dataRoot)
     const ids = value?.global?.workspaceIds
     const path = Array.isArray(ids) && ids.length === 1 ? value?.tables?.workspaces?.[ids[0]]?.path : undefined
     checks.push({
       id: 'default-workspace',
-      status: typeof path === 'string' && resolve(path) === dataRoot ? 'ok' : 'mismatch',
-      detail: typeof path === 'string' ? path : `原生工作区登记未唯一绑定到 ${dataRoot}`,
+      status: typeof path === 'string' && resolve(path) === expected ? 'ok' : 'mismatch',
+      detail: typeof path === 'string' ? path : `原生工作区登记未唯一绑定到 ${expected}`,
     })
   }
   const launcher = join(prefix, 'platform', 'dsh-platform')
