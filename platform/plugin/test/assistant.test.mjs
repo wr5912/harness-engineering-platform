@@ -72,9 +72,9 @@ function fixture(t, responder, root) {
     const custom = await responder?.(endpoint, input, signal)
     if (custom !== undefined) return custom
     if (endpoint === 'instances/preview') return { ok: true, value: {
-      name: input.name, operation: input.operation, source_id: 'experiment:EXP-test-agent-001',
+      name: input.name, operation: input.operation, source_id: 'business:test-agent',
       observed_state: 'running', observed_at: '2026-10-21T00:00:00.000Z',
-      plan: { source_id: input.source ?? 'experiment:EXP-test-agent-001', port: 3199,
+      plan: { source_id: input.source ?? 'business:test-agent', port: 3199,
         ...(input.operation === 'create' ? { business_control: { source_digest: 'sha256:' + 'a'.repeat(64) } } : {}) },
       ...(input.operation === 'create' ? { access_mode: 'anonymous', identity_mode: 'development' } : {}),
       model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64),
@@ -350,13 +350,13 @@ test('实例创建、启动和重启由助手内部预览冻结来源、端口�
   const f = fixture(t)
   const id = (await f.rpc('session', { task: '按固定版本办理实例操作' })).value.session_id
   for (const operation of ['create', 'start', 'restart']) {
-    const request = { operation, name: `assistant-${operation}`, ...(operation === 'create' ? { source: 'experiment:EXP-test-agent-001' } : {}),
+    const request = { operation, name: `assistant-${operation}`, ...(operation === 'create' ? { source: 'business:test-agent' } : {}),
       expected_model_policy_hash: 'b'.repeat(64) }
     const pending = f.execute(id, 'instances', 'run', request)
     const card = await f.operation(id)
     assert.equal(f.calls.findLast(call => call.endpoint === 'instances/preview').input.name, request.name)
     assert.equal(f.calls.some(call => call.endpoint === 'instances/run' && call.input.name === request.name), true)
-    assert.equal(card.input.expected_source_id, 'experiment:EXP-test-agent-001')
+    assert.equal(card.input.expected_source_id, 'business:test-agent')
     assert.equal(card.input.port, 3199)
     assert.deepEqual(card.input.model_selection, { provider: 'fixture', model: 'default' })
     assert.equal(card.input.expected_model_policy_hash, 'a'.repeat(64), '模型填入的旧摘要不得覆盖实际预览')
@@ -373,7 +373,7 @@ test('实例创建、启动和重启由助手内部预览冻结来源、端口�
 
 test('助手重载冻结实际来源与代次，批量部分失败和旧确认均不重放', async t => {
   const asset = 'sha256:' + 'b'.repeat(64), generation = 'sha256:' + 'c'.repeat(64)
-  const preview = input => ({ ...input, plan: { source_id: 'experiment:EXP-test-agent-001', current_asset_digest: asset,
+  const preview = input => ({ ...input, plan: { source_id: 'business:test-agent', current_asset_digest: asset,
     ...(input.name === 'missing-generation' ? {} : { generation_digest: generation }) }, model_policy_hash: 'a'.repeat(64) })
   const f = fixture(t, (endpoint, input) => {
     if (endpoint === 'instances/preview') return { ok: true, value: preview(input) }
@@ -386,7 +386,7 @@ test('助手重载冻结实际来源与代次，批量部分失败和旧确认�
   assert.equal((await f.execute(id, 'instances', 'run', request)).state, 'completed')
   const card = await f.operation(id)
   const run = f.calls.find(call => call.endpoint === 'instances/run')
-  assert.equal(run.input.expected_source_id, 'experiment:EXP-test-agent-001')
+  assert.equal(run.input.expected_source_id, 'business:test-agent')
   assert.equal(run.input.expected_asset_digest, asset)
   assert.equal(run.input.expected_generation_digest, generation)
   assert.equal(run.input.expected_model_policy_hash, 'a'.repeat(64))
@@ -413,15 +413,15 @@ test('业务实例创建冻结来源摘要、访问方式并使用统一网关�
   const digest = 'sha256:' + 'b'.repeat(64)
   const f = fixture(t, async endpoint => {
     if (endpoint === 'instances/preview') return { ok: true, value: {
-      name: 'biz-one', operation: 'create', source_id: 'experiment:EXP-test-agent-001',
-      plan: { source_id: 'experiment:EXP-test-agent-001', port: 18600, business_control: { source_digest: digest } },
+      name: 'biz-one', operation: 'create', source_id: 'business:test-agent',
+      plan: { source_id: 'business:test-agent', port: 18600, business_control: { source_digest: digest } },
       access_mode: 'anonymous', identity_mode: 'development',
       model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64),
     } }
     if (endpoint === 'instances/url') return { ok: true, value: { url: 'http://172.16.138.228:53105/agents/security-operations-expert/instances/biz-one/', lan_access: true } }
   })
   const id = (await f.rpc('session', { task: '创建业务受控实例' })).value.session_id
-  const pending = f.execute(id, 'instances', 'run', { name: 'biz-one', operation: 'create', source: 'experiment:EXP-test-agent-001', port: 18600 })
+  const pending = f.execute(id, 'instances', 'run', { name: 'biz-one', operation: 'create', source: 'business:test-agent', port: 18600 })
   const card = await f.operation(id)
   assert.equal(card.input.business_control, true)
   assert.equal(card.input.expected_source_digest, digest)
@@ -441,14 +441,14 @@ test('助手创建开发实例时冻结 workspace-write 能力，不能用会话
   const digest = 'sha256:' + 'c'.repeat(64)
   const capability = { workspace_mode: 'workspace-write', permission_mode: 'workspace-write', project_workspace_path: 'dsh/workspace/project' }
   const f = fixture(t, endpoint => endpoint === 'instances/preview' ? { ok: true, value: {
-    name: 'dev-one', operation: 'create', source_id: 'experiment:EXP-test-agent-001',
-    plan: { source_id: 'experiment:EXP-test-agent-001', port: 18601, business_control: { source_digest: digest } },
+    name: 'dev-one', operation: 'create', source_id: 'business:test-agent',
+    plan: { source_id: 'business:test-agent', port: 18601, business_control: { source_digest: digest } },
     workspace_capability: capability, access_mode: 'anonymous', identity_mode: 'development',
     model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64),
   } } : undefined)
   const id = (await f.rpc('session', { task: '创建可写开发实例' })).value.session_id
   const pending = f.execute(id, 'instances', 'run', {
-    name: 'dev-one', operation: 'create', source: 'experiment:EXP-test-agent-001', workspace_mode: 'workspace-write',
+    name: 'dev-one', operation: 'create', source: 'business:test-agent', workspace_mode: 'workspace-write',
   })
   const card = await f.operation(id)
   assert.equal(card.input.workspace_mode, 'workspace-write')
@@ -462,16 +462,16 @@ test('助手创建开发实例时冻结 workspace-write 能力，不能用会话
 test('实例预览失败、对象变化和批量部分失败均不生成可执行提案', async t => {
   const f = fixture(t, (endpoint, input) => {
     if (endpoint === 'instances/batch-preview') return { ok: true, value: { previews: [
-      { name: 'first', operation: 'stop', ok: true, value: { name: 'first', operation: 'stop', source_id: 'experiment:EXP-test-agent-001', observed_state: 'running', observed_at: '2026-10-21T00:00:00.000Z' } },
+      { name: 'first', operation: 'stop', ok: true, value: { name: 'first', operation: 'stop', source_id: 'business:test-agent', observed_state: 'running', observed_at: '2026-10-21T00:00:00.000Z' } },
       { name: 'second', operation: 'stop', ok: false, error: { message: '状态未知' } },
     ] } }
     if (endpoint === 'instances/preview' && input.name === 'mismatch') return { ok: true, value: { name: 'other', operation: 'create', plan: { source_id: input.source, port: 3199 }, model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64) } }
     if (endpoint === 'instances/preview' && input.name === 'failed') return { ok: false, error: { message: '模型不可用' } }
   })
   const id = (await f.rpc('session', { task: '检查实例操作' })).value.session_id
-  assert.equal((await f.execute(id, 'instances', 'run', { name: 'failed', operation: 'create', source: 'experiment:EXP-test-agent-001' })).ok, false)
-  await assert.rejects(() => f.execute(id, 'instances', 'run', { name: 'missing-source', operation: 'create' }), /固定版本/)
-  await assert.rejects(() => f.execute(id, 'instances', 'run', { name: 'mismatch', operation: 'create', source: 'experiment:EXP-test-agent-001' }), /预览与请求对象不一致/)
+  assert.equal((await f.execute(id, 'instances', 'run', { name: 'failed', operation: 'create', source: 'business:test-agent' })).ok, false)
+  await assert.rejects(() => f.execute(id, 'instances', 'run', { name: 'missing-source', operation: 'create' }), /business:/)
+  await assert.rejects(() => f.execute(id, 'instances', 'run', { name: 'mismatch', operation: 'create', source: 'business:test-agent' }), /预览与请求对象不一致/)
   await assert.rejects(() => f.execute(id, 'instances', 'batch', { items: [{ name: 'first', operation: 'stop' }, { name: 'second', operation: 'stop' }] }), /预览失败/)
   assert.equal((await f.status(id)).proposals.length, 0)
   assert.equal(f.calls.some(call => ['instances/run', 'instances/batch'].includes(call.endpoint)), false)
@@ -492,14 +492,15 @@ test('真实实例 handler 接收助手一次确认的冻结参数，策略过�
     if (previousPython === undefined) delete process.env.HARNESS_PYTHON; else process.env.HARNESS_PYTHON = previousPython
     if (previousState === undefined) delete process.env.HARNESS_INSTANCE_STATE_ROOT; else process.env.HARNESS_INSTANCE_STATE_ROOT = previousState
   })
+  mkdirSync(join(f.root, 'config'), { recursive: true })
+  writeFileSync(join(f.root, 'config/repositories.json'), JSON.stringify({ repositories: [{ id: 'business-agents', path: './business-agents' }] }))
   const adapter = join(f.root, 'runtime/adapters/dsh-container')
   initializeBusinessGateway(f.root, 'http://127.0.0.1:18120/hep/')
   const callsPath = join(f.root, 'dsh-dev.calls')
   mkdirSync(adapter, { recursive: true })
-  const versionRoot = join(f.root, 'evolution/experiments/EXP-real-agent-002')
-  mkdirSync(join(versionRoot, 'candidate'), { recursive: true })
-  writeFileSync(join(versionRoot, 'change.yaml'), 'experiment_id: EXP-real-agent-002\nagent_id: real-agent\n')
-  writeFileSync(join(versionRoot, 'candidate/harness.yaml'), 'loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: real-agent\n  profile_patch: dsh/managed/real.patch.yml\n')
+  const versionRoot = join(f.root, 'business-agents/agents/real-agent')
+  mkdirSync(versionRoot, { recursive: true })
+  writeFileSync(join(versionRoot, 'harness.yaml'), 'agent: {id: real-agent}\nloadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: real-agent\n  profile_patch: dsh/managed/real.patch.yml\n')
   writeFileSync(join(adapter, 'dsh-dev'), `const fs = require('node:fs')
 const args = process.argv.slice(2)
 fs.appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(args) + '\\n')
@@ -521,13 +522,13 @@ if (args[0] === 'up') {
   }
   console.log(JSON.stringify(args.includes('--dry-run') ? plan : { name: plan.name, dsh_running: true }))
 }
-else if (args[0] === 'ps') console.log(JSON.stringify({ instances: [{ name: 'existing', state: 'running', source_id: 'experiment:EXP-real-agent-002' }] }))
+else if (args[0] === 'ps') console.log(JSON.stringify({ instances: [{ name: 'existing', state: 'running', source_id: 'business:real-agent' }] }))
 else if (args[0] === 'url') console.log('http://127.0.0.1:53105/agents/real-agent/instances/' + args[1] + '/')
 else throw new Error('unexpected command')
 `)
   mkdirSync(join(f.root, '.local/instances/existing'), { recursive: true })
   writeFileSync(join(f.root, '.local/instances/existing/instance.json'), JSON.stringify({
-    name: 'existing', source_id: 'experiment:EXP-real-agent-002', port: 3198,
+    name: 'existing', source_id: 'business:real-agent', agent_id: 'real-agent', asset_root: f.root, port: 3198,
     model_policy: { default: { provider: 'fixture', model: 'business' } },
   }))
   let revision = 'current'
@@ -538,7 +539,7 @@ else throw new Error('unexpected command')
     return { policy: { allowed: [selected], default: selected, revision }, environment: {} }
   })
   const id = (await f.rpc('session', { task: '以最新固定版本创建并启动实例' })).value.session_id
-  const source = 'experiment:EXP-real-agent-002'
+  const source = 'business:real-agent'
   const created = f.execute(id, 'instances', 'run', { operation: 'create', name: 'new-one', source })
   const card = await f.operation(id)
   assert.equal(card.preview.value.plan.source_id, source)
@@ -569,7 +570,7 @@ else throw new Error('unexpected command')
   assert.equal((await f.rpc('confirm', { session_id: id, proposal_id: staleCard.id })).value.state, 'failed')
   assert.equal(readFileSync(callsPath, 'utf8').split('\n').filter(Boolean).map(JSON.parse).filter(args => args[0] === 'up' && !args.includes('--dry-run')).length, before)
   const batch = await f.execute(id, 'instances', 'batch', { items: [
-    { operation: 'create', name: 'good-one', source }, { operation: 'create', name: 'bad-one', source: 'experiment:EXP-missing-003' },
+    { operation: 'create', name: 'good-one', source }, { operation: 'create', name: 'bad-one', source: 'business:missing-agent' },
   ] }).catch(error => error)
   assert.match(String(batch), /预览失败/)
   assert.equal(f.calls.some(call => call.endpoint === 'instances/batch'), false)
@@ -1718,11 +1719,11 @@ test('移除任务机制后新建智能体仍验证业务用例边界', () => {
 
 test('助手省略网关参数也拒绝缺少网关来源摘要的直连创建预览', async t => {
   const f = fixture(t, endpoint => endpoint === 'instances/preview' ? { ok: true, value: {
-    name: 'no-direct', operation: 'create', plan: { source_id: 'experiment:EXP-test-agent-001', port: 18500 },
+    name: 'no-direct', operation: 'create', plan: { source_id: 'business:test-agent', port: 18500 },
     model_selection: { provider: 'fixture', model: 'default' }, model_policy_hash: 'a'.repeat(64),
   } } : undefined)
   const id = (await f.rpc('session', { task: '创建业务实例' })).value.session_id
-  await assert.rejects(() => f.execute(id, 'instances', 'run', { operation: 'create', name: 'no-direct', source: 'experiment:EXP-test-agent-001' }), /业务实例预览缺少来源摘要/)
+  await assert.rejects(() => f.execute(id, 'instances', 'run', { operation: 'create', name: 'no-direct', source: 'business:test-agent' }), /业务实例预览缺少来源摘要/)
   assert.equal(f.calls.some(call => call.endpoint === 'instances/run'), false)
 })
 
