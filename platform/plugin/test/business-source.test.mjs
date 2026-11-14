@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { businessList, businessListAsync, businessRead, businessSource, runtimeSource, businessAsset, businessEdit } from '../src/agents/business-source.ts'
-import { candidateDigest } from '../src/tasks/files.ts'
+import { candidateDigest, sourceInfo } from '../src/tasks/files.ts'
 
 test('业务目录是主线事实源，Git 和工作树变化可区分，Git tag 只读且旧研究来源停用', async t => {
   const root = mkdtempSync(join(tmpdir(), 'business-source-'))
@@ -31,6 +31,8 @@ test('业务目录是主线事实源，Git 和工作树变化可区分，Git tag
   assert.equal(pinned.source_commit, commit)
   assert.equal(pinned.candidate_root, 'agents/test-agent/dsh')
   assert.equal(businessSource(data, 'test-agent').repository_root, business)
+  assert.equal(sourceInfo(data, `business:test-agent@${commit}`).candidate, agent)
+  assert.equal(sourceInfo(data, `business:test-agent@${commit}`).source, `business:test-agent@${commit}`)
   assert.equal(businessRead(data, 'test-agent', 'harness.yaml').content, harness)
   writeFileSync(join(agent, 'harness.yaml'), harness.replace('当前业务', '工作树修改'))
   const changed = businessList(data).agents[0]

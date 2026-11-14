@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { versionIdentity } from '../agents/version-source.ts'
-import { programRoot } from '../workspace.ts'
+import { businessAgentsRoot, programRoot } from '../workspace.ts'
 
 export const EXPERIMENT = VERSION_ID
 export const RUN = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -36,6 +36,16 @@ export function dataPath(root: string, path: string): string {
 }
 
 export function sourceInfo(root: string, source: string) {
+  if (typeof source === 'string' && source.startsWith('business:')) {
+    const value = source.slice('business:'.length)
+    const separator = value.indexOf('@')
+    const id = separator < 0 ? value : value.slice(0, separator)
+    const tag = separator < 0 ? '' : value.slice(separator + 1)
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) || tag.includes('/') || tag.includes('\\')) throw new Error('业务来源身份无效')
+    const candidate = dataPath(businessAgentsRoot(root), `agents/${id}`)
+    if (!existsSync(candidate) || !lstatSync(candidate).isDirectory()) throw new Error('业务 Harness 不存在')
+    return { id: source, source, agent_id: id, candidate }
+  }
   const id = typeof source === 'string' ? source.replace(/^experiment:/, '') : ''
   const match = EXPERIMENT.exec(id)
   if (!match) throw new Error('来源必须是固定 Experiment 身份')
