@@ -10,6 +10,7 @@ import { validateBusinessGateway } from '../plugin/src/business-control/configur
 import { resolveBusinessSecretFile } from '../plugin/src/business-control/secret-file.ts'
 import { checkRunningBusinessEntries } from '../business-readiness.mts'
 import { managerHome } from '../manager-home.mts'
+import { assertImageSource } from './image.mts'
 
 export interface DeploymentCheck {
   id: string
@@ -58,6 +59,12 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
       } else if (!stat.isFile() || sha256File(path) !== entry.sha256 || (entry.mode !== undefined && (stat.mode & 0o777) !== entry.mode)) throw new Error(`程序文件摘要或权限不符：${entry.path}`)
     }
     checks.push({ id: 'program-integrity', status: 'ok', detail: `安装来源 ${manifest.package.commit}` })
+    if (manifest.image) {
+      try {
+        assertImageSource(prefix, manifest.package.arch, manifest.image)
+        checks.push({ id: 'standard-runtime-source', status: 'ok', detail: `${manifest.image.tag}，安装后的构建输入与标准镜像一致` })
+      } catch (error) { checks.push({ id: 'standard-runtime-source', status: 'mismatch', detail: error instanceof Error ? error.message : String(error) }) }
+    }
   } catch (error) { checks.push({ id: 'program-integrity', status: 'mismatch', detail: error instanceof Error ? error.message : '缺少安装清单' }) }
   const data = inspectDataRoot(dataRoot)
   try {

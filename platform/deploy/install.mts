@@ -7,13 +7,13 @@ import { copyTree } from './fsutil.mts'
 import { readManifest, verifyEntries } from './manifest.mts'
 import { rewriteDeploymentAddress, rewriteKnownPaths, scanKnownOldPaths } from './paths.mts'
 import { installRuntime } from './runtime.mts'
-import { dockerAvailable, findVerifiedImage, loadVerifiedImage } from './image.mts'
+import { assertImageSource, dockerAvailable, findVerifiedImage, loadVerifiedImage } from './image.mts'
 import { assertRealWorkspace } from './data.mts'
 import { restoreRepository } from './repository.mts'
 import { prepareDeploymentFirewall } from './firewall.mts'
 import { validatePlatformEntryUrl } from '../plugin/src/business-control/group-link.ts'
 import { copyDataState } from './state.mts'
-import { copyManagerState, workspaceTargets } from './workspace.mts'
+import { alignBusinessRepository, copyManagerState, workspaceTargets } from './workspace.mts'
 
 export interface InstallOptions {
   bundleRoot: string
@@ -203,6 +203,7 @@ export function install(options: InstallOptions): InstallReport {
       if (workspace) for (const repository of manifest.workspace!.repositories) {
         restoreRepository(join(workspace.root, repository.path), join(bundleRoot, `repositories/${repository.name}.bundle`), repository.commit, repository.origin)
       }
+      alignBusinessRepository(manifest, prefix, dataRoot)
     } finally { process.env.PATH = previousPath }
     if (options.skipPrepare) {
       warnings.push('按要求跳过 prepare；平台尚未构建，不能直接启动')
@@ -214,6 +215,15 @@ export function install(options: InstallOptions): InstallReport {
       })
       if (prepared.status !== 0) throw new Error(`离线 prepare 失败（退出码 ${prepared.status}）`)
       report.prepare = 'ok'
+      if (manifest.image) {
+        const previousPython = process.env.HARNESS_PYTHON
+        process.env.HARNESS_PYTHON = env.HARNESS_PYTHON || env.HEP_PYTHON
+        try { assertImageSource(prefix, manifest.package.arch, manifest.image) }
+        finally {
+          if (previousPython === undefined) delete process.env.HARNESS_PYTHON
+          else process.env.HARNESS_PYTHON = previousPython
+        }
+      }
       if (dataCheck?.kind === 'workspace') {
         const locator = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'harness-engineering-platform', 'workspace.json')
         if (!existsSync(locator)) {

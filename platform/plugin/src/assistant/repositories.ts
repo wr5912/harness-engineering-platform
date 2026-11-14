@@ -87,7 +87,8 @@ export function resolveRepository(root: string, requestedId?: string): Repositor
   const remotes = git(workspace, ['remote']).split('\n').filter(Boolean)
   if (!remotes.some(remote => sameRepositorySource(git(workspace, ['remote', 'get-url', remote]), entry.url))) throw new Error('目标仓库远端与登记不一致')
   const commit = git(workspace, ['rev-parse', 'HEAD'])
-  if (commit !== entry.commit || git(workspace, ['rev-parse', '--verify', `${entry.ref}^{commit}`]) !== commit) throw new Error('目标仓库 HEAD、ref 与锁定提交不一致')
+  const refCommit = git(workspace, ['rev-parse', '--verify', `${entry.ref}^{commit}`])
+  if (commit !== entry.commit || refCommit !== commit) throw new Error(`目标仓库 HEAD、ref 与锁定提交不一致：${workspace}，HEAD=${commit}，${entry.ref}=${refCommit}，登记 commit=${entry.commit}`)
   if (entry.agent_path && !inside(workspace, realpathSync(join(workspace, entry.agent_path)))) throw new Error('agent_path 超出目标仓库')
   return { id, url: entry.url, ...sourceFields(entry.url), ref: entry.ref, commit, workspace, ...(entry.agent_path ? { agent_path: entry.agent_path } : {}), dirty: Boolean(git(workspace, ['status', '--porcelain'])) }
 }

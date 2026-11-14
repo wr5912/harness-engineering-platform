@@ -145,6 +145,10 @@ test('无系统 Git 的五仓更新使用随包 Git，保留 HOME 会话并采�
   write(join(home, 'node_modules/cache'), 'discard')
   write(join(prefix, '.local/installation.json'), '{}')
   write(join(dataRoot, 'workspace.json'), JSON.stringify({ id: 'target-workspace', extensions: [] }))
+  write(join(dataRoot, 'config/repositories.json'), JSON.stringify({ schemaVersion: 1, setting: 'keep', repositories: [
+    { id: 'business-agents', url: origin, internal_url: 'http://site.invalid/business.git', path: '/old/business', ref: 'old', commit: 'old-commit' },
+    { id: 'other', path: '/site/other', commit: 'keep' },
+  ] }))
   manifest(path)
   const m = JSON.parse(readFileSync(join(path, 'manifest.json'), 'utf8'))
   m.package.commit = program.commit; m.source.programOrigin = origin; m.source.dataOrigin = origin
@@ -167,6 +171,12 @@ test('无系统 Git 的五仓更新使用随包 Git，保留 HOME 会话并采�
       assert.equal(git(join(workspace, relative), 'branch', '--show-current'), 'main')
     }
     assert.equal(JSON.parse(readFileSync(join(dataRoot, 'workspace.json'), 'utf8')).id, 'target-workspace')
+    const registry = JSON.parse(readFileSync(join(dataRoot, 'config/repositories.json'), 'utf8'))
+    assert.equal(registry.setting, 'keep')
+    assert.deepEqual(registry.repositories, [
+      { id: 'business-agents', url: origin, internal_url: 'http://site.invalid/business.git', path: '../business-agents', ref: 'main', commit: repositories.find(item => item.name === 'business').commit },
+      { id: 'other', path: '/site/other', commit: 'keep' },
+    ])
     assert.equal(process.env.PATH, baseBin)
   } finally { process.env.PATH = previousPath }
 })
@@ -307,6 +317,8 @@ test('Docker 归档识别标签、ID、多标签同镜像，并拒绝歧义和�
     assert.throws(() => loadVerifiedImage('archive.tar', { id: other }), /ID 不符/)
     assert.throws(() => loadVerifiedImage('archive.tar', { fingerprint: 'wrong' }), /指纹不符/)
     const path = bundle('image-bundle'), prefix = join(root, 'image-program')
+    const contract = join(path, 'program/runtime/adapters/dsh-container/source_contract.py')
+    write(contract, 'import json\nprint(json.dumps({"tag":"hep:a","fingerprint":"expected"}))\n')
     write(join(path, 'image.tar'), 'external docker boundary fixture')
     manifest(path, { archive: 'image.tar' })
     assert.throws(() => install({ ...options(path, prefix), dryRun: true }), /镜像身份不完整/)
@@ -314,6 +326,12 @@ test('Docker 归档识别标签、ID、多标签同镜像，并拒绝歧义和�
     const reused = install(options(path, prefix))
     assert.equal(reused.image.id, id)
     assert.equal(reused.image.reused, true)
+    write(contract, 'import json\nprint(json.dumps({"tag":"hep:rebuilt","fingerprint":"rebuilt"}))\n')
+    manifest(path, { archive: 'image.tar', tag: 'hep:a', id, fingerprint: 'expected', arch: process.arch === 'arm64' ? 'arm64' : 'amd64' })
+    const previousPython = process.env.HARNESS_PYTHON
+    assert.throws(() => install(options(path, prefix + '-drift')), /标准 Runtime.*hep:rebuilt.*rebuilt.*hep:a.*expected/)
+    assert.equal(existsSync(prefix + '-drift'), false)
+    assert.equal(process.env.HARNESS_PYTHON, previousPython)
     manifest(path, { archive: 'image.tar', tag: 'hep:a', id, fingerprint: 'wrong', arch: process.arch === 'arm64' ? 'arm64' : 'amd64' })
     assert.throws(() => install(options(path, prefix + '-failed')), /指纹不符/)
     assert.equal(existsSync(prefix + '-failed'), false)

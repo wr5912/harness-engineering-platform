@@ -10,7 +10,7 @@ import { copyTree, run, tarCreate, tarExtract } from '../fsutil.mts'
 import { rewriteDeploymentAddress, rewriteKnownPaths, scanKnownOldPaths } from '../paths.mts'
 import { ensureDshScopeLink } from '../runtime.mts'
 import { assertRealWorkspace, inspectDataRoot } from '../data.mts'
-import { pack } from '../pack.mts'
+import { copyProgram, pack } from '../pack.mts'
 import { verifyDeployment } from '../verify.mts'
 import { install } from '../install.mts'
 import { copyDataState } from '../state.mts'
@@ -19,6 +19,30 @@ function workspace() {
   const root = mkdtempSync(join(tmpdir(), 'hep-deploy-test-'))
   return { root, close: () => rmSync(root, { recursive: true, force: true }) }
 }
+
+test('程序离线快照保留标准镜像采用的完整 Web 编译输入，不混入未提交源码', () => {
+  const { root, close } = workspace()
+  try {
+    const source = join(root, 'source'), staging = join(root, 'staging')
+    mkdirSync(source)
+    const git = (...args) => run('git', ['-C', source, ...args])
+    git('init', '-b', 'main'); git('config', 'user.name', 'fixture'); git('config', 'user.email', 'fixture@example.invalid')
+    git('remote', 'add', 'origin', 'https://example.invalid/program.git')
+    writeFileSync(join(source, '.gitignore'), 'runtime/adapters/dsh-web/lib/\n')
+    writeFileSync(join(source, 'source.mjs'), 'committed')
+    git('add', '.'); git('commit', '-m', 'fixture')
+    writeFileSync(join(source, 'source.mjs'), 'uncommitted')
+    const web = join(source, 'runtime/adapters/dsh-web/lib')
+    mkdirSync(web, { recursive: true })
+    writeFileSync(join(web, 'index.mjs'), 'entry')
+    writeFileSync(join(web, 'chunk-existing.mjs'), 'existing image input')
+    copyProgram(source, staging)
+    assert.equal(readFileSync(join(staging, 'program/source.mjs'), 'utf8'), 'committed')
+    assert.deepEqual(collectEntries(join(staging, 'program/runtime/adapters/dsh-web/lib')), collectEntries(web))
+    assert.equal(existsSync(join(staging, 'program/.git')), false)
+    assert.ok(existsSync(join(staging, 'repositories/program.bundle')))
+  } finally { close() }
+})
 
 test('文件 SHA 保留空文件、二进制、跨块末尾和连续调用的完整摘要', () => {
   const { root, close } = workspace()

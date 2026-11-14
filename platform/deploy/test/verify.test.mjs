@@ -47,6 +47,31 @@ test('无关 HTTP 200 不通过在线工作区核验，也不向它发送登录�
   } finally { await new Promise(resolve => server.close(resolve)); rmSync(root, { recursive: true, force: true }) }
 })
 
+test('部署核验拒绝重建后偏离随包标准镜像的输入，报告期望与实际身份', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'hep-runtime-source-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  mkdirSync(join(root, '.local'))
+  const python = join(root, 'python')
+  writeFileSync(python, '#!/bin/sh\necho \'{"tag":"standard:expected","fingerprint":"sha256:expected"}\'\n', { mode: 0o755 })
+  const previous = process.env.HARNESS_PYTHON
+  process.env.HARNESS_PYTHON = python
+  try {
+    const manifest = { files: [], package: { arch: 'arm64', commit: 'fixture' }, image: { tag: 'standard:actual', fingerprint: 'sha256:actual' } }
+    const check = async () => {
+      writeFileSync(join(root, '.local/installation.json'), JSON.stringify(manifest))
+      return (await verifyDeployment({ prefix: root, dataRoot: join(root, 'data') })).checks.find(item => item.id === 'standard-runtime-source')
+    }
+    const mismatch = await check()
+    assert.equal(mismatch.status, 'mismatch')
+    assert.match(mismatch.detail, /standard:expected.*sha256:expected.*standard:actual.*sha256:actual/)
+    manifest.image = { tag: 'standard:expected', fingerprint: 'sha256:expected' }
+    assert.equal((await check()).status, 'ok')
+  } finally {
+    if (previous === undefined) delete process.env.HARNESS_PYTHON
+    else process.env.HARNESS_PYTHON = previous
+  }
+})
+
 test('离线核验检查网关配置与本地密钥，关闭或配置不全不得通过', async t => {
   const root = mkdtempSync(join(tmpdir(), 'hep-verify-gateway-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))

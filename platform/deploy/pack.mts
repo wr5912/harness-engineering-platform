@@ -58,10 +58,13 @@ function copyAsset(source: string, target: string): void {
   copyTree(source, target)
 }
 
-function copyProgram(programRoot: string, staging: string, assetsDir?: string, workingTree = false): void {
+export function copyProgram(programRoot: string, staging: string, assetsDir?: string, workingTree = false): void {
   const target = join(staging, 'program')
   snapshotRepository(programRoot, target, join(staging, 'repositories/program.bundle'), workingTree)
   removeTree(join(target, '.git'))
+  // 标准镜像指纹包含已编译的 Web 文件集；Git 快照不包含这些生成文件。
+  const web = join(programRoot, 'runtime/adapters/dsh-web/lib')
+  if (existsSync(web)) copyTree(web, join(target, 'runtime/adapters/dsh-web/lib'))
   if (assetsDir) {
     const preparedPlugin = join(assetsDir, 'program', 'platform', 'plugin', 'node_modules')
     const preparedWeb = join(assetsDir, 'program', 'runtime', 'adapters', 'dsh-web', 'node_modules')

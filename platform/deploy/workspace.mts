@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
 import { copyTree, run, safeRelative } from './fsutil.mts'
 import { snapshotRepository } from './repository.mts'
 import type { Manifest } from './manifest.mts'
@@ -47,4 +47,19 @@ export function workspaceTargets(manifest: Manifest, prefix: string, dataRoot: s
     throw new Error('五仓包的数据目录须为程序同级的 manager-workspace/harness-engineering-platform-data')
   }
   return { root, managerHome: join(root, 'platform-manager-dsh-home'), business: join(root, 'manager-workspace/business-agents') }
+}
+
+/** 现场配置保留，随包替换的业务仓引用则必须指向本次恢复的提交。 */
+export function alignBusinessRepository(manifest: Manifest, prefix: string, dataRoot: string): void {
+  const workspace = workspaceTargets(manifest, prefix, dataRoot)
+  const business = manifest.workspace?.repositories.find(repository => repository.name === 'business')
+  if (!workspace || !business) return
+  const file = join(dataRoot, 'config/repositories.json')
+  const config = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { schemaVersion: 1, repositories: [] }
+  if (!Array.isArray(config.repositories)) throw new Error(`${file} 的 repositories 必须为数组`)
+  let entry = config.repositories.find((item: { id: string }) => item.id === 'business-agents')
+  if (!entry) config.repositories.push(entry = { id: 'business-agents', url: business.origin })
+  Object.assign(entry, { path: relative(dataRoot, workspace.business), ref: 'main', commit: business.commit })
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, JSON.stringify(config, null, 2) + '\n')
 }

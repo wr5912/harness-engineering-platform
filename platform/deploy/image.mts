@@ -46,6 +46,13 @@ export function expectedImage(programRoot: string, arch: Arch): { tag: string; f
   return JSON.parse(run(process.env.HARNESS_PYTHON || 'python3', [script, '--image-identity-for', `linux/${arch}`]))
 }
 
+export function assertImageSource(programRoot: string, arch: Arch, image: { tag?: string; fingerprint?: string }): void {
+  const expected = expectedImage(programRoot, arch)
+  if (image.tag !== expected.tag || image.fingerprint !== expected.fingerprint) {
+    throw new Error(`标准 Runtime 与安装后的构建输入不一致：期望标签 ${expected.tag}、指纹 ${expected.fingerprint}；安装清单标签 ${image.tag || '缺失'}、指纹 ${image.fingerprint || '缺失'}。请用相同构建输入重新打包平台与标准镜像`)
+  }
+}
+
 export function inspectImageArchive(archive: string, tag: string): ImageInfo {
   const manifest = JSON.parse(run('tar', ['-xOf', archive, 'manifest.json'])) as Array<{
     Config: string
