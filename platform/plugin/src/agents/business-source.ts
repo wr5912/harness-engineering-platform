@@ -1,4 +1,5 @@
-import { spawnSync } from 'node:child_process'
+import { execFile, spawnSync } from 'node:child_process'
+import { promisify } from 'node:util'
 import { existsSync, readFileSync, mkdirSync, mkdtempSync, renameSync, rmSync, lstatSync } from 'node:fs'
 import { join } from 'node:path'
 import { DEFAULT_SCHEMA, Type, load } from 'js-yaml'
@@ -92,7 +93,7 @@ export function businessSources(root: string) {
   return { repository, sources, errors }
 }
 
-export function businessDetail(root: string, selector: string) {
+export function businessDetail(root: string, selector: string, revision?: { branch: string | null; commit: string | null; asset_commit: string | null; dirty: boolean; versions: ReturnType<typeof businessVersions> }) {
   const source = businessSource(root, selector), repository = source.repository_root, id = source.agent_id as string
   const path = `agents/${id}`, directory = dataPath(repository, path)
   const harness = load(readFileSync(dataPath(directory, 'harness.yaml'), 'utf8')) as Record<string, any>
@@ -104,9 +105,9 @@ export function businessDetail(root: string, selector: string) {
   }
   return { id, name: harness.agent.name ?? id, notes: harness.agent.notes ?? null, source_id: source.source_id,
     repository: origin, path: directory, tag: source.tag ?? null,
-    branch: source.tag ? null : info(['branch', '--show-current']), commit: source.source_commit ?? info(['rev-parse', 'HEAD']),
+    ...(revision ?? { branch: source.tag ? null : info(['branch', '--show-current']), commit: source.source_commit ?? info(['rev-parse', 'HEAD']),
     asset_commit: source.source_commit ?? info(['log', '-1', '--format=%H', '--', path]), dirty: !source.tag && Boolean(info(['status', '--porcelain', '--', path])),
-    versions: businessVersions(root, id),
+    versions: businessVersions(root, id) }),
     digest: `sha256:${candidateDigest(directory)}`, profile: source.profile, harness, files }
 }
 
@@ -114,6 +115,35 @@ export function businessList(root: string) {
   const catalog = businessSources(root)
   return { repository: catalog.repository, errors: catalog.errors,
     agents: Object.keys(catalog.sources).sort().map(id => businessDetail(root, id)) }
+}
+
+/** HTTP 列表异步读取 Git，避免同步子进程阻塞同一进程的网关及健康检查。 */
+export async function businessListAsync(root: string, signal?: AbortSignal) {
+  const catalog = businessSources(root), runGit = promisify(execFile)
+  const info = async (args: string[]) => {
+    try { return (await runGit('git', args, { cwd: catalog.repository, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, signal })).stdout.trim() }
+    catch (error) { signal?.throwIfAborted(); return null }
+  }
+  const [branch, commit, tagNames] = await Promise.all([
+    info(['branch', '--show-current']), info(['rev-parse', 'HEAD']),
+    info(['for-each-ref', '--sort=-creatordate', '--format=%(refname:strip=2)', 'refs/tags']),
+  ])
+  if (tagNames === null) throw new Error('业务仓 Git tag 读取失败')
+  const tags = await Promise.all(tagNames.split('\n').filter(Boolean).map(async tag => {
+    const commit = await info(['rev-parse', `refs/tags/${tag}^{commit}`])
+    if (commit === null) throw new Error(`业务 Git tag 无法解析：${tag}`)
+    return { tag, commit }
+  }))
+  const agents = await Promise.all(Object.keys(catalog.sources).sort().map(async id => {
+    const path = `agents/${id}`
+    const [asset_commit, dirty, versions] = await Promise.all([
+      info(['log', '-1', '--format=%H', '--', path]), info(['status', '--porcelain', '--', path]),
+      Promise.all(tags.map(async tag => await info(['cat-file', '-e', `refs/tags/${tag.tag}:${path}/harness.yaml`]) === null ? null
+        : { tag: tag.tag, source_id: `business:${id}@${encodeURIComponent(tag.tag)}`, commit: tag.commit })),
+    ])
+    return businessDetail(root, id, { branch, commit, asset_commit, dirty: Boolean(dirty), versions: versions.filter(value => value !== null) })
+  }))
+  return { repository: catalog.repository, errors: catalog.errors, agents }
 }
 
 export function businessRead(root: string, id: string, path: string) {

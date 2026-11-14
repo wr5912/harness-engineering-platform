@@ -4,10 +4,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { businessList, businessRead, businessSource, runtimeSource, businessAsset, businessEdit } from '../src/agents/business-source.ts'
+import { businessList, businessListAsync, businessRead, businessSource, runtimeSource, businessAsset, businessEdit } from '../src/agents/business-source.ts'
 import { candidateDigest } from '../src/tasks/files.ts'
 
-test('业务目录是主线事实源，Git 和工作树变化可区分，Git tag 只读且旧研究来源停用', t => {
+test('业务目录是主线事实源，Git 和工作树变化可区分，Git tag 只读且旧研究来源停用', async t => {
   const root = mkdtempSync(join(tmpdir(), 'business-source-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const data = join(root, 'data'), business = join(root, 'business'), agent = join(business, 'agents/test-agent')
@@ -21,6 +21,7 @@ test('业务目录是主线事实源，Git 和工作树变化可区分，Git tag
   git(['init', '-b', 'main']); git(['config', 'user.name', 'Fixture']); git(['config', 'user.email', 'fixture@example.invalid']); git(['add', '.']); git(['commit', '-m', 'business main'])
   const commit = git(['rev-parse', 'HEAD']), list = businessList(data)
   assert.deepEqual(list.errors, {}); assert.equal(list.agents.length, 1)
+  assert.deepEqual(await businessListAsync(data), list)
   const current = list.agents[0]
   assert.equal(current.commit, commit); assert.equal(current.asset_commit, commit); assert.equal(current.dirty, false)
   assert.equal(current.path, agent); assert.equal(current.digest, `sha256:${candidateDigest(agent)}`)
@@ -38,6 +39,7 @@ test('业务目录是主线事实源，Git 和工作树变化可区分，Git tag
   assert.equal(runtimeSource(data, 'business:test-agent').patch, 'main.patch.yml')
   assert.throws(() => runtimeSource(data, 'business:test-agent', commit), /固定提交/)
   git(['tag', 'release/v1'])
+  assert.deepEqual(await businessListAsync(data), businessList(data))
   const tagged = businessList(data).agents[0].versions[0]
   assert.equal(tagged.tag, 'release/v1')
   assert.equal(tagged.source_id, 'business:test-agent@release%2Fv1')
