@@ -176,11 +176,10 @@ function checkedManifest(assetRoot: string, agentId: string, candidatePath?: str
   // 未配置业务仓时 businessAgentsRoot 会退回 assetRoot；临时测试 Candidate
   // 不能因此被误判为业务来源。生产业务来源必须来自独立真实业务仓并含 harness.yaml。
   const candidate = candidatePath ? resolve(candidatePath) : undefined
-  const isBusiness = Boolean(candidate && businessRoot !== root
-    && existsSync(join(businessRoot, 'manifest.yaml'))
-    && candidate.startsWith(`${businessRoot}/`) && existsSync(join(candidate, 'harness.yaml')))
-  const selectedRoot = isBusiness ? businessRoot : root
-  const agentDir = join(selectedRoot, 'agents', agentId)
+  const isBusiness = Boolean(candidate && existsSync(join(candidate, 'harness.yaml'))
+    && ((businessRoot !== root && existsSync(join(businessRoot, 'manifest.yaml')) && candidate.startsWith(`${businessRoot}/`))
+      || candidate.includes('/.local/business-sources/')))
+  const agentDir = isBusiness ? candidate! : join(root, 'agents', agentId)
   // business-agents 的唯一 Agent 身份声明是各 Agent 目录下的 harness.yaml；
   // data 根的 manifest.yaml 只用于非业务测试/历史来源，不能拿来冒充业务 Harness。
   const file = join(agentDir, isBusiness ? 'harness.yaml' : 'manifest.yaml')
