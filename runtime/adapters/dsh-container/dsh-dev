@@ -1074,7 +1074,11 @@ def prepare_harness_projection(contract: dict, target: Path, *, copy_workspace: 
 
 def assert_asset_dependencies(contract: dict, image_id: str | None = None) -> None:
     """只读核对标准镜像依赖锁，清除旧宿主依赖投影。"""
-    experiment_id = contract.get("experiment_id") or str(contract.get("source_id", "")).removeprefix("experiment:")
+    # 业务来源的运行依赖核对必须继续携带 business:<agent-id>[@<commit>] 身份；
+    # 仅使用 experiment_id（业务 Agent ID）会把来源重新送入已停用的 Experiment 解析器。
+    experiment_id = contract.get("source_id") if contract.get("source_kind") == "business" else (
+        contract.get("experiment_id") or str(contract.get("source_id", "")).removeprefix("experiment:")
+    )
     pointer = REPO / ".local/asset-dependencies" / experiment_id / "current.json"
     if not contract.get("harness_runtime") and not pointer.exists() and not contract.get("model_policy", {}).get("asset_dependencies") and not contract.get("asset_dependencies"):
         return
