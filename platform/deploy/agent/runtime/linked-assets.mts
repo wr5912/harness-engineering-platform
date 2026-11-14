@@ -25,8 +25,9 @@ export function refreshLinkedAgentAssets(root: string, programRoot: string, depe
   const backupRoot = join(root, 'state/asset-updates')
   mkdirSync(backupRoot, { recursive: true, mode: 0o700 })
   const backup = mkdtempSync(join(backupRoot, 'linked-'))
-  const metadata = ['manifest.json', 'SHA256SUMS', 'agent', 'runtime/compose.yaml', 'runtime/managed-projection.json', 'runtime/linked-assets.json']
+  const metadata = ['manifest.json', 'SHA256SUMS', 'agent', 'standalone_agent_launcher', 'runtime/compose.yaml', 'runtime/managed-projection.json', 'runtime/linked-assets.json']
   const originals = new Map(metadata.map(path => [path, existsSync(join(root, path)) ? readFileSync(join(root, path)) : null]))
+  const modes = new Map(metadata.map(path => [path, existsSync(join(root, path)) ? lstatSync(join(root, path)).mode & 0o777 : 0o600]))
   for (const [path, bytes] of originals) if (bytes) {
     mkdirSync(dirname(join(backup, path)), { recursive: true })
     writeFileSync(join(backup, path), bytes, { mode: 0o600 })
@@ -69,12 +70,15 @@ export function refreshLinkedAgentAssets(root: string, programRoot: string, depe
     }
     writeFileSync(composeFile, JSON.stringify(compose, null, 2) + '\n', { mode: 0o600 })
     // Compose 只指定 dsh 时会复用旧 init；挂载变化必须同时重建依赖容器。
-    const launcher = join(root, 'agent')
+    const launcher = join(root, 'standalone_agent_launcher')
+    if (!existsSync(launcher) && existsSync(join(root, 'agent'))) renameSync(join(root, 'agent'), launcher)
     if (existsSync(launcher)) writeFileSync(launcher, readFileSync(launcher, 'utf8')
-      .replaceAll('compose up -d --force-recreate --wait dsh', 'compose up -d --force-recreate --always-recreate-deps --wait dsh'))
+      .replaceAll('compose up -d --force-recreate --wait dsh', 'compose up -d --force-recreate --always-recreate-deps --wait dsh')
+      .replaceAll('./agent ', './standalone_agent_launcher '))
+    rmSync(join(root, 'agent'), { force: true })
     writeFileSync(join(root, 'runtime/linked-assets.json'), JSON.stringify({ harnessRoot, updatedAt: new Date().toISOString() }, null, 2) + '\n', { mode: 0o600 })
     const replaced = (path: string) => path.startsWith('assets/') || path.startsWith('runtime/projections/managed/')
-      || ['agent', 'runtime/compose.yaml', 'runtime/managed-projection.json', 'runtime/linked-assets.json'].includes(path)
+      || ['agent', 'standalone_agent_launcher', 'runtime/compose.yaml', 'runtime/managed-projection.json', 'runtime/linked-assets.json'].includes(path)
     manifest.files = manifest.files.filter((entry: any) => !replaced(entry.path))
     manifest.files.push(...collectEntries(join(root, 'assets')).map(entry => ({ ...entry, path: `assets/${entry.path}` })))
     if (existsSync(projection)) manifest.files.push(...collectEntries(projection).map(entry => ({ ...entry, path: `runtime/projections/managed/${entry.path}` })))
@@ -82,7 +86,7 @@ export function refreshLinkedAgentAssets(root: string, programRoot: string, depe
       const path = `runtime/${name}`, file = join(root, path)
       if (existsSync(file)) manifest.files.push({ path, type: 'file', sha256: sha256File(file), mode: lstatSync(file).mode & 0o777 })
     }
-    if (existsSync(launcher)) manifest.files.push({ path: 'agent', type: 'file', sha256: sha256File(launcher), mode: lstatSync(launcher).mode & 0o777 })
+    if (existsSync(launcher)) manifest.files.push({ path: 'standalone_agent_launcher', type: 'file', sha256: sha256File(launcher), mode: lstatSync(launcher).mode & 0o777 })
     manifest.files.sort((a: any, b: any) => a.path.localeCompare(b.path))
     writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 })
     writeChecksums(root, manifest.files)
@@ -91,7 +95,7 @@ export function refreshLinkedAgentAssets(root: string, programRoot: string, depe
     rmSync(projection, { recursive: true, force: true })
     if (hadProjection) renameSync(join(backup, 'projection'), projection)
     for (const [path, bytes] of originals) {
-      if (bytes) writeFileSync(join(root, path), bytes, { mode: 0o600 })
+      if (bytes) { rmSync(join(root, path), { force: true }); writeFileSync(join(root, path), bytes, { mode: modes.get(path) }) }
       else rmSync(join(root, path), { force: true })
     }
     throw error

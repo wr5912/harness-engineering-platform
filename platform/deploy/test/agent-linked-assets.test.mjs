@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, realpathSync, rmSync } from 'node:fs'
+import { existsSync, lstatSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -43,13 +43,22 @@ test('软链接资产更新刷新投影、保留源字节与镜像、纠正迁�
   const mounts = JSON.parse(readFileSync(join(root, 'runtime/compose.yaml'))).services.dsh.volumes
   assert.deepEqual(mounts[1], { source: harness, target: '/old/agents/test-agent' })
   assert(mounts.some(m => m.source === harness && m.target === harness && m.read_only))
-  assert.match(readFileSync(join(root, 'agent'), 'utf8'), /--force-recreate --always-recreate-deps --wait dsh/)
+  assert.match(readFileSync(join(root, 'standalone_agent_launcher'), 'utf8'), /--force-recreate --always-recreate-deps --wait dsh/)
+  assert.equal(lstatSync(join(root, 'standalone_agent_launcher')).mode & 0o777, 0o755)
+  assert.equal(existsSync(join(root, 'agent')), false)
+  assert(m.files.some(entry => entry.path === 'standalone_agent_launcher'))
+  assert(!m.files.some(entry => entry.path === 'agent'))
+  assert.equal(readFileSync(join(result.backup, 'agent'), 'utf8'), 'compose up -d --force-recreate --wait dsh\n')
+  refreshLinkedAgentAssets(root, program)
+  assert.equal(existsSync(join(root, 'agent')), false)
 })
 test('链接不属于同一 Harness 时在修改现场前拒绝', t => {
   const { root } = fixture(t)
   rmSync(join(root, 'assets/workspace')); symlinkSync(join(root, 'assets'), join(root, 'assets/workspace'))
   assert.throws(() => refreshLinkedAgentAssets(root, program), /同一 Harness/)
   assert.equal(readFileSync(join(root, 'runtime/projections/managed/previous'), 'utf8'), 'previous')
+  assert.equal(lstatSync(join(root, 'agent')).mode & 0o777, 0o755)
+  assert.equal(existsSync(join(root, 'standalone_agent_launcher')), false)
 })
 test('生成失败恢复原投影与运行元数据', t => {
   const { root } = fixture(t)
