@@ -1,4 +1,3 @@
-import { VERSION_ID } from './version-id.ts'
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -48,20 +47,12 @@ export function workspaceOwnsInstance(assetRoot: string, manifest: Record<string
   const workspace = workspaceIdentity(assetRoot)
   const initialized = existsSync(join(workspace.root, 'workspace.json'))
   const roots = [workspace.root, ...workspace.legacyRoots]
+  // 实例必须声明当前 business source 和真实数据根；旧 Experiment/Candidate 挂载不再认领。
+  if (typeof manifest.source_id !== 'string' || !/^business:[a-z0-9]+(?:-[a-z0-9]+)*(?:@[a-f0-9]{40})?$/.test(manifest.source_id)) return false
+  if (manifest.source_ref !== undefined && (typeof manifest.source_ref !== 'string' || !/^git:[a-f0-9]{40}$/.test(manifest.source_ref))) return false
   if (manifest.workspace_id != null && (!initialized || manifest.workspace_id !== workspace.id)) return false
-  if (manifest.asset_root != null && (typeof manifest.asset_root !== 'string' || !isAbsolute(manifest.asset_root) || !roots.includes(resolve(manifest.asset_root)))) return false
-  // UUID 可随 Git 克隆；缺少路径的旧登记仍须由 Candidate 挂载确认。
-  if (manifest.asset_root != null) return true
-  if (!initialized) return true
-  if (typeof manifest.source_id !== 'string' || !manifest.source_id.startsWith('experiment:') || !VERSION_ID.test(manifest.source_id.slice('experiment:'.length))) return false
-  const mounts = manifest.mounts as Record<string, unknown> | undefined
-  const values = ['workspace', 'presets', 'managed'].map(key => mounts?.[key])
-  if (values.some(value => value != null && (typeof value !== 'string' || !isAbsolute(value)))) return false
-  const paths = values.filter((value): value is string => typeof value === 'string').map(value => resolve(value))
-  return paths.length > 0 && roots.some(root => {
-    const prefix = join(root, 'evolution/experiments', (manifest.source_id as string).slice(11), 'candidate')
-    return paths.every(path => path === prefix || path.startsWith(prefix + '/'))
-  })
+  if (typeof manifest.asset_root !== 'string' || !isAbsolute(manifest.asset_root) || !roots.includes(resolve(manifest.asset_root))) return false
+  return true
 }
 
 export function workspaceConfigPath(assetRoot: string, name: string): string {

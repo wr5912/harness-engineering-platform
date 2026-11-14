@@ -8,7 +8,7 @@
 
 ```bash
 export HARNESS_ASSET_ROOT="$HOME/harness-engineering-platform-data"
-/usr/bin/python3 runtime/adapters/dsh-container/source_contract.py --source experiment:EXP-security-operations-expert-024-rad80a907c628
+/usr/bin/python3 runtime/adapters/dsh-container/source_contract.py --source business:security-operations-expert@<business-commit>
 /usr/bin/python3 runtime/adapters/dsh-container/dsh-dev --repo "$HARNESS_ASSET_ROOT" ps --all
 ```
 
@@ -24,7 +24,7 @@ export HARNESS_ASSET_ROOT="$HOME/harness-engineering-platform-data"
 /usr/bin/python3 runtime/adapters/dsh-container/dsh-dev init sdk-example --profile sdk
 # input.json：{"input":"你是谁？请用一句中文回答。"}；可选 session_id 表示显式恢复。
 /usr/bin/python3 runtime/adapters/dsh-container/dsh-dev sdk-run \
-  --source experiment:<版本ID> --instance sdk-example-dev --input-file ./input.json
+  --source business:<agent-id>@<business-commit> --instance sdk-example-dev --input-file ./input.json
 ```
 
 平台使用当前模型投影和专用凭据运行调试；命令行可用 `--model-policy` 接收同一非秘密投影。调用示例和接入说明保存在版本 Candidate 的 `sdk/`。运行时生成官方依赖链接与配置，不安装另一份 DSH。新会话装载该版本的主 Preset，恢复时核对历史 Preset；有子智能体的任务等待后代及根会话后续回合完成。
@@ -117,10 +117,10 @@ bash runtime/adapters/dsh-container/build-image.sh --build-network host
 
 ```bash
 python3 runtime/adapters/dsh-container/source_contract.py \
-  --source experiment:<experiment-id> --field image.platform
+  --source business:<agent-id>@<business-commit> --field image.platform
 bash runtime/adapters/dsh-container/build-image.sh --source <experiment-id>
 hep_image_tag="$(python3 runtime/adapters/dsh-container/source_contract.py \
-  --source experiment:<experiment-id> --field image.local_image_tag)"
+  --source business:<agent-id>@<business-commit> --field image.local_image_tag)"
 docker image inspect "$hep_image_tag" --format \
   '{{.Os}}/{{.Architecture}} {{.Id}} {{index .Config.Labels "org.ai-agent-harness.dsh.image-build-fingerprint"}}'
 ```
@@ -130,7 +130,7 @@ docker image inspect "$hep_image_tag" --format \
 当前 `security-operations-expert` 的 `dsh-voice-hub` 安装示例（`<experiment-id>` 必须取该 Agent 的当前 active Experiment）：
 
 ```bash
-cd "$HARNESS_ASSET_ROOT/evolution/experiments/<experiment-id>/candidate/dsh/managed/dsh-voice-hub"
+cd "$HARNESS_BUSINESS_AGENTS_ROOT/agents/<agent-id>/dsh/managed/dsh-voice-hub"
 npm ci --ignore-scripts --legacy-peer-deps --registry=https://registry.npmmirror.com
 node -e "require('sherpa-onnx-node')"
 ```
@@ -154,8 +154,8 @@ docker exec -w /opt/dsh-managed/dsh-voice-hub <instance-name> \
 
 ```bash
 python3 runtime/adapters/dsh-container/dsh-dev init test01
-python3 runtime/adapters/dsh-container/dsh-dev up --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode eval --dry-run
-python3 runtime/adapters/dsh-container/dsh-dev up --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode eval
+python3 runtime/adapters/dsh-container/dsh-dev up --source business:security-operations-expert@<business-commit> --mode eval --dry-run
+python3 runtime/adapters/dsh-container/dsh-dev up --source business:security-operations-expert@<business-commit> --mode eval
 python3 runtime/adapters/dsh-container/dsh-dev ps
 python3 runtime/adapters/dsh-container/dsh-dev url security-operations-expert-eval --non-interactive   # 交互终端可省略该旗标
 python3 runtime/adapters/dsh-container/dsh-dev logs security-operations-expert-eval --tail 200
@@ -192,12 +192,12 @@ python3 runtime/adapters/dsh-container/dsh-dev down security-operations-expert-e
 本地 TypeScript 研究入口直接读取现有来源与 Run，不另存可编辑副本。`edit` 调用编辑器修改所选 Experiment 的 `candidate/`；`run` 默认对显式 Case 启用 AI 证据复核，完成后输出封存状态、工具调用与证据路径。真实业务判断仍需核对原始回答及工具记录。
 
 ```bash
-node runtime/adapters/dsh-container/research-tool.mts context --source experiment:EXP-security-operations-expert-024-rad80a907c628
-node runtime/adapters/dsh-container/research-tool.mts edit --source experiment:EXP-security-operations-expert-024-rad80a907c628 --file dsh/workspace/.agents/skills/security-inspection/SKILL.md
-node runtime/adapters/dsh-container/research-tool.mts run --source experiment:EXP-security-operations-expert-024-rad80a907c628 --case U-INS-001 --case U-INS-002 --case U-INS-007 --dry-run
-node runtime/adapters/dsh-container/research-tool.mts run --source experiment:EXP-security-operations-expert-024-rad80a907c628 --case U-INS-001 --case U-INS-002 --case U-INS-007 --compare-to <baseline-run-id>
+node runtime/adapters/dsh-container/research-tool.mts context --source business:security-operations-expert@<business-commit>
+node runtime/adapters/dsh-container/research-tool.mts edit --source business:security-operations-expert@<business-commit> --file dsh/workspace/.agents/skills/security-inspection/SKILL.md
+node runtime/adapters/dsh-container/research-tool.mts run --source business:security-operations-expert@<business-commit> --case U-INS-001 --case U-INS-002 --case U-INS-007 --dry-run
+node runtime/adapters/dsh-container/research-tool.mts run --source business:security-operations-expert@<business-commit> --case U-INS-001 --case U-INS-002 --case U-INS-007 --compare-to <baseline-run-id>
 node runtime/adapters/dsh-container/research-tool.mts review --left <baseline-run-id> --right <candidate-run-id>
-node runtime/adapters/dsh-container/research-tool.mts instance --source experiment:EXP-security-operations-expert-024-rad80a907c628
+node runtime/adapters/dsh-container/research-tool.mts instance --source business:security-operations-expert@<business-commit>
 ```
 
 `context --run <run-id> [--case <case-id>]` 显示冻结口径、当前口径、已注册工具和实际调用；`instance --restart --name <已存在且属于该来源的实例名>` 重启后重新读取容器镜像与只读挂载。`--review ai|none` 也可直接传给 `dsh-eval`；API 通道的 `full` 默认 `ai`，其他选择默认 `none`。浏览器通道仅支持 `none`。
@@ -206,15 +206,15 @@ node runtime/adapters/dsh-container/research-tool.mts instance --source experime
 
 ```bash
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode fast --dry-run
+  --source business:security-operations-expert@<business-commit> --mode fast --dry-run
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode fast
+  --source business:security-operations-expert@<business-commit> --mode fast
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --mode full --dry-run
+  --source business:security-operations-expert@<business-commit> --mode full --dry-run
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --executor browser --case U-INS-001
+  --source business:security-operations-expert@<business-commit> --executor browser --case U-INS-001
 python3 runtime/adapters/dsh-container/dsh-eval \
-  --source experiment:EXP-security-operations-expert-024-rad80a907c628 --case U-QA-012 --case U-QA-013 \
+  --source business:security-operations-expert@<business-commit> --case U-QA-012 --case U-QA-013 \
   --compare-to <baseline-run-id>
 ```
 
@@ -278,7 +278,7 @@ API 通道退出码 `0` 表示锁定 Case 均得到 `passed`；`1` 表示运行�
 
 MCP 是可选的外部服务。连接失败只影响相应工具发现与调用，不阻塞实例启动、普通聊天或其他可用工具。当前来源默认取智能体 manifest 的 `active_experiment`；需要复现历史来源时，先从固定数据提交恢复到独立数据目录，再显式指定来源，不向当前来源目录重新登记旧版本。
 
-历史装载证据见 [2026-09-18 实机记录](https://github.com/wr5912/harness-engineering-platform-data/blob/9afc8fd0047367deb9df5b51595f101835359044/evolution/experiments/EXP-security-operations-expert-001/evaluation/evidence/dsh-dev-live-load-20260918.json)。该记录只证明当时的技术装载，不代表当前业务验收。
+历史装载记录不属于当前运行输入；当前验证必须从 business-agents 的固定 commit 重新执行并记录新证据。
 
 在上述装载核验开始前，脚本会核对镜像构建指纹、平台和 Image ID，并把 Compose 固定到 `tag@image-id`；无 OCI 指纹 label 或指纹过期的本地镜像会直接拒绝。
 
@@ -305,6 +305,6 @@ bash runtime/adapters/dsh-container/verify-load.sh verification --frozen SNAPSHO
 
 副本位于所选 Experiment 的 `snapshots/frozen-sources/fr-<UUIDv4>/`；`snapshot.json` 记录三树文件、目录权限摘要和来源，`frozen-digest` 会核对副本字节与权限。`restore SNAPSHOT_DIR` 仅在 Candidate 根目录不存在时恢复三棵挂载树，绝不覆盖现有工作树。这只是一次局部装载探针使用的可还原挂载源，不是项目 Baseline 或 Research Release；长期研究版本仍由 Git 保存。
 
-整套源码研究快照（`snapshots/research/`）的创建与复核已退役：它与 Git 重复保存同一份内容，并要求跨环境重现宿主机完整 POSIX 权限。历史内容按 `evolution/experiments/<id>/snapshots/README.md` 的映射从 Git 提交恢复。
+整套源码研究快照（`snapshots/research/`）的创建与复核已退役；当前运行只接受 business-agents 的固定来源和发布清单。
 
 未来若实现 `release:<id>`，启动器应直接装载具体、不可变的 Research Release，并核对清单摘要与实际 DSH 身份。当前没有 Research Release，也没有对应解析入口，不能把 Candidate 装载写成 Release 复现完成。

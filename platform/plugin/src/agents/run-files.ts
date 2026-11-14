@@ -1,6 +1,5 @@
 import { redactText as redactRunText } from '../redact.ts'
 export { redactText as redactRunText } from '../redact.ts'
-import { VERSION_ID } from '../version-id.ts'
 import { separatedReview } from '../evaluation/review-state.ts'
 import { createHash } from 'node:crypto'
 import { lstat, readdir, readFile, open } from 'node:fs/promises'
@@ -9,7 +8,6 @@ import { load as loadYaml } from 'js-yaml'
 import { zip, type AsyncZippable } from 'fflate'
 
 const RUN_ID = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-const EXP_ID = VERSION_ID
 const PREVIEW_LIMIT = 64 * 1024
 const FINAL_STATUSES = new Set(['completed', 'failed', 'cancelled'])
 type JsonMap = Record<string, unknown>
@@ -45,17 +43,9 @@ async function locateRun(root: string, runId: string, signal?: AbortSignal): Pro
   checkCancelled(signal)
   if (!RUN_ID.test(runId)) throw new RunFileError('invalid_request', 'run_id 必须是 run-<UUIDv4>')
   const absoluteRoot = resolve(root)
-  const base = join(absoluteRoot, 'evolution/experiments')
-  const entries = await readdir(base, { withFileTypes: true })
-  const matches: string[] = []
-  for (const entry of entries) {
-    if (!EXP_ID.test(entry.name)) continue
-    const path = join(base, entry.name, 'runs', runId)
-    if (await optionalStat(path)) { await assertNoLinks(absoluteRoot, path); matches.push(path) }
-  }
-  if (!matches.length) throw new RunFileError('not_found', '未找到 Run')
-  if (matches.length !== 1) throw new RunFileError('conflict', 'Run ID 重复，无法确定证据来源')
-  const directory = matches[0]
+  const directory = join(absoluteRoot, 'evolution', 'runs', runId)
+  if (!(await optionalStat(directory))) throw new RunFileError('not_found', '未找到 Run')
+  await assertNoLinks(absoluteRoot, directory)
   if (!(await lstat(directory)).isDirectory()) throw new RunFileError('path_rejected', 'Run 必须是目录')
   return { root: absoluteRoot, directory, path: relative(absoluteRoot, directory).split(sep).join('/'), id: runId }
 }

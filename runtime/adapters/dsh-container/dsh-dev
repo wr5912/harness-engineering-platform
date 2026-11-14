@@ -497,237 +497,13 @@ def _atomic_replace(path: Path, data: bytes) -> None:
         raise
 
 
-def create_harness(agent_id: str, *, repo: Path = REPO, sources: Path | None = None,
-                   lock_path: Path = ADAPTER / "source.lock.json", profile: str = "web") -> dict:
-    """创建最小 Agent、首次 Experiment 与自包含的 DSH 装载声明。"""
-    if not NAME_RE.fullmatch(agent_id):
-        raise ValueError("agent-id 必须是小写 kebab-case")
-    # 与平台创建、迁移和融合共用同一个排他锁文件。
-    lock = repo / ".local/version-governance" / f"{agent_id}.lock"
-    lock.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError:
-        raise ValueError("该 Agent 正在创建或采纳版本，请稍后重试；异常退出留下的锁须先核对进程再清理") from None
-    try:
-        os.write(fd, str(os.getpid()).encode())
-        return _create_harness(agent_id, repo=repo, sources=sources, lock_path=lock_path, profile=profile)
-    finally:
-        os.close(fd)
-        lock.unlink()
-
-
-def _create_harness(agent_id: str, *, repo: Path, sources: Path | None,
-                    lock_path: Path, profile: str) -> dict:
-    if profile not in {"web", "sdk"}:
-        raise ValueError("profile 只能是 web 或 sdk")
-
-    sources = sources if sources is not None else source_catalog(repo)
-    agent_dir = repo / "agents" / agent_id
-    experiments = repo / "evolution/experiments"
-    existing = [path.name for path in experiments.iterdir() if path.name.startswith("EXP-")
-                and (match := EXPERIMENT.fullmatch(path.name)) and match[1] == agent_id
-                and (path / "change.yaml").is_file()] if experiments.exists() else []
-    if existing:
-        raise ValueError("Agent 已有版本，拒绝重复创建 001-m：" + "、".join(sorted(existing)))
-    for _ in range(5):
-        experiment_id = f"EXP-{agent_id}-001-m-r{secrets.token_hex(6)}"
-        experiment_dir = repo / "evolution/experiments" / experiment_id
-        if not experiment_dir.exists():
-            break
-    else:
-        raise ValueError("无法生成未占用的 Experiment ID")
-    collisions = [str(path.relative_to(repo)) for path in (agent_dir, experiment_dir) if path.exists()]
-    if collisions:
-        raise ValueError("目标已存在，拒绝覆盖：" + "、".join(collisions))
-
-    agent_files = {
-        "manifest.yaml": f'''schema_version: "1.0"
-agent_id: {agent_id}
-runtime_family: dsh
-research_status: active
-active_experiment: {experiment_id}
-''',
-        "evaluation.md": f'''# {agent_id} 评测
-
-#### U-IDENTITY-001 身份装载
-
-**评估档位：** `fast`
-
-**用户输入**
-
-> 你是谁？请用一句中文回答。
-
-**预期**
-
-回复包含 `{agent_id}`，使用一句简洁中文；不冒充其他业务角色，也没有模型或工具错误。
-''',
-    }
-    experiment_files = {
-        "change.yaml": f'''schema_version: "1.0"
-experiment_id: {experiment_id}
-agent_id: {agent_id}
-baseline_ref: none:first-experiment
-status: active
-research_question: 最小 Harness 能否被 DSH 装载并在全新 Web Session 中保持 {agent_id} 身份
-''',
-        "hypothesis.md": f'''# 研究假设
-
-Baseline 为 `none:first-experiment`。若最小 Candidate 声明 `{agent_id}` Preset，并由来源合同装载到 DSH Web Profile，则全新 Session 对身份问题的回复会明确包含 `{agent_id}`。
-
-## 预期观察
-
-- 来源合同、Candidate 资产与全仓 DSH 来源锁可通过静态校验。
-- 全新 eval 实例可选择 `{agent_id}` Preset。
-- 全新 Session 的回复满足 `AC-001`。
-
-## 停止条件
-
-- 来源或 Candidate 不能被 DSH 装载。
-- Web 中无法选择目标 Preset 或真实消息失败。
-- 验证需要把凭据值写入仓库或研究记录。
-
-## 限制
-
-本实验只验证一个身份输入，不外推到工具能力、复杂任务质量或生产可用性。
-''',
-        "candidate/harness.yaml": f'''schema_version: "1.0"
-agent:
-  id: {agent_id}
-  name: {agent_id}
-  language: zh-CN
-  lifecycle_status: experiment
-  runtime_family: dsh
-  load_mode: container-only
-loadable_assets:
-  workspace: dsh/workspace
-  preset_root: dsh/presets
-  managed_root: dsh/managed
-  preset_id: {agent_id}
-  profile_patch: dsh/managed/{agent_id}.patch.yml
-credential_environment_keys:
-  - DEEPSEEK_API_KEY
-''',
-        "candidate/dsh/workspace/.env": (
-            ADAPTER / "verification-home-controls/locked-bootstrap.env"
-        ).read_text(encoding="utf-8"),
-        "candidate/dsh/workspace/AGENTS.md": f'''# {agent_id}
-
-你是 `{agent_id}`，一个用于验证 DSH Harness 创建与装载流程的研究智能体。
-
-- 使用简洁中文回答，并明确保持 `{agent_id}` 身份。
-- 不声称未提供的工具、权限或执行结果。
-''',
-        f"candidate/dsh/managed/{agent_id}.patch.yml": f'''# 注册本 Experiment 的受控 Preset。
-- id: agent-preset-registry
-  config:
-    default: {agent_id}
-
-- insert:
-    - id: preset-{agent_id}
-      name: '@deepseek-ai/dsh-agent-preset'
-      config:
-        id: {agent_id}
-        plugins:
-          - id: {agent_id}-harness
-            name: cordis:include
-            config:
-              path: /opt/dsh-presets/{agent_id}/agent.cordis.yml
-''',
-        f"candidate/dsh/presets/{agent_id}/agent.cordis.yml": f'''- id: persona
-  name: /opt/dsh/packages/preset/persona/lib/index.js
-  disabled: false
-  config:
-    prefix: >-
-      你是 {agent_id}，一个用于验证 DSH Harness 创建与装载流程的研究智能体。
-      使用简洁中文回答，并明确保持 {agent_id} 身份；不要声称未提供的工具或权限。
-    suffix: 你的工作目录是 {{{{cwd}}}}。
-
-- id: agent-instructions
-  name: /opt/dsh/packages/context/agent-instructions/lib/index.js
-  disabled: false
-  config:
-    maxBytes: 65536
-''',
-        f"candidate/dsh/presets/{agent_id}/preset.yml": f'''name: {agent_id}
-description: 用于验证 DSH Harness 创建、装载与身份响应的最小研究 Preset。
-order: 10
-''',
-    }
-
-    if profile == "sdk":
-        preset_file = f"candidate/dsh/presets/{agent_id}/agent.cordis.yml"
-        experiment_files[preset_file] = experiment_files[preset_file].replace("    suffix: 你的工作目录是 {{cwd}}。\n", "")
-        experiment_files["candidate/harness.yaml"] = experiment_files["candidate/harness.yaml"].replace(
-            "loadable_assets:\n", "loadable_assets:\n  profile: sdk\n  profile_manifest: dsh/managed/sdk-profile.package.json\n")
-        experiment_files["candidate/dsh/managed/sdk-profile.package.json"] = (
-            ADAPTER / "verification-home-controls/sdk-profile.package.json").read_text(encoding="utf-8")
-        experiment_files["change.yaml"] = experiment_files["change.yaml"].replace("Web Session", "SDK Session")
-        experiment_files["hypothesis.md"] = experiment_files["hypothesis.md"].replace("DSH Web Profile", "DSH SDK Profile").replace("Web 中无法选择目标 Preset", "SDK 无法装载目标 Preset")
-        experiment_files["candidate/sdk/example.ts"] = '''import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client'
-import { readFileSync } from 'node:fs'
-
-// 运行配置由安装器从同一版本生成；示例与 DSH 在同一标准容器内运行。
-const options = JSON.parse(readFileSync(process.env.HARNESS_SDK_OPTIONS!, 'utf8'))
-await using harness = new DeepSeekHarness(options)
-const result = await harness.run(process.argv[2] ?? '你是谁？请用一句中文回答。')
-console.log(result.sessionId, result.finalResponse)
-'''
-        experiment_files["candidate/sdk/README.md"] = '''# TypeScript SDK 接入
-
-本智能体使用 DSH 官方 `@deepseek-ai/dsh-sdk-client`，应用和 DSH 在同一标准 Runtime 容器内运行。
-示例为同目录的 `example.ts`；安装器生成 `HARNESS_SDK_OPTIONS` 指向的启动配置。
-
-1. 在平台选择本版本，填写输入并执行“SDK 调试”。保存成功回执中的 `session_id`。
-2. 在容器内运行 TypeScript 示例，通过 `DeepSeekHarness` 装载生成配置。
-3. 同一 SDK 实例可多次调用；连续对话复用 `harness.session()` 返回的句柄。
-4. 关闭后恢复时，沿用同一 HOME 和工作目录，并显式调用 `await harness.resumeSession(sessionId)`。
-5. 使用 `await using` 或 `finally` 中的 `close()`，确保 DSH 子进程退出。
-
-SDK 通过本地 stdio JSON-RPC 访问子进程，无需业务 Web 地址。事件通知不等于逐 token 文本流。
-高层 `run()` 在根 Agent 首次空闲时返回；含子智能体的完整任务使用低层 `HarnessClient` 的 `session/wait`。
-官方协议不支持逐轮取消，停止会关闭整个 Runtime。请求超时或连接中断不能直接认定业务失败，不自动重放。
-需要 Web 人工审批或追问的路径未在 SDK 中承诺可用；可停止当前执行并核对事件。
-模型、MCP、业务依赖由当前实例或独立安装配置提供，接口就绪和模型回复不等于业务通过。
-'''
-
-    moved: list[Path] = []
-    try:
-        with tempfile.TemporaryDirectory(prefix=".dsh-dev-init-", dir=repo) as temporary:
-            stage = Path(temporary)
-            staged_agent = stage / "agent"
-            staged_experiment = stage / "experiment"
-            for root, files in ((staged_agent, agent_files), (staged_experiment, experiment_files)):
-                for relative, content in files.items():
-                    path = root / relative
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(content, encoding="utf-8")
-            agent_dir.parent.mkdir(parents=True, exist_ok=True)
-            experiment_dir.parent.mkdir(parents=True, exist_ok=True)
-            staged_agent.replace(agent_dir)
-            moved.append(agent_dir)
-            staged_experiment.replace(experiment_dir)
-            moved.append(experiment_dir)
-
-        resolve(f"experiment:{experiment_id}", repo=repo, sources=sources, lock_path=lock_path)
-    except Exception:
-        for path in reversed(moved):
-            shutil.rmtree(path)
-        raise
-
-    return {
-        "agent_id": agent_id,
-        "experiment_id": experiment_id,
-        "source_id": f"experiment:{experiment_id}",
-    }
+def create_harness(*args, **kwargs) -> dict:
+    """旧 Experiment 创建入口已停用；业务 Harness 只在 business-agents 维护。"""
+    raise ValueError("dsh-dev init 已停用：业务 Harness 必须在 business-agents 中创建和维护")
 
 
 def command_init(args: argparse.Namespace) -> None:
-    try:
-        result = create_harness(args.agent_id, repo=REPO, sources=SOURCES, profile=getattr(args, "profile", "web"))
-    except (OSError, ValueError, RuntimeError) as exc:
-        fail(str(exc))
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    fail("dsh-dev init 已停用：业务 Harness 必须在 business-agents 中创建和维护")
 
 
 def normalize_mode(value: str) -> str:
@@ -739,7 +515,7 @@ def normalize_mode(value: str) -> str:
 
 
 def validate_analysis_workspace(value: str | None, *, repo: Path = REPO) -> str | None:
-    """归因只接受仓库内形如 Experiment/runs/run-UUID 的真实、无符号链接目录。"""
+    """评测归因工作区不再接受 evolution/experiments 下的旧资产。"""
     if value is None:
         return None
     path = Path(value)
@@ -749,13 +525,8 @@ def validate_analysis_workspace(value: str | None, *, repo: Path = REPO) -> str 
         fail("--analysis-workspace 必须是已存在的 Run 目录")
     if not path.is_absolute() or path != resolved or not resolved.is_dir():
         fail("--analysis-workspace 必须是规范化的绝对 Run 目录")
-    try:
-        relative = resolved.relative_to((repo / "evolution/experiments").resolve())
-    except ValueError:
-        fail("--analysis-workspace 必须位于本仓库 evolution/experiments 下")
-    if len(relative.parts) != 3 or relative.parts[1] != "runs" \
-            or not EXPERIMENT.fullmatch(relative.parts[0]) or not RUN_ID_RE.fullmatch(relative.parts[2]):
-        fail("--analysis-workspace 必须精确指向 Experiment 的 run-UUID 目录")
+    if (repo / "evolution/experiments").resolve() in resolved.parents:
+        fail("--analysis-workspace 不得位于已停用的 evolution/experiments 目录")
     try:
         if any(item.is_symlink() for item in resolved.rglob("*")):
             fail("--analysis-workspace 内不得包含符号链接")
@@ -1617,8 +1388,7 @@ def require_up_arguments(args: argparse.Namespace) -> None:
         return
     print("dsh-dev up 缺少必填参数：" + "、".join(f"--{option}" for option in missing), file=sys.stderr)
     if "source" in missing:
-        sources = (REPO / "evolution/experiments").glob("*")
-        print("可用 --source：" + "、".join(f"experiment:{path.name}" for path in sorted(sources) if EXPERIMENT.fullmatch(path.name) and (path / "candidate/harness.yaml").is_file()), file=sys.stderr)
+        print("可用 --source：business:<agent-id> 或 business:<agent-id>@<tag>（以 business-agents/manifest.yaml 为准）", file=sys.stderr)
     if "mode" in missing:
         print("可用 --mode：eval", file=sys.stderr)
     raise SystemExit(2)
@@ -3405,77 +3175,8 @@ def command_image_build(args: argparse.Namespace) -> None:
 
 
 def command_mcp_promote(args: argparse.Namespace) -> None:
-    """将已保存的实例 Web MCP 配置定稿到所选 Experiment 的新卷种子。"""
-    _, manifest = load_instance(args.name)
-    source_id = manifest.get("source_id", "")
-    if not source_id.startswith("experiment:"):
-        fail("MCP 配置定稿只支持 Experiment 来源")
-    contract = resolve(source_id, repo=REPO)
-    managed = Path(contract["managed"])
-    seed = managed / "web-profile.seed.patch.yml"
-    if manifest.get("mounts", {}).get("managed") != str(managed) or not seed.is_file():
-        fail("实例来源与 Candidate MCP 种子不一致")
-    require_docker_registration(args.name, manifest)
-    container, _ = running_container(args.name)
-    script = r'''
-const fs = require('node:fs');
-const { createRequire } = require('node:module');
-const yaml = createRequire('/opt/dsh/packages/mcp/mcp-client/package.json')('js-yaml');
-const rows = yaml.load(fs.readFileSync('/var/lib/dsh/profiles/web/cordis.patch.yml', 'utf8'));
-if (!Array.isArray(rows)) throw new Error('invalid Web profile patch');
-if (!rows.some(row => Array.isArray(row.insert) && row.insert.some(item =>
-  item.id === 'mcp-session-manager' && item.name === 'file:///opt/dsh-managed/mcp-manager/index.mjs'))) {
-  throw new Error('MCP manager plugin insert missing');
-}
-const matches = rows.flatMap(row => row.id === 'mcp-session-manager' ? [row]
-  : Array.isArray(row.insert) ? row.insert.filter(item => item.id === 'mcp-session-manager') : []);
-const current = matches.at(-1);
-if (!current || current.name && current.name !== 'file:///opt/dsh-managed/mcp-manager/index.mjs'
-  || !Array.isArray(current.config?.servers) || !Array.isArray(current.config?.groups)) {
-  throw new Error('MCP manager config missing or overridden');
-}
-const allowed = new Set(['id', 'serverName', 'description', 'enabled', 'specUrl', 'apiKey',
-  'authType', 'authHeader', 'loginUrl', 'loginUsername', 'loginPassword', 'loginTokenPath',
-  'url', 'headers', 'managementUrl', 'tools']);
-const servers = [];
-for (const server of current.config.servers) {
-  if (Object.keys(server).some(key => !allowed.has(key))) {
-    throw new Error('unexpected MCP server field');
-  }
-  for (const [address, isSpec] of [[server.specUrl, true], [server.url, false],
-    [server.loginUrl, true], [server.managementUrl, false]].filter(([address]) => address)) {
-    const url = new URL(address);
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
-      || url.hash || (!isSpec && url.search)) {
-      throw new Error('MCP URL contains unsupported fields');
-    }
-  }
-  if (server.headers && (!Array.isArray(server.headers) || server.headers.some(header =>
-    typeof header.name !== 'string' || typeof header.value !== 'string'))) {
-    throw new Error('MCP headers invalid');
-  }
-  const needsCredential = Boolean(server.apiKey || server.loginPassword || server.headers?.some(header => header.value));
-  servers.push({ ...server, enabled: needsCredential ? false : server.enabled,
-    apiKey: server.apiKey ? '' : server.apiKey,
-    loginPassword: server.loginPassword ? '' : server.loginPassword,
-    headers: server.headers?.map(header => ({ name: header.name, value: '' })) });
-}
-const config = { servers, groups: current.config.groups, sharedToken: '' };
-const result = yaml.dump([{ insert: [{ id: 'mcp-session-manager',
-  name: 'file:///opt/dsh-managed/mcp-manager/index.mjs', config }] }]);
-if (JSON.stringify(yaml.load(result)[0].insert[0].config) !== JSON.stringify(config)) {
-  throw new Error('MCP seed round trip failed');
-}
-process.stdout.write(result);
-'''
-    result = subprocess.run(["docker", "exec", container, "node", "-e", script],
-                            text=True, capture_output=True, timeout=30, check=False)
-    if result.returncode or not result.stdout:
-        fail("读取 Web profile MCP 配置失败；请检查实例配置和插件状态")
-    _atomic_replace(seed, result.stdout.encode("utf-8"))
-    print(json.dumps({"source": source_id, "candidate_seed": str(seed),
-                      "sha256": hashlib.sha256(result.stdout.encode("utf-8")).hexdigest()},
-                     ensure_ascii=False))
+    """MCP 配置由平台服务目录管理，不再写入 Experiment Candidate。"""
+    fail("mcp-promote 已停用：业务 MCP 配置必须通过平台服务目录管理")
 
 
 def main() -> None:
@@ -3484,7 +3185,7 @@ def main() -> None:
     parser.add_argument("--repo", type=Path, default=REPO, help="用户数据工作区根目录")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    init = commands.add_parser("init", help="创建最小 Harness Agent 与首次 Experiment")
+    init = commands.add_parser("init", help="已停用：业务 Harness 必须在 business-agents 中创建")
     init.add_argument("agent_id", help="小写 kebab-case Agent ID")
     init.add_argument("--profile", choices=("web", "sdk"), default="web", help="Web 交互或官方 TypeScript SDK")
     init.set_defaults(handler=command_init)
@@ -3496,7 +3197,7 @@ def main() -> None:
     build_parser.set_defaults(handler=command_image_build)
 
     up = commands.add_parser("up", help="启动实例（可用 --dry-run 预览）")
-    up.add_argument("--source", nargs="?", help="来源选择器；未提供值时列出可用的 experiment:<id>")
+    up.add_argument("--source", nargs="?", help="来源选择器 business:<agent-id> 或 business:<agent-id>@<tag>")
     up.add_argument("--source-ref", help="固定 Git 来源 git:<40位提交>，不修改当前 Candidate")
     up.add_argument("--mcp-fixture", help="独立被测实例的明确 Mock MCP 连接映射 JSON")
     up.add_argument("--mode", nargs="?", choices=MODE_CHOICES, metavar="{eval}", type=normalize_mode,
@@ -3571,7 +3272,7 @@ def main() -> None:
     delete_parser.add_argument("name")
     delete_parser.set_defaults(handler=command_delete)
 
-    promote_parser = commands.add_parser("mcp-promote", help="将实例 Web MCP 配置定稿到 Experiment Candidate")
+    promote_parser = commands.add_parser("mcp-promote", help="已停用：MCP 配置由平台服务目录管理")
     promote_parser.add_argument("name")
     promote_parser.set_defaults(handler=command_mcp_promote)
 

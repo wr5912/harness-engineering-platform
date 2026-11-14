@@ -41,7 +41,8 @@ export function businessSource(root: string, selector: string): Record<string, a
   let repository = origin, commit: string | undefined
   if (tag !== undefined) {
     if (!tag) throw new Error('Git tag 不能为空')
-    commit = git(origin, ['rev-parse', '--verify', `refs/tags/${tag}^{commit}`])
+    const pinnedCommit = /^[0-9a-f]{40}$/.test(tag)
+    commit = git(origin, ['rev-parse', '--verify', pinnedCommit ? `${tag}^{commit}` : `refs/tags/${tag}^{commit}`])
     const parent = dataPath(root, '.local/business-sources')
     repository = join(parent, commit, id)
     if (!existsSync(join(repository, base, 'harness.yaml'))) {
@@ -49,7 +50,7 @@ export function businessSource(root: string, selector: string): Record<string, a
       const temporary = mkdtempSync(join(parent, commit, `${id}-`))
       try {
         const archive = spawnSync('git', ['archive', commit, '--', base], { cwd: origin, maxBuffer: 256 * 1024 * 1024 })
-        if (archive.status !== 0) throw new Error('Git tag 中没有该智能体的 Harness')
+        if (archive.status !== 0) throw new Error(`${pinnedCommit ? 'Git commit' : 'Git tag'} 中没有该智能体的 Harness`)
         const unpack = spawnSync('tar', ['-xf', '-', '-C', temporary], { input: archive.stdout })
         if (unpack.status !== 0) throw new Error('业务 Harness 缓存展开失败')
         try { renameSync(temporary, repository) } catch (error) { if (!existsSync(join(repository, base, 'harness.yaml'))) throw error }
