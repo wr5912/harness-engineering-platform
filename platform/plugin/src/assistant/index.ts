@@ -237,8 +237,10 @@ function freezeInstanceOperation(input: MapValue, preview: any): MapValue {
   const value = preview?.value
   if (!value || value.name !== input.name || value.operation !== input.operation) throw new Error('实例预览与请求对象不一致，请重新提交操作')
   const source = value.plan?.source_id ?? value.source_id
-  if (typeof source !== 'string' || !source || input.operation === 'create' && !input.source
-    || input.source && input.source !== source) throw new Error('实例预览来源与请求不一致，请先指定并核对固定版本')
+  if (typeof source !== 'string' || !source || !source.startsWith('business:') || input.source?.startsWith('experiment:')
+    || input.operation === 'create' && !input.source || input.source && input.source !== source) {
+    throw new Error('实例预览必须使用当前 business:<agent-id>[@<40位commit>] 来源；旧 experiment: 来源已停用')
+  }
   if (['create', 'start', 'restart'].includes(input.operation)) {
     const port = value.plan?.port
     const selected = value.model_selection
