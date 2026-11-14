@@ -227,7 +227,7 @@ test('包内 Git 可用时优先使用，包内和系统均不可用时明确失
 
 test('Docker 归档识别标签、ID、多标签同镜像，并拒绝歧义和身份不符', () => {
   const fakeBin = join(root, 'docker-bin'), id = 'sha256:' + 'a'.repeat(64), other = 'sha256:' + 'b'.repeat(64)
-  write(join(fakeBin, 'docker'), `#!${process.execPath}\nconst a=process.argv.slice(2); if(a[0]==='load') console.log(process.env.HEP_TEST_LOAD); else if(a[0]==='version') console.log('amd64'); else console.log(JSON.stringify([{Id:a.at(-1)==='other:tag'?'${other}':'${id}',Architecture:'${process.arch === 'arm64' ? 'arm64' : 'amd64'}',Config:{Labels:{'org.ai-agent-harness.dsh.image-build-fingerprint':'expected'}}}]));\n`, true)
+  write(join(fakeBin, 'docker'), `#!${process.execPath}\nconst a=process.argv.slice(2); if(a[0]==='load') console.log(process.env.HEP_TEST_LOAD); else if(a[0]==='version') console.log('amd64'); else console.log(JSON.stringify([{Id:a.at(-1)==='other:tag'?'${other}':'${id}',Architecture:'${process.arch === 'arm64' ? 'arm64' : 'amd64'}',Os:'linux',Config:{Labels:{'org.ai-agent-harness.dsh.image-build-fingerprint':'expected'}}}]));\n`, true)
   const previous = process.env.PATH
   process.env.PATH = fakeBin + ':' + previous
   try {
@@ -278,6 +278,9 @@ test('打包前从 Docker 归档核对标签、配置摘要、架构和构建指
   const info = inspectImageArchive(archive, 'hep:standard')
   assert.equal(info.id, `sha256:${digest}`)
   assert.deepEqual(verifyImageInfo(info, { arch: 'arm64', fingerprint: 'expected' }), [])
+  for (const changed of [{ id: 'hep:latest' }, { id: 'sha256:' + '0'.repeat(64) }, { arch: 'amd64' }, { os: 'windows' }, { labels: {} }]) {
+    assert.ok(verifyImageInfo({ ...info, ...changed }, { id: info.id, arch: 'arm64', fingerprint: 'expected' }).length, JSON.stringify(changed))
+  }
   assert.match(verifyImageInfo(info, { fingerprint: 'wrong' }).join(''), /指纹不符/)
   assert.throws(() => inspectImageArchive(archive, 'hep:poc'), /标准标签/)
   const oci = JSON.stringify({ schemaVersion: 2, config: { digest: `sha256:${digest}` }, layers: [] })

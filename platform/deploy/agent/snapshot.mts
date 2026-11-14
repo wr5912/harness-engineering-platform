@@ -6,8 +6,6 @@ import { createRequire } from 'node:module'
 import { runtimeSource } from '../../plugin/src/agents/business-source.ts'
 import { candidateFiles } from '../../plugin/src/tasks/files.ts'
 import { assertStandaloneVersionSupported } from '../../plugin/src/agents/version-source.ts'
-import { assetDependencyDeclarations, preparedAssetDependencyPackages } from '../../plugin/src/agents/asset-dependencies.ts'
-import { expectedImage } from '../image.mts'
 import { collectEntries, sha256File } from '../manifest.mts'
 import { isGlibcLibrary } from '../fsutil.mts'
 import type { AgentPackageInput, AgentSourceSnapshot, DependencyPackage } from './types.mts'
@@ -218,17 +216,6 @@ export function inspectAgentSnapshot(input: AgentPackageInput, targetImage?: { t
   let image: { tag?: string; id?: string } = targetImage ?? {}
   if (!targetImage && input.resourcesDir) try { image = JSON.parse(readFileSync(join(input.resourcesDir, 'resources.json'), 'utf8')).image ?? {} } catch { /* 运行资源缺失由调用方报告。 */ }
   const matchesTarget = (dependency: DependencyPackage) => !dependency.preparedTarget || !image.id || dependency.preparedTarget.imageId === image.id && dependency.preparedTarget.image === image.tag
-  // 普通实例与独立部署复用同一份已核对依赖；不回拷到 Candidate 或复制宿主 venv。
-  const preparedPackages = assetDependencyDeclarations(candidate).length ? preparedAssetDependencyPackages(input.assetRoot, input.experimentId, input.arch, { image: expectedImage(input.programRoot, input.arch).tag }) : []
-  for (const prepared of preparedPackages) {
-    const index = dependencies.findIndex(item => item.path === prepared.path)
-    if (index >= 0 && dependencies[index].lockSha256 !== prepared.lockSha256) continue
-    if (index >= 0 && dependencies[index].ready && matchesTarget(dependencies[index]) && input.resourcesDir && dependencies[index].modulesPath?.startsWith(resolve(input.resourcesDir) + sep)) continue
-    assertDependencyArchitecture(prepared.modulesPath, input.arch)
-    const frozen = { ...prepared, preparedFiles: dependencyEntries(prepared.modulesPath) }
-    if (index >= 0) dependencies[index] = { ...dependencies[index], ...frozen, reason: undefined }
-    else dependencies.push(frozen)
-  }
   for (const dependency of dependencies) if (!matchesTarget(dependency)) {
     dependency.ready = false; dependency.reason = '已准备业务依赖对应另一标准镜像，需要针对当前运行资源重新准备'
   }

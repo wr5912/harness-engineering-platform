@@ -774,8 +774,8 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
         fail("归因实例只允许监听 127.0.0.1，不能启用 --lan-access")
     if unsafe_no_auth and analysis_workspace:
         fail("归因实例不能启用 --unsafe-no-auth")
-    if plugin_node_modules and analysis_workspace:
-        fail("归因实例不能装载业务插件依赖")
+    if plugin_node_modules:
+        fail("实例必须使用标准 Runtime 镜像内的依赖，不支持宿主 --plugin-node-modules")
     validate_trusted_host(trusted_host)
     fallback_suffix = ""
     if image_fingerprint:
@@ -908,21 +908,6 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
         if text.count(business_patch) != 1:
             fail("Compose 模板缺少唯一的业务 patch 锚点")
         text = text.replace(business_patch, "")
-    if plugin_node_modules:
-        managed_mount = (
-            "      - type: volume\n"
-            f"        source: {project}-fallback{fallback_suffix}\n"
-            "        target: /opt/node_modules\n"
-            "        read_only: true\n"
-        )
-        if text.count(managed_mount) != 1:
-            fail("Compose 模板缺少唯一的 managed 挂载锚点")
-        text = text.replace(managed_mount, (
-            "      - type: bind\n"
-            "        source: ${DSH_PLUGIN_NODE_MODULES_HOST:?插件依赖由启动器注入}\n"
-            "        target: /opt/node_modules\n"
-            "        read_only: true\n"
-        ))
     command_tail = "      - --no-open\n"
     if text.count(command_tail) != 1:
         fail("Compose 模板缺少唯一的 command 锚点")
@@ -1088,10 +1073,10 @@ def prepare_harness_projection(contract: dict, target: Path, *, copy_workspace: 
 
 
 def assert_asset_dependencies(contract: dict, image_id: str | None = None) -> None:
-    """重用已准备的目标环境，不在实例启动过程中安装或执行来源包。"""
+    """只读核对标准镜像依赖锁，清除旧宿主依赖投影。"""
     experiment_id = contract.get("experiment_id") or str(contract.get("source_id", "")).removeprefix("experiment:")
     pointer = REPO / ".local/asset-dependencies" / experiment_id / "current.json"
-    if not contract.get("harness_runtime") and not pointer.exists() and not contract.get("model_policy", {}).get("asset_dependencies"):
+    if not contract.get("harness_runtime") and not pointer.exists() and not contract.get("model_policy", {}).get("asset_dependencies") and not contract.get("asset_dependencies"):
         return
     command = [NODE_EXECUTABLE, str(ADAPTER / "harness-runtime.mts"), "--dependencies", str(REPO), experiment_id,
                contract["image"]["local_image_tag"]]
@@ -1111,29 +1096,17 @@ def assert_asset_dependencies(contract: dict, image_id: str | None = None) -> No
     projected = contract.get("model_policy", {}).get("asset_dependencies")
     if projected is not None and projected != dependencies or projected is None and dependencies.get("mounts") and contract.get("model_policy", {}).get("source") == "platform":
         fail("业务依赖准备回执已变化，请重新预览实例或评测")
-    if dependencies.get("mounts"):
-        contract["asset_dependencies"] = dependencies
+    if dependencies.get("mounts") or dependencies.get("environment"):
+        fail("业务依赖必须由标准 Runtime 镜像提供，不支持宿主依赖挂载或环境覆盖")
+    contract["asset_dependencies"] = dependencies
 
 
 def asset_dependency_mounts(contract: dict) -> list[dict]:
-    """项目副本复用同一只读依赖，路径随其原生工作目录一起投影。"""
-    mounts = [dict(mount) for mount in contract.get("asset_dependencies", {}).get("mounts", [])]
-    project = contract.get("harness_runtime", {}).get("project_workspace", {}).get("path")
-    if not project:
-        return mounts
-    if project.startswith("dsh/workspace/"):
-        seed_target = "/work/harness/workspace/" + project.removeprefix("dsh/workspace/")
-    elif project.startswith("dsh/managed/"):
-        seed_target = "/opt/dsh-managed/" + project.removeprefix("dsh/managed/")
-    else:
-        seed_target = "/opt/harness-candidate/" + project
-    for mount in list(mounts):
-        target = mount.get("target", "")
-        if target.startswith(seed_target + "/"):
-            projected = {**mount, "target": "/work/project" + target[len(seed_target):]}
-            if projected not in mounts:
-                mounts.append(projected)
-    return mounts
+    """运行库只从标准镜像装载；私有配置文件另由 runtime_mounts 投影。"""
+    dependencies = contract.get("asset_dependencies", {})
+    if dependencies.get("mounts") or dependencies.get("environment"):
+        fail("业务依赖必须由标准 Runtime 镜像提供，不支持宿主依赖挂载或环境覆盖")
+    return []
 
 
 def runtime_mounts(contract: dict, analysis_workspace: str | None = None,
@@ -1515,11 +1488,7 @@ def prepare_up(args: argparse.Namespace) -> tuple[dict, tuple[Path, dict] | None
     args.analysis_workspace = validate_analysis_workspace(getattr(args, "analysis_workspace", None), repo=REPO)
     plugin_node_modules = getattr(args, "plugin_node_modules", None)
     if plugin_node_modules:
-        path = Path(plugin_node_modules)
-        if not path.is_absolute() or not path.is_dir() or path != path.resolve():
-            fail("--plugin-node-modules 必须是已存在的规范化绝对目录")
-    if args.analysis_workspace and plugin_node_modules:
-        fail("归因实例不能装载业务插件依赖")
+        fail("实例必须使用标准 Runtime 镜像内的依赖，不支持宿主 --plugin-node-modules")
     if args.analysis_workspace and bool(getattr(args, "lan_access", False)):
         fail("归因实例只允许监听 127.0.0.1，不能启用 --lan-access")
     if args.analysis_workspace and bool(getattr(args, "unsafe_no_auth", False)):
@@ -2305,6 +2274,7 @@ def _command_sdk_run(args: argparse.Namespace) -> None:
         identity = validate_image_identity(contract)
         _sdk_cancel_checkpoint(args)
         assert_asset_dependencies(contract, identity["image_id"])
+        check_managed_plugin_dependencies(contract)
         contract.update(prepare_harness_projection(contract, target))
         _sdk_cancel_checkpoint(args)
         manifest = {"schema_version": INSTANCE_SCHEMA_VERSION, "asset_root": str(REPO),
@@ -3136,42 +3106,29 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
 
 
 def check_managed_plugin_dependencies(contract: dict, external_modules: str | None = None) -> None:
-    """插件运行依赖由挂载目录或同一标准 Runtime 镜像提供。"""
+    """核对标准镜像内的实际安装闭包，不接受宿主目录补偿。"""
+    if external_modules:
+        fail("实例必须使用标准 Runtime 镜像内的依赖，不支持宿主 --plugin-node-modules")
     managed = Path(contract["managed"])
     runtime_dependencies = None
     for manifest in managed.glob("*/package.json"):
         package = json.loads(manifest.read_text(encoding="utf-8"))
-        dependencies = set((package.get("dependencies") or {}).keys())
-        lock_files = ("package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock")
-        lock_file = next((name for name in lock_files if (manifest.parent / name).is_file()), None)
-        hint = "请核对标准 Runtime 的依赖锁并重建共享镜像"
-        if external_modules:
-            hint = f"请在显式指定的 {external_modules} 提供完整运行依赖"
-        elif lock_file:
-            hint += f"；插件专有依赖可在 {manifest.parent} 按 {lock_file} 准备"
+        dependencies = set((package.get("dependencies") or {}).keys()) | set((package.get("optionalDependencies") or {}).keys())
+        if any(path.exists() or path.is_symlink() for path in (manifest.parent / "node_modules", managed / "node_modules")):
+            fail(f"插件 {manifest.parent.name} 含宿主 node_modules；请移除该目录，依赖统一由标准 Runtime 镜像提供")
         for name in dependencies:
-            roots = (manifest.parent / "node_modules", managed / "node_modules")
-            if external_modules:
-                roots += (Path(external_modules),)
-            for mount in contract.get("asset_dependencies", {}).get("mounts", []):
-                expected = "/opt/dsh-managed/" + manifest.parent.relative_to(managed).as_posix() + "/node_modules"
-                if mount.get("target") in (expected, "/opt/dsh-managed/node_modules"):
-                    roots += (Path(mount["source"]),)
-            if not any((root / name).is_dir() for root in roots):
-                if not external_modules:
-                    if runtime_dependencies is None:
-                        result = run([
-                            "docker", "run", "--rm", "--network", "none", "--read-only",
-                            "--mount", f"type=bind,source={ADAPTER},target=/opt/dsh-adapter,readonly",
-                            "--entrypoint", "node", contract["image"]["local_image_tag"],
-                            "--input-type=module", "-e",
-                            "import { runtimeInstallationClosure } from '/opt/dsh-adapter/prepare-verification-home.mjs';"
-                            "console.log(JSON.stringify([...runtimeInstallationClosure().keys()]))",
-                        ])
-                        runtime_dependencies = set(json.loads(result.stdout))
-                    if name in runtime_dependencies:
-                        continue
-                fail(f"插件 {manifest.parent.name} 缺少运行依赖 {name}；{hint}")
+            if runtime_dependencies is None:
+                result = run([
+                    "docker", "run", "--rm", "--network", "none", "--read-only",
+                    "--mount", f"type=bind,source={ADAPTER},target=/opt/dsh-adapter,readonly",
+                    "--entrypoint", "node", contract["image"]["local_image_tag"],
+                    "--input-type=module", "-e",
+                    "import { runtimeInstallationClosure } from '/opt/dsh-adapter/prepare-verification-home.mjs';"
+                    "console.log(JSON.stringify([...runtimeInstallationClosure().keys()]))",
+                ])
+                runtime_dependencies = set(json.loads(result.stdout))
+            if name not in runtime_dependencies:
+                fail(f"插件 {manifest.parent.name} 缺少运行依赖 {name}；请核对标准 Runtime 的依赖锁并重建共享镜像")
 
 
 def migrate_existing_instance(args: argparse.Namespace, contract: dict,
@@ -3255,7 +3212,7 @@ def main() -> None:
     up.add_argument("--analysis-workspace", metavar="PATH",
                     help=argparse.SUPPRESS)
     up.add_argument("--plugin-node-modules", metavar="PATH",
-                    help="将已有 Node 插件依赖目录只读挂载到 /opt/node_modules")
+                    help=argparse.SUPPRESS)
     up.add_argument("--model-policy", metavar="PATH",
                     help="平台生成的非秘密模型策略 JSON；未提供时只使用统一业务默认模型")
     up.add_argument("--business-control", metavar="CONFIG",

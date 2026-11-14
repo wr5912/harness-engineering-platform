@@ -9,6 +9,7 @@ import { collectEntries, verifyEntries } from '../manifest.mts'
 import { execFileSync } from 'node:child_process'
 const programRoot = fileURLToPath(new URL('../../../', import.meta.url))
 const { build } = createRequire(join(programRoot, 'platform/plugin/package.json'))('esbuild')
+const imageId = `sha256:${'a'.repeat(64)}`, imageFingerprint = `sha256:${'b'.repeat(64)}`
 
 test('复制到其他目录的 compiled worker 仍从显式程序根装载运行器脚本', async t => {
   const root = mkdtempSync(join(tmpdir(), 'agent-runtime-compiled-'))
@@ -20,10 +21,10 @@ test('复制到其他目录的 compiled worker 仍从显式程序根装载运行
   const staging = join(root, 'bundle')
   mkdirSync(join(staging, 'assets/managed'), { recursive: true })
   writeFileSync(join(staging, 'assets/managed/probe.mjs'), 'export const name="source-companion";\n')
-  const options = { programRoot, imageTag: 'fixture/runtime:amd64', arch: 'amd64', agentId: 'demo', experimentId: 'EXP-demo-001', presetId: 'demo', profilePatch: 'demo.patch.yml' }
+  const options = { programRoot, imageTag: 'fixture/runtime:amd64', imageId, imageFingerprint, arch: 'amd64', agentId: 'demo', experimentId: 'EXP-demo-001', presetId: 'demo', profilePatch: 'demo.patch.yml' }
   await writeLegacyRuntimeBundle(staging, options)
   for (const name of ['install.sh', 'standalone_agent_launcher', 'README.md']) assert.deepEqual(readFileSync(join(staging, name)), readFileSync(join(programRoot, 'platform/deploy/agent/runtime', name)))
-  assert.match(readFileSync(join(staging, 'runtime/compose.yaml'), 'utf8'), /fixture\/runtime:amd64/)
+  assert.equal(JSON.parse(readFileSync(join(staging, 'runtime/compose.yaml'))).services.dsh.image, imageId)
   const mounts = JSON.parse(readFileSync(join(staging, 'runtime/compose.yaml'))).services.dsh.volumes
   assert.ok(mounts.some(mount => mount.source === './state/home/profiles/node_modules' && mount.target === '/opt/node_modules' && mount.read_only))
   assert.ok(readFileSync(join(staging, 'runtime/standalone-bootstrap.js')).byteLength > 0)
@@ -36,7 +37,7 @@ test('复制到其他目录的 compiled worker 仍从显式程序根装载运行
     writeFileSync(join(staging, path, 'legacy.json'), '{}')
   }
   const preview = { agentId: options.agentId, experimentId: options.experimentId, candidateSha256: 'f'.repeat(64), arch: options.arch }
-  writeFileSync(join(staging, 'manifest.json'), JSON.stringify({ kind: 'standalone-agent', source: preview, package: { arch: options.arch }, image: { tag: options.imageTag }, files: collectEntries(staging, ['state']) }))
+  writeFileSync(join(staging, 'manifest.json'), JSON.stringify({ kind: 'standalone-agent', source: preview, package: { arch: options.arch }, image: { tag: options.imageTag, id: imageId, fingerprint: imageFingerprint }, files: collectEntries(staging, ['state']) }))
   const compose = JSON.parse(readFileSync(join(staging, 'runtime/compose.yaml')))
   delete compose.services.dsh.environment.HOME
   writeFileSync(join(staging, 'runtime/compose.yaml'), JSON.stringify(compose))
@@ -62,12 +63,14 @@ test('旧原生预览刷新后只保留统一启动入口，清单与校验和�
   const root = mkdtempSync(join(tmpdir(), 'agent-preview-launcher-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const preview = { agentId: 'demo', experimentId: 'business:demo', candidateSha256: 'f'.repeat(64), arch: 'arm64' }
-  await writeRuntimeBundle(root, { ...preview, programRoot, imageTag: 'fixture:arm64', presetId: 'demo', profilePatch: 'demo.patch.yml' })
+  const image = { tag: 'fixture:arm64', id: imageId, fingerprint: imageFingerprint }
+  await writeRuntimeBundle(root, { ...preview, programRoot, imageTag: image.tag, imageId, imageFingerprint, presetId: 'demo', profilePatch: 'demo.patch.yml' })
+  await assert.rejects(writeRuntimeBundle(root, { ...preview, programRoot, imageTag: image.tag, presetId: 'demo', profilePatch: 'demo.patch.yml' }), /不可变镜像 ID/)
   renameSync(join(root, 'standalone_agent_launcher'), join(root, 'agent'))
   mkdirSync(join(root, 'state/home'), { recursive: true })
   writeFileSync(join(root, 'state/home/retained'), 'session-and-config')
   const deployment = readFileSync(join(root, 'config/deployment.env'))
-  writeFileSync(join(root, 'manifest.json'), JSON.stringify({ kind: 'standalone-agent', schemaVersion: 2, source: preview, package: { arch: preview.arch }, files: collectEntries(root, ['state']) }))
+  writeFileSync(join(root, 'manifest.json'), JSON.stringify({ kind: 'standalone-agent', schemaVersion: 2, source: preview, package: { arch: preview.arch }, image, files: collectEntries(root, ['state']) }))
   await refreshAgentPreview(root, programRoot, preview)
   assert.equal(existsSync(join(root, 'agent')), false)
   assert.equal(existsSync(join(root, 'standalone_agent_launcher')), true)

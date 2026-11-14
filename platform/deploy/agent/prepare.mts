@@ -16,6 +16,7 @@ export function inspectAgentResources(input: AgentPackageInput): { directory: st
     if (!existsSync(join(directory, 'resources.json'))) throw new Error('目标架构运行资源尚未准备')
     manifest = JSON.parse(readFileSync(join(directory, 'resources.json'), 'utf8'))
     if (![1, 2].includes(manifest?.schemaVersion ?? 0) || manifest?.arch !== input.arch || !manifest.image?.archive) throw new Error('目标架构资源清单无效')
+    if (!/^sha256:[0-9a-f]{64}$/.test(manifest.image.id ?? '') || !/^sha256:[0-9a-f]{64}$/.test(manifest.image.fingerprint ?? '')) throw new Error('运行资源缺少完整的标准 Runtime 镜像 ID 或构建指纹，请重新准备')
     const expected = expectedImage(input.programRoot, input.arch)
     if (manifest.image.tag !== expected.tag || manifest.image.fingerprint !== expected.fingerprint) throw new Error('目标架构资源与标准 Runtime 不一致，请重新准备')
     if (!existsSync(join(directory, manifest.image.archive))) throw new Error('目标架构资源缺少标准镜像归档')

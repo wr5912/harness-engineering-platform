@@ -5,6 +5,7 @@ import type { RuntimeBundleOptions } from './index.mts'
 /** 通用适配器在标准镜像内；归档只带 Harness、入口和现场配置。 */
 export async function writeCompactRuntime(staging: string, options: RuntimeBundleOptions) {
   if (!options.programRoot) throw new Error('运行包需要明确的平台程序根')
+  if (!/^sha256:[0-9a-f]{64}$/.test(options.imageId ?? '') || !/^sha256:[0-9a-f]{64}$/.test(options.imageFingerprint ?? '')) throw new Error('运行包需要完整的标准 Runtime 不可变镜像 ID 和构建指纹')
   const sdk = options.profile === 'sdk', runtime = '/opt/dsh-standalone'
   mkdirSync(join(staging, 'config/seed'), { recursive: true, mode: 0o700 })
   copyFileSync(join(options.programRoot, 'platform/deploy/agent/runtime/standalone_agent_launcher'), join(staging, 'standalone_agent_launcher'))
@@ -20,7 +21,7 @@ export async function writeCompactRuntime(staging: string, options: RuntimeBundl
     { type: 'bind', source: './state/home/standalone/presets', target: '/opt/dsh-presets', read_only: true },
     { type: 'bind', source: './state/home/profiles/node_modules', target: '/opt/node_modules', read_only: true },
   ]
-  const common = { image: options.imageTag, pull_policy: 'never', working_dir: '/work/harness/workspace', volumes,
+  const common = { image: options.imageId, pull_policy: 'never', working_dir: '/work/harness/workspace', volumes,
     environment: { HOME: '/var/lib/dsh', DSH_HOME: '/var/lib/dsh', STANDALONE_ROOT: '/opt/standalone',
       STANDALONE_RUNTIME: runtime, STANDALONE_UID: '${AGENT_UID:-1000}', STANDALONE_GID: '${AGENT_GID:-1000}',
       STANDALONE_HOST: '${AGENT_HOST:-127.0.0.1}', ...(!sdk ? { STANDALONE_PORT: '${AGENT_PORT:-18500}' } : {}),
@@ -39,7 +40,7 @@ export async function writeCompactRuntime(staging: string, options: RuntimeBundl
       extra_hosts: ['host.docker.internal:host-gateway'], stop_grace_period: '20s' },
   } }
   writeFileSync(join(staging, 'config/compose.yaml'), JSON.stringify(compose, null, 2) + '\n')
-  writeFileSync(join(staging, 'config/deployment.env'), `# 修改后运行 ./standalone_agent_launcher restart；首次启动自动导入随包镜像。\nAGENT_ID=${options.agentId}\nAGENT_ARCH=${options.arch}\nAGENT_PROFILE=${options.profile ?? 'web'}\nIMAGE_TAG=${options.imageTag}\nIMAGE_ID=${options.imageId ?? ''}\n# AGENT_PORT=18500\n# AGENT_HOST=192.168.1.10\n# AGENT_HARNESS_ROOT=/absolute/path/to/harness\n# AGENT_UID=1000\n# AGENT_GID=1000\n# COMPOSE_PROJECT_NAME=hep-agent-${options.agentId}\n# HTTP_PROXY=http://host.docker.internal:7897\n# HTTPS_PROXY=http://host.docker.internal:7897\n# NO_PROXY=localhost,127.0.0.1,host.docker.internal\n`)
+  writeFileSync(join(staging, 'config/deployment.env'), `# 修改后运行 ./standalone_agent_launcher restart；首次启动自动导入随包镜像。\nAGENT_ID=${options.agentId}\nAGENT_ARCH=${options.arch}\nAGENT_PROFILE=${options.profile ?? 'web'}\nIMAGE_TAG=${options.imageTag}\nIMAGE_ID=${options.imageId}\nIMAGE_FINGERPRINT=${options.imageFingerprint}\n# AGENT_PORT=18500\n# AGENT_HOST=192.168.1.10\n# AGENT_HARNESS_ROOT=/absolute/path/to/harness\n# AGENT_UID=1000\n# AGENT_GID=1000\n# COMPOSE_PROJECT_NAME=hep-agent-${options.agentId}\n# HTTP_PROXY=http://host.docker.internal:7897\n# HTTPS_PROXY=http://host.docker.internal:7897\n# NO_PROXY=localhost,127.0.0.1,host.docker.internal\n`)
   const environmentTemplate = join(options.harnessRoot ?? join(staging, 'harness'), 'dsh/workspace/deployment.env.example')
   if (existsSync(environmentTemplate)) appendFileSync(join(staging, 'config/deployment.env'), '\n# 业务 Harness 公开环境配置\n' + readFileSync(environmentTemplate, 'utf8').trimEnd() + '\n')
 }

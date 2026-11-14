@@ -173,16 +173,37 @@ compose() {
   docker compose --project-directory "$ROOT" "${env_files[@]}" -f "$compose_file" "$@"
 }
 ensure_image() {
-  [ -f "$ROOT/config/deployment.env" ] || return 0
   docker compose version >/dev/null
-  local actual
-  actual=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}' 2>/dev/null || true)
-  if [ "$actual" != "${IMAGE_ID:-$actual}" ] || [ -z "$actual" ]; then
+  [[ "${IMAGE_ID:-}" =~ ^sha256:[0-9a-f]{64}$ ]] && [[ "${IMAGE_FINGERPRINT:-}" =~ ^sha256:[0-9a-f]{64}$ ]] && [ -n "${IMAGE_TAG:-}" ] && [ -f "$ROOT/manifest.json" ] || {
+    echo '缺少完整的标准 Runtime 镜像身份或 manifest.json；请重新导出安装包。' >&2; exit 2;
+  }
+  local host_arch actual actual_id actual_os actual_arch actual_fingerprint
+  case "$(uname -m)" in aarch64|arm64) host_arch=arm64 ;; x86_64|amd64) host_arch=amd64 ;; *) echo '标准 Runtime 仅支持 Linux AMD64/ARM64。' >&2; exit 2 ;; esac
+  [ "$(uname -s)" = Linux ] && [ "${AGENT_ARCH:-}" = "$host_arch" ] || { echo '标准 Runtime 镜像与当前主机架构不一致。' >&2; exit 2; }
+  actual=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}|{{.Os}}|{{.Architecture}}|{{index .Config.Labels "org.ai-agent-harness.dsh.image-build-fingerprint"}}' 2>/dev/null || true)
+  if [ "${actual%%|*}" != "$IMAGE_ID" ]; then
     [ -f "$ROOT/images/dsh-runtime.tar" ] || { echo '标准镜像尚未导入且安装介质不存在，请恢复 images/dsh-runtime.tar。' >&2; exit 2; }
     docker load -i "$ROOT/images/dsh-runtime.tar"
-    actual=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')
-    [ -z "${IMAGE_ID:-}" ] || [ "$actual" = "$IMAGE_ID" ] || { echo '导入镜像与当前包不一致。' >&2; exit 2; }
+    actual=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}|{{.Os}}|{{.Architecture}}|{{index .Config.Labels "org.ai-agent-harness.dsh.image-build-fingerprint"}}')
   fi
+  IFS='|' read -r actual_id actual_os actual_arch actual_fingerprint <<< "$actual"
+  [ "$actual_id" = "$IMAGE_ID" ] && [ "$actual_os" = linux ] && [ "$actual_arch" = "$AGENT_ARCH" ] && [ "$actual_fingerprint" = "$IMAGE_FINGERPRINT" ] || {
+    echo '标准 Runtime 镜像 ID、系统、架构或构建指纹不符，已拒绝启动。' >&2; exit 2;
+  }
+  # 在已核验的标准镜像内解析清单和 Compose，无需宿主安装 Node/Python。
+  compose config --format json | docker run --rm -i --network none --read-only \
+    --mount "type=bind,source=$ROOT/manifest.json,target=/runtime-manifest.json,readonly" \
+    --entrypoint node "$IMAGE_ID" -e '
+    try {
+      const fs = require("node:fs"), manifest = JSON.parse(fs.readFileSync("/runtime-manifest.json", "utf8"));
+      const [id, tag, fingerprint, arch] = process.argv.slice(1);
+      if (manifest.kind !== "standalone-agent" || manifest.image?.id !== id || manifest.image?.tag !== tag || manifest.image?.fingerprint !== fingerprint || manifest.package?.arch !== arch)
+        throw Error("包清单与标准 Runtime 镜像身份不一致");
+      const services = JSON.parse(fs.readFileSync(0, "utf8")).services;
+      if (!services?.init || !services?.dsh || Object.values(services).some(service => service.image !== id || service.build))
+        throw Error("Compose 必须只使用清单锁定的标准 Runtime 不可变镜像 ID，禁止自建镜像");
+    } catch (error) { console.error(error.message); process.exit(2); }
+    ' "$IMAGE_ID" "$IMAGE_TAG" "$IMAGE_FINGERPRINT" "$AGENT_ARCH"
 }
 case "$action" in install|start|restart|configure|prepare-sdk|run|example) ensure_image ;; esac
 if [ "$action" = install ]; then

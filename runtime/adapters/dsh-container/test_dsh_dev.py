@@ -9,6 +9,7 @@ import io
 import json
 from importlib.machinery import SourceFileLoader
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -35,7 +36,9 @@ dev.SOURCES = dev.REPO / "config/sources.json"
 dev.resolve = partial(dev.resolve, repo=dev.REPO)
 
 TOKEN = "dsh web: http://127.0.0.1:3081/?token=secret-token-value\n"
-IMAGE_TAG = dev.resolve()["image"]["local_image_tag"]
+from source_contract import _read_source_lock, image_build_fingerprint
+_IMAGE_LOCK = _read_source_lock(ADAPTER / "source.lock.json")
+IMAGE_TAG = f"{_IMAGE_LOCK['local_image_tag']}-amd64-{image_build_fingerprint(_IMAGE_LOCK, image_platform_name='linux/amd64')[7:19]}"
 
 
 def isolate_registration_guard(test):
@@ -338,14 +341,14 @@ class RenderComposeTest(unittest.TestCase):
         self.assertEqual(rendered.count("      - DEEPSEEK_API_KEY\n"), 1)
         self.assertEqual(rendered.count("      - LOCAL_LLM_BASE_URL\n"), 1)
 
-    def test_plugin_dependencies_are_an_optional_read_only_mount(self):
+    def test_host_plugin_dependencies_cannot_replace_standard_runtime(self):
         template = (ADAPTER / "verification.compose.yaml").read_text(encoding="utf-8")
-        rendered = dev.render_compose(
-            template, mode="verification", name="voice", project="dsh-dev-voice", port=3081,
-            plugin_node_modules=True,
-        )
-        self.assertIn("source: ${DSH_PLUGIN_NODE_MODULES_HOST:?", rendered)
-        self.assertIn("target: /opt/node_modules\n        read_only: true", rendered)
+        with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+            dev.render_compose(
+                template, mode="verification", name="voice", project="dsh-dev-voice", port=3081,
+                plugin_node_modules=True,
+            )
+        self.assertIn("标准 Runtime", error.getvalue())
         self.assertNotIn("DSH_PLUGIN_NODE_MODULES_HOST", dev.render_compose(
             template, mode="verification", name="plain", project="dsh-dev-plain", port=3081,
         ))
@@ -825,26 +828,19 @@ class EvaluationModeContractTest(unittest.TestCase):
                 dev.check_managed_plugin_dependencies(contract)
             for name in ("@deepseek-ai/schemastery", "ws"):
                 (plugin / "node_modules" / name).mkdir(parents=True)
-            dev.check_managed_plugin_dependencies(contract)
-            (plugin / "node_modules" / "ws").rmdir()
-            external = managed / "external"
-            (external / "ws").mkdir(parents=True)
-            dev.check_managed_plugin_dependencies(contract, str(external))
-            (plugin / "package.json").write_text(
-                '{"dependencies":{"@deepseek-ai/schemastery":"^3"},'
-                '"peerDependencies":{"react":"^18"}}', encoding="utf-8"
-            )
-            (plugin / "node_modules" / "@deepseek-ai/schemastery").rmdir()
             with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
                 dev.check_managed_plugin_dependencies(contract)
-            self.assertIn("@deepseek-ai/schemastery", error.getvalue())
-            probe.return_value.stdout = '["@deepseek-ai/schemastery"]'
+            self.assertIn("宿主 node_modules", error.getvalue())
+            shutil.rmtree(plugin / "node_modules")
+            external = managed / "external"
+            (external / "ws").mkdir(parents=True)
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.check_managed_plugin_dependencies(contract, str(external))
+            probe.return_value.stdout = '["@deepseek-ai/schemastery", "ws"]'
             dev.check_managed_plugin_dependencies(contract)
             self.assertIn("--network", probe.call_args.args[0])
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 dev.check_managed_plugin_dependencies(contract, str(external))
-            (plugin / "node_modules" / "@deepseek-ai/schemastery").mkdir()
-            dev.check_managed_plugin_dependencies(contract)
 
     def test_candidate_without_node_modules_uses_standard_runtime_extensions(self):
         with tempfile.TemporaryDirectory() as temp, mock.patch.object(
@@ -1088,22 +1084,16 @@ class EvaluationModeContractTest(unittest.TestCase):
                                  manifest["runtime_managed_patch_host"])
             self.assertIn("target: /opt/dsh-profile-compat/managed.patch.yml", (target / "compose.yaml").read_text())
 
-    def test_plugin_dependencies_are_recorded_for_compose_lifecycle(self):
+    def test_host_plugin_dependencies_are_rejected_before_compose_write(self):
         contract = self.contract()
         with tempfile.TemporaryDirectory() as temp, mock.patch.object(dev, "STATE_ROOT", Path(temp)):
             node_modules = str(Path(temp) / "node_modules")
-            target = dev.write_instance(
-                "voice-probe", mode="verification", contract=contract, port=3082,
-                plugin_node_modules=node_modules,
-            )
-            manifest = json.loads((target / "instance.json").read_text(encoding="utf-8"))
-            self.assertEqual(manifest["mounts"]["plugin_node_modules"], node_modules)
-            self.assertEqual(manifest["mount_modes"]["plugin_node_modules"], "ro")
-            self.assertEqual(dev.compose_env(contract, "verification", 3082, "voice-probe",
-                                              plugin_node_modules=node_modules)["DSH_PLUGIN_NODE_MODULES_HOST"],
-                             node_modules)
-            self.assertEqual(dev.instance_compose_env(manifest)["DSH_PLUGIN_NODE_MODULES_HOST"],
-                             node_modules)
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.write_instance(
+                    "voice-probe", mode="verification", contract=contract, port=3082,
+                    plugin_node_modules=node_modules,
+                )
+            self.assertFalse((Path(temp) / "voice-probe/compose.yaml").exists())
 
     def test_dry_run_delivers_workspace_path_and_cold_start_hint(self):
         """DSH Web 冷启动需要先在界面注册工作区；计划必须交付确切路径与步骤。"""
@@ -1246,6 +1236,28 @@ class InstanceStateTest(unittest.TestCase):
             other = dict(contract, source_id="experiment:EXP-second-harness-002")
             with self.assertRaises(SystemExit):
                 dev.write_instance("soe-verify", mode="verification", contract=other, port=3081)
+
+
+class StandardRuntimeDependencyTest(unittest.TestCase):
+    def test_current_catalog_clears_old_dependency_mounts(self):
+        contract = {"source_id": "business:demo", "source_kind": "business", "candidate_root": "/repo/agents/demo/dsh",
+                    "image": {"local_image_tag": IMAGE_TAG}, "asset_dependencies": {"mounts": [{"source": "/old", "target": "/opt/node_modules"}]}}
+        ready = {"status": "ready", "mounts": [], "environment": {}, "reasons": []}
+        with mock.patch.object(dev, "run", return_value=subprocess.CompletedProcess([], 0, json.dumps(ready), "")):
+            dev.assert_asset_dependencies(contract)
+        self.assertEqual(contract["asset_dependencies"], ready)
+        self.assertEqual(dev.asset_dependency_mounts(contract), [])
+
+    def test_old_mounts_and_pythonpath_cannot_bypass_standard_runtime(self):
+        for old in ({"mounts": [{"source": "/host", "target": "/opt/node_modules"}]},
+                    {"environment": {"PYTHONPATH": "/host/site-packages"}}):
+            with self.subTest(old=old), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.asset_dependency_mounts({"asset_dependencies": old})
+            contract = {"source_id": "business:demo", "harness_runtime": {}, "asset_dependencies": old,
+                        "image": {"local_image_tag": IMAGE_TAG}}
+            with mock.patch.object(dev, "run", return_value=subprocess.CompletedProcess([], 0, json.dumps({"status": "ready", **old}), "")), \
+                    contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.assert_asset_dependencies(contract)
 
 
 class ImageIdentityAndPsStateTest(unittest.TestCase):
@@ -1445,6 +1457,18 @@ class ImageIdentityAndPsStateTest(unittest.TestCase):
         ), contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
             dev.validate_image_identity(contract)
         self.assertIn("构建指纹不匹配", errors.getvalue())
+
+    def test_validate_image_identity_rejects_wrong_fingerprint_or_mutable_id(self):
+        fingerprint = "sha256:" + "2" * 64
+        contract = {"source_id": "business:demo", "image": {"local_image_tag": IMAGE_TAG,
+                    "build_fingerprint": fingerprint, "platform": "linux/amd64"}}
+        for image_id, actual in (("sha256:" + "1" * 64, "sha256:" + "3" * 64), ("dsh:latest", fingerprint)):
+            metadata = {"Id": image_id, "Os": "linux", "Architecture": "amd64",
+                        "Config": {"Labels": {dev.IMAGE_LABEL_KEY: actual}}}
+            with self.subTest(image_id=image_id, fingerprint=actual), mock.patch.object(dev, "run",
+                    return_value=subprocess.CompletedProcess([], 0, json.dumps(metadata), "")), \
+                    contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                dev.validate_image_identity(contract)
 
 
 class DownCommandTest(unittest.TestCase):

@@ -97,6 +97,16 @@ test('未承接的迁移运行声明在独立包预览和打包前明确拒绝�
   assert.equal(existsSync(join(f.out, 'manifest.json')), false)
 })
 
+test('预览和打包拒绝缺少不可变镜像身份的旧资源清单', async t => {
+  const f = fixture(t), path = join(f.resources, 'resources.json')
+  const resource = JSON.parse(readFileSync(path, 'utf8'))
+  delete resource.image.id
+  write(path, JSON.stringify(resource))
+  const preview = previewAgentPackage(f.input)
+  assert.equal(preview.resourceReady, false)
+  await assert.rejects(packAgent(f.input), /镜像 ID|资源/)
+})
+
 test('单 Agent 包归档、SHA与安装脚本完整，凭据不进入 manifest 或普通预览', async t => {
   const f = fixture(t), messages = []
   const preview = previewAgentPackage(f.input)
@@ -119,7 +129,12 @@ test('单 Agent 包归档、SHA与安装脚本完整，凭据不进入 manifest 
   assert.equal(existsSync(join(extracted, 'install.sh')), false)
   assert.ok(existsSync(join(extracted, 'standalone_agent_launcher')))
   const compose = JSON.parse(readFileSync(join(extracted, 'config/compose.yaml'), 'utf8'))
-  for (const service of Object.values(compose.services)) { assert.equal(service.environment.HOME, '/var/lib/dsh'); assert.equal(service.environment.DSH_HOME, '/var/lib/dsh') }
+  for (const service of Object.values(compose.services)) {
+    assert.equal(service.environment.HOME, '/var/lib/dsh'); assert.equal(service.environment.DSH_HOME, '/var/lib/dsh')
+    assert.equal(service.image, result.manifest.image.id)
+    assert.equal(service.pull_policy, 'never')
+    assert.equal(service.build, undefined)
+  }
   const healthcheck = compose.services.dsh.healthcheck
   assert.equal(healthcheck.start_period, '180s')
   assert.equal(healthcheck.retries, 30)

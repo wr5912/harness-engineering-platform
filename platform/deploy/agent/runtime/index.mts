@@ -15,12 +15,27 @@ export async function refreshAgentPreview(root: string, programRoot: string, pre
     || manifest.package.arch !== preview.arch) throw new Error('预览目录与所选智能体版本、资产摘要或架构不一致')
   if (manifest.source.profile === 'sdk') throw new Error('现有预览运行器刷新仅支持 Web 包；SDK 包请使用正式导出入口')
   if (manifest.schemaVersion === 2) {
+    if (!/^sha256:[0-9a-f]{64}$/.test(manifest.image?.id ?? '') || !/^sha256:[0-9a-f]{64}$/.test(manifest.image?.fingerprint ?? '')) throw new Error('预览缺少标准 Runtime 镜像身份；请重新导出')
+    const composeFile = join(root, 'config/compose.yaml')
+    const compose = JSON.parse(readFileSync(composeFile, 'utf8'))
+    for (const service of Object.values(compose.services) as any[]) {
+      if (![manifest.image.id, manifest.image.tag].includes(service.image) || service.build) throw new Error('预览 Compose 未使用标准 Runtime 镜像；请重新导出')
+      service.image = manifest.image.id
+    }
+    writeFileSync(composeFile, JSON.stringify(compose, null, 2) + '\n')
+    const deploymentFile = join(root, 'config/deployment.env')
+    let deployment = readFileSync(deploymentFile, 'utf8')
+    for (const [key, value] of Object.entries({ IMAGE_TAG: manifest.image.tag, IMAGE_ID: manifest.image.id, IMAGE_FINGERPRINT: manifest.image.fingerprint })) {
+      const pattern = new RegExp(`^${key}=.*$`, 'm')
+      deployment = pattern.test(deployment) ? deployment.replace(pattern, `${key}=${value}`) : deployment.trimEnd() + `\n${key}=${value}\n`
+    }
+    writeFileSync(deploymentFile, deployment, { mode: 0o600 })
     // 镜像承载运行器；预览刷新只更新入口，不改写现场配置或旧包目录。
     cpSync(join(programRoot, 'platform/deploy/agent/runtime/standalone_agent_launcher'), join(root, 'standalone_agent_launcher'))
     rmSync(join(root, 'agent'), { force: true })
     chmodSync(join(root, 'standalone_agent_launcher'), 0o755)
     cpSync(join(programRoot, 'platform/deploy/agent/runtime/config.README.md'), join(root, 'config/README.md'))
-    const refreshed = ['standalone_agent_launcher', 'config/README.md']
+    const refreshed = ['standalone_agent_launcher', 'config/README.md', 'config/deployment.env', 'config/compose.yaml']
     manifest.files = manifest.files.filter((file: { path: string }) => file.path !== 'agent' && !refreshed.includes(file.path))
     manifest.files.push(...refreshed.map(path => ({ path, type: 'file', sha256: sha256File(join(root, path)), mode: lstatSync(join(root, path)).mode & 0o777 })))
     manifest.files.sort((a: { path: string }, b: { path: string }) => a.path.localeCompare(b.path))
@@ -49,6 +64,7 @@ export async function refreshAgentPreview(root: string, programRoot: string, pre
 /** 目标机只用 Bash 和 Docker；Node、DSH 与初始化均在同一标准镜像内执行。 */
 export async function writeLegacyRuntimeBundle(staging: string, options: RuntimeBundleOptions) {
   if (!options.programRoot) throw new Error('独立运行器需要明确的平台程序根')
+  if (!/^sha256:[0-9a-f]{64}$/.test(options.imageId ?? '') || !/^sha256:[0-9a-f]{64}$/.test(options.imageFingerprint ?? '')) throw new Error('运行包需要完整的标准 Runtime 不可变镜像 ID 和构建指纹')
   const programRoot = options.programRoot
   const root = join(staging, 'runtime')
   mkdirSync(root, { recursive: true })
@@ -88,7 +104,7 @@ export async function writeLegacyRuntimeBundle(staging: string, options: Runtime
     for (const name of ['workspace', 'presets', 'managed']) volume.push({ type: 'bind', source: `./assets/${name}`, target: `/opt/harness-candidate/dsh/${name}`, read_only: true })
     volume.push({ type: 'bind', source: './runtime/model-binding-runtime.js', target: '/opt/harness-model-runtime/model-binding-runtime.mjs', read_only: true })
   }
-  const common = { image: options.imageTag, pull_policy: 'never', working_dir: '/work/harness/workspace', volumes: volume,
+  const common = { image: options.imageId, pull_policy: 'never', working_dir: '/work/harness/workspace', volumes: volume,
     environment: { HOME: '/var/lib/dsh', DSH_HOME: '/var/lib/dsh', STANDALONE_UID: '${AGENT_UID:-1000}', STANDALONE_GID: '${AGENT_GID:-1000}', ...(!sdk ? { STANDALONE_HOST: '${AGENT_HOST:-127.0.0.1}', STANDALONE_PORT: '${AGENT_PORT:-18500}' } : {}), STANDALONE_ROOT: '/opt/standalone', DSH_TELEMETRY_DISABLED: '1', HARNESS_DSH_ENTRY: '/opt/dsh/apps/cli/lib/bin.js', ...(sdk ? { HARNESS_SDK_OPTIONS: '/var/lib/dsh/standalone/sdk-options.json' } : {}) } }
   const compose = { services: {
     init: { ...common, user: '0:0', network_mode: 'none', entrypoint: ['/bin/sh', '-c'], command: ['node /opt/standalone/runtime/standalone-bootstrap.js init && chown -R $$STANDALONE_UID:$$STANDALONE_GID /var/lib/dsh'] },

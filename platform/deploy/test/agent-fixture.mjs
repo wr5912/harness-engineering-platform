@@ -15,7 +15,7 @@ export function fixture(t, arch = 'amd64', id = 'business:alpha') {
   const before = process.env.HARNESS_PYTHON
   process.env.HARNESS_PYTHON = process.execPath
   t.after(() => { if (before === undefined) delete process.env.HARNESS_PYTHON; else process.env.HARNESS_PYTHON = before; rmSync(root, { recursive: true, force: true }) })
-  const candidate = join(business, 'agents/alpha'), fingerprint = 'f'.repeat(64), tag = `dsh:fixture-${arch}`
+  const candidate = join(business, 'agents/alpha'), fingerprint = 'sha256:' + 'f'.repeat(64), tag = `dsh:fixture-${arch}`
   write(join(data, 'config/repositories.json'), JSON.stringify({ repositories: [{ id: 'business-agents', path: business }] }))
   write(join(business, 'manifest.yaml'), 'agents:\n- {agent_id: alpha, path: agents/alpha, status: active}\n')
   write(join(candidate, 'harness.yaml'), 'agent: {id: alpha}\nloadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: alpha-main\n  profile_patch: dsh/managed/alpha.patch.yml\ncredential_environment_keys: [TEST_MODEL_KEY]\n')
