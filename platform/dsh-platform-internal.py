@@ -1024,6 +1024,32 @@ def bootstrap_state():
         raise PlatformError("无法检查数据工作区；请核对 Node.js 24.9 及以上版本、Git 与数据目录读取权限。") from None
 
 
+def trust_codex_browser_origin(executable, home, profile, public_url, host, port):
+    """把当前平台公开入口登记到 Codex Connect 的精确浏览器来源清单。
+
+    Codex Connect 将远程浏览器 OAuth 来源保存在 DSH HOME 旁路文件中，不能依赖
+    一次性的人工命令，否则平台换 IP 或重建 HOME 后设置页会再次出现未信任来源。
+    仅在 Profile 实际安装该插件时执行；其它平台 Profile 不增加任何外部调用。
+    """
+    from urllib.parse import urlsplit
+
+    package = profile / "node_modules/dsh-codex-connect/package.json"
+    if not package.is_file() or package.is_symlink():
+        return
+    raw = public_url or f"http://{host}:{port}{base_path()}"
+    parsed = urlsplit(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise PlatformError("平台公开入口不是有效的 HTTP(S) 地址，无法同步 Codex Connect 浏览器来源。")
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    command = [executable, "plugin", "--profile", PROFILE_NAME, "exec", "dsh-codex-connect",
+               "trust-origin", origin]
+    result = subprocess.run(command, cwd=manager_workspace_root(), env=native_home_environment(home),
+                            capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        raise PlatformError(f"无法登记 Codex Connect 浏览器来源 {origin}：{detail or '命令失败'}")
+
+
 def initialize_from_browser(host, port):
     check_port(host, port)
     with tempfile.TemporaryDirectory(prefix="harness-platform-initialize-") as temporary:
@@ -1111,6 +1137,7 @@ def start(home, host, port, dry_run, public_url=None, applied=False):
             "host": host, "port": port, "command": command,
         }, ensure_ascii=False, indent=2))
         return
+    trust_codex_browser_origin(executable, home, profile, public_url, host, port)
     print(f"平台地址：{public_url or f'http://{host}:{port}{base_path()}'}（打开页面登录）", flush=True)
     print("平台运行中；使用 dsh-platform stop 停止，重启复用同一平台 HOME。", flush=True)
     os.chdir(manager_workspace_root())
