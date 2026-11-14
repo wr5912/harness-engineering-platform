@@ -2,6 +2,7 @@ import { validateCaseIds, type CaseCatalog } from '../evaluation/case-ids.ts'
 import { reuseParentDependencies } from './plugin-dependency-reuse.ts'
 import { documentOperation } from './document-operations.ts'
 import { assetText } from './asset-text.ts'
+import { retiredResearchAction } from './action-status.ts'
 import { assertCandidateAssets, validateCandidateChanges, type CandidateChange } from './candidate-assets.ts'
 import { createRequire } from 'node:module'
 import { execFile, spawnSync } from 'node:child_process'
@@ -1872,7 +1873,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
     if (endpoint.startsWith('deployment/') && deployment) return deployment(endpoint.slice('deployment/'.length), payload, signal, peer)
     try {
       const body = payload === undefined ? {} : requireObject(payload)
-      if (/^(?:versions\/|features\/|fusion\/|compute-variants\/|migrations\/|research\/validate$|decision\/(?:preview|update)$)/.test(endpoint) || ['create', 'new'].includes(endpoint)) {
+      if (retiredResearchAction(endpoint)) {
         throw new RpcError('retired', '研究版本已停用；请在 business-agents 维护 Harness，通过 Git tag 管理版本')
       }
       if (endpoint.startsWith('edit/')) {
