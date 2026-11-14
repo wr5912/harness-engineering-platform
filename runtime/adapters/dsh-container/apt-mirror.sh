@@ -1,18 +1,20 @@
 #!/bin/sh
 # 把基础镜像的 Debian APT 主源切换到指定镜像，并在切换后强制签名核验。
-# 默认使用 TUNA 主源和 Debian 官方 security；仅在 TUNA 不可达时显式改回官方主源。
+# 默认优先使用阿里云主源和 security；TUNA、Debian 官方源作为显式回退。
 set -eu
 
 tuna_main=http://mirrors.tuna.tsinghua.edu.cn/debian
+aliyun_main=http://mirrors.aliyun.com/debian
 official_main=http://deb.debian.org/debian
+aliyun_security=http://mirrors.aliyun.com/debian-security
 official_security=http://deb.debian.org/debian-security
 
-task_main_mirror="${1:-$tuna_main}"
+task_main_mirror="${1:-$aliyun_main}"
 task_security_mirror="$official_security"
 
 case "$task_main_mirror" in
-  "$tuna_main"|"$official_main")
-    ;;
+  "$aliyun_main") task_security_mirror="$aliyun_security" ;;
+  "$tuna_main"|"$official_main") task_security_mirror="$official_security" ;;
   *)
     printf 'Unsupported apt mirror: %s\n' "$task_main_mirror" >&2
     exit 2
@@ -27,8 +29,9 @@ grep -q "^URIs: $official_main\$" "$task_sources"
 grep -q "^URIs: $official_security\$" "$task_sources"
 
 if [ "$task_main_mirror" != "$official_main" ]; then
-  # 原始 URI 已被精确 grep 锁定；security 始终保留 Debian 官方源。
+  # 原始 URI 已被精确 grep 锁定；镜像的 main/security 均保持签名校验。
   sed -i "s#^URIs: $official_main\$#URIs: $task_main_mirror#" "$task_sources"
+  sed -i "s#^URIs: $official_security\$#URIs: $task_security_mirror#" "$task_sources"
 fi
 
 grep -Fqx "URIs: $task_main_mirror" "$task_sources"
