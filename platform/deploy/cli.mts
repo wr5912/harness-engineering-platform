@@ -56,6 +56,7 @@ function flag(options: Options, name: string): boolean {
 
 function validateOptions(command: string, options: Options): void {
   const values: Record<string, string[]> = {
+    'agent-refresh-linked': ['prefix', 'program-root', 'dependency-projection'],
     'agent-cleanup': ['prefix'],
     'agent-preview': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'prefix'],
     'agent-pack': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'out', 'seed-file', 'expected-candidate-sha256'],
@@ -69,6 +70,7 @@ function validateOptions(command: string, options: Options): void {
     'mcp-migrate': ['program-root', 'data-root'],
   }
   const flags: Record<string, string[]> = {
+    'agent-refresh-linked': [],
     'agent-cleanup': [],
     'agent-preview': ['update-assets'], 'agent-pack': [], 'agent-prepare': [],
     pack: ['no-image', 'no-data', 'allow-dirty', 'include-working-tree', 'allow-fixture-data', 'keep-staging'],
@@ -104,6 +106,9 @@ function installPort(value: string | undefined, name: string, fallback: number):
 
 function usage(): string {
   return `用法：
+  dsh-deploy agent-refresh-linked --prefix <旧版软链接实例目录> [--program-root <目录>] [--dependency-projection <旧依赖投影目录>]
+    从已链接的原生 Harness 刷新投影和挂载来源，保留配置、HOME、镜像和链接源；随后用 agent restart 生效。
+
   dsh-deploy agent-cleanup --prefix <独立智能体安装目录>
     移除该安装的容器、网络和安装介质，保留标准镜像、Harness、HOME 和会话。
 
@@ -212,6 +217,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     const { command, options } = parse(argv)
     if (!command || command === '--help' || flag(options, 'help')) { console.log(usage()); return 0 }
     validateOptions(command, options)
+    if (command === 'agent-refresh-linked') {
+      const prefix = text(options, 'prefix')
+      if (!prefix) throw new Error('agent-refresh-linked 需要 --prefix')
+      const { refreshLinkedAgentAssets } = await import('./agent/runtime/linked-assets.mts')
+      console.log(JSON.stringify(refreshLinkedAgentAssets(resolve(prefix), resolve(text(options, 'program-root', REPO)!), text(options, 'dependency-projection')), null, 2))
+      return 0
+    }
     if (command === 'agent-cleanup') {
       const prefix = text(options, 'prefix')
       if (!prefix) throw new Error('agent-cleanup 需要 --prefix')
