@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { isIP } from 'node:net'
 import type { BusinessGatewayConfig } from './gateway.ts'
 import { ensureBusinessSecret, prepareBusinessRuntimeFile } from './secret-file.ts'
 
@@ -31,10 +32,24 @@ export function initializeBusinessGateway(assetRoot: string, managementUrl: stri
   if (typeof gateway !== 'object' || Array.isArray(gateway)) throw new Error('业务网关配置必须是对象')
   gateway.host ??= host ?? entry.hostname.replace(/^\[|\]$/g, '')
   gateway.port = port ?? gateway.port ?? 53105
-  const explicitOrigin = gateway.publicOriginMode === 'explicit'
+  // 兼容没有模式字段的旧配置：旧版本允许用户直接写入自定义域名/HTTPS
+  // 入口，而自动生成的历史 IP 入口必须在启动时迁移到当前环境。
+  const legacyOrigin = typeof gateway.publicOrigin === 'string' ? (() => {
+    try { return new URL(gateway.publicOrigin) } catch { return undefined }
+  })() : undefined
+  if (gateway.publicOrigin !== undefined && (!legacyOrigin || !['http:', 'https:'].includes(legacyOrigin.protocol)
+    || legacyOrigin.username || legacyOrigin.password || legacyOrigin.pathname !== '/' || legacyOrigin.search || legacyOrigin.hash)) {
+    throw new Error('业务网关 publicOrigin 必须是无路径和凭据的 HTTP(S) 地址')
+  }
+  const legacyExplicitOrigin = gateway.publicOriginMode === undefined && legacyOrigin !== undefined
+    && (legacyOrigin.protocol === 'https:' || (isIP(legacyOrigin.hostname) === 0 && !['localhost'].includes(legacyOrigin.hostname)))
+  const explicitOrigin = gateway.publicOriginMode === 'explicit' || legacyExplicitOrigin
   if (!explicitOrigin) gateway.publicOrigin = `http://${host ?? entry.hostname}:${gateway.port}`
-  gateway.publicOriginMode = explicitOrigin ? 'explicit' : 'auto'
-  gateway.managementUrlMode = entry.protocol === 'https:' ? 'explicit' : 'auto'
+  // 保留旧版自定义入口的文件形状，避免仅为补充模式字段产生无意义配置漂移。
+  if (!legacyExplicitOrigin) {
+    gateway.publicOriginMode = explicitOrigin ? 'explicit' : 'auto'
+    gateway.managementUrlMode = entry.protocol === 'https:' ? 'explicit' : 'auto'
+  }
   gateway.sharedSecretFile ??= '.local/credentials/business-shared.key'
   gateway.instances ??= []
   gateway.managementUrl = managementUrl
