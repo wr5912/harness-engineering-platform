@@ -3185,7 +3185,7 @@ def main() -> None:
     parser.add_argument("--repo", type=Path, default=REPO, help="用户数据工作区根目录")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    init = commands.add_parser("init", help="创建最小 Harness Agent 与首次 Experiment")
+    init = commands.add_parser("init", help="已停用：业务 Harness 必须在 business-agents 中创建")
     init.add_argument("agent_id", help="小写 kebab-case Agent ID")
     init.add_argument("--profile", choices=("web", "sdk"), default="web", help="Web 交互或官方 TypeScript SDK")
     init.set_defaults(handler=command_init)
