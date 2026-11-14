@@ -63,6 +63,7 @@ STARTUP_LOCK = Path("/tmp/harness-engineering-platform-dsh-dev-startup.lock")
 LAN_LISTEN_PATCH = "/opt/dsh-adapter/verification-home-controls/lan-listen.patch.yml"
 UNSAFE_NO_AUTH_PATCH = "/opt/dsh-adapter/verification-home-controls/web-unsafe-no-auth.patch.yml"
 SKIP_TESTING_NOTICE_PATCH = "/opt/dsh-adapter/verification-home-controls/web-skip-testing-notice.patch.yml"
+DISABLE_HMR_PATCH = "/opt/dsh-adapter/verification-home-controls/web-disable-hmr.patch.yml"
 CONTAINER_WORKSPACE = "/work/harness/workspace"
 CONTAINER_ANALYSIS_WORKSPACE = "/work/evaluation-run"
 CONTAINER_REFERENCE = "/work/reference"
@@ -1122,6 +1123,8 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
         text = text.replace(command_tail, f"      - --patch\n      - {UNSAFE_NO_AUTH_PATCH}\n" + command_tail)
     if skip_testing_notice:
         text = text.replace(command_tail, f"      - --patch\n      - {SKIP_TESTING_NOTICE_PATCH}\n" + command_tail)
+    if not analysis_workspace:
+        text = text.replace(command_tail, f"      - --patch\n      - {DISABLE_HMR_PATCH}\n" + command_tail)
     if lan_access:
         text = text.replace(
             command_tail,
