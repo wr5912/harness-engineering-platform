@@ -70,6 +70,13 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+for task_command in git docker python3 pnpm node; do
+  command -v "$task_command" >/dev/null || { printf '标准 Runtime 构建缺少命令：%s；请安装后重试。\n' "$task_command" >&2; exit 1; }
+done
+if ! task_buildx_version="$(docker buildx version 2>&1)"; then
+  printf '标准 Runtime 构建需要 Docker Buildx 插件；docker buildx version 失败：\n%s\n请安装与当前主机架构匹配的 Buildx 后重试。\n' "$task_buildx_version" >&2
+  exit 1
+fi
 (cd "$task_repo_dir/platform/plugin" && pnpm run build)
 task_source_id="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field source_id)"
 task_source_commit="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.commit)"
@@ -108,10 +115,6 @@ task_cleanup() {
   fi
 }
 trap task_cleanup EXIT
-
-command -v git >/dev/null
-command -v docker >/dev/null
-command -v python3 >/dev/null
 
 task_standalone_dir="$(mktemp -d /tmp/dsh-standard-runtime.XXXXXXXX)"
 node "$task_adapter_dir/stage-standalone.mts" "$task_standalone_dir"
