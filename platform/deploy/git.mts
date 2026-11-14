@@ -1,4 +1,4 @@
-import { chmodSync, copyFileSync, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, copyFileSync, existsSync, mkdirSync, openSync, readSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { cpSync } from 'node:fs'
 import { assertNoBundledGlibc, isGlibcLibrary, run } from './fsutil.mts'
@@ -43,13 +43,32 @@ export function collectSystemGit(destination: string): GitBundleResult {
   for (const path of ['/usr/lib/git-core', '/usr/share/git-core', '/usr/share/git']) {
     if (existsSync(path)) copyPreservingPath(path, join(destination, 'root'))
   }
-  let ldd = ''
-  try { ldd = run('ldd', [git]) } catch { ldd = '' }
-  for (const line of ldd.split('\n')) {
-    const match = line.match(/=>\s+(\/\S+)/) || line.match(/^\s*(\/\S+)\s+\(/)
-    // ELF 使用目标系统加载器；不能把准备机的 glibc 注入该加载器。
-    if (match && !isGlibcLibrary(match[1])) copyPreservingPath(match[1], join(destination, 'root'))
+  // 网络传输由 git-core 中的独立 ELF 执行；只收集 git 主程序会遗漏 libcurl 等依赖。
+  const seen = new Set<string>()
+  function collectLibraries(path: string): void {
+    const stat = statSync(path)
+    if (stat.isDirectory()) {
+      for (const name of readdirSync(path)) collectLibraries(join(path, name))
+      return
+    }
+    const key = `${stat.dev}:${stat.ino}`
+    if (!stat.isFile() || seen.has(key)) return
+    seen.add(key)
+    const header = Buffer.alloc(4), fd = openSync(path, 'r')
+    try { readSync(fd, header, 0, 4, 0) } finally { closeSync(fd) }
+    if (!header.equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]))) return
+    let ldd: string
+    try { ldd = run('ldd', [path]) }
+    catch (error) { throw new Error(`无法收集 Git 程序依赖 ${path}：${error instanceof Error ? error.message : error}`) }
+    if (/=>\s+not found/.test(ldd)) throw new Error(`Git 程序依赖缺失 ${path}：${ldd.trim()}`)
+    for (const line of ldd.split('\n')) {
+      const match = line.match(/=>\s+(\/\S+)/) || line.match(/^\s*(\/\S+)\s+\(/)
+      // ELF 使用目标系统加载器；不能把准备机的 glibc 注入该加载器。
+      if (match && !isGlibcLibrary(match[1])) copyPreservingPath(match[1], join(destination, 'root'))
+    }
   }
+  collectLibraries(git)
+  if (existsSync('/usr/lib/git-core')) collectLibraries('/usr/lib/git-core')
   const libDir = process.arch === 'arm64' ? 'aarch64' : 'x86_64'
   const wrapper = `#!/bin/sh
 BASE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)

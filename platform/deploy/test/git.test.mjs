@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { assertGitBundle, collectSystemGit, copyGitBundle } from '../git.mts'
-import { run } from '../fsutil.mts'
+import { isGlibcLibrary, run } from '../fsutil.mts'
 
 test('系统 Git 收集使用宿主 glibc，完整执行初始化、归档与离线克隆', () => {
   const root = mkdtempSync(join(tmpdir(), 'hep-git-'))
@@ -14,6 +14,14 @@ test('系统 Git 收集使用宿主 glibc，完整执行初始化、归档与离
     const { path: git } = collectSystemGit(bundle)
     assertGitBundle(bundle)
     assert.match(run(git, ['--version']), /^git version /)
+    // git --version 不会装载 HTTP/HTTPS 辅助程序的依赖；这些依赖也必须随包交付。
+    const helper = '/usr/lib/git-core/git-remote-https'
+    assert.ok(existsSync(helper))
+    for (const line of run('ldd', [helper]).split('\n')) {
+      const match = line.match(/=>\s+(\/\S+)/)
+      if (!match || isGlibcLibrary(match[1])) continue
+      assert.ok(existsSync(join(bundle, 'root', match[1])), `缺少 HTTPS 辅助程序依赖 ${match[1]}`)
+    }
     const repository = join(root, 'repository'), archive = join(root, 'source.bundle'), restored = join(root, 'restored')
     run(git, ['init', '-b', 'main', repository])
     writeFileSync(join(repository, 'asset'), 'offline asset\n')
