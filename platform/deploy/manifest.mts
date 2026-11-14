@@ -60,6 +60,10 @@ export interface Manifest {
   runtime: Record<string, RuntimeEntry>
   image?: ImageEntry
   data?: DataEntry
+  workspace?: {
+    sourceRoot: string
+    repositories: Array<{ name: 'control' | 'manager-home' | 'business'; source: string; path: string; commit: string; dirty: boolean; origin: string }>
+  }
   sensitivePaths?: string[]
 }
 

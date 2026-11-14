@@ -1,5 +1,7 @@
 # Harness 工程平台项目验收矩阵
 
+2026-11-14 UTC，实例入口按运行中的平台地址派生，自动地址不受同步回旧 IP 的配置影响；更新、恢复和迁移保留自动模式，显式域名与反向代理入口继续保留。入口与管理定向测试 73 项、适配器 24 项、生命周期与部署 73 项、原生 Compose 与 Harness Runtime 10 项通过。实际回放旧地址后列表、打开入口仍指向当前地址；真实 UI 打开 security-operations-expert-test 返回 HTTP 200，定向重载成功且资产状态 current。证据位于 `.local/acceptance/runtime-dependencies-20261114/address-*.json`；本项不代表 ARM64 完整包或全部业务效果验收完成。
+
 2026-11-14 UTC，补充旧版软链接 Harness 的资产刷新维护入口：校验同源链接、备份及失败恢复、迁移后宿主挂载修正、源目录外插件依赖保留、同步重建 init。定向回归 4 项、相邻投影回归 4 项通过；通过该入口刷新并定向重启 18506 实例，保留镜像、端口、HOME、会话及业务仓软链接。见[装载合同](platform-design/02_系统架构与部署设计.md#当前最小平台接入合同)和[回归用例](../platform/deploy/test/agent-linked-assets.test.mjs)。业务通知、图标与布局验证由 data 仓记录；平台业务 Evaluation 预览受默认模型连接缺失阻塞，未创建 Run，不提升业务 Evaluation 或 Research Release 状态。
 
 2026-11-14，本机 `manager-workspace/` 改为包含 data 与 business-agents 的真实独立 Git 工作树，默认原生会话从父目录启动。工作区工具 19 项、初始化 23 项、助手与首页 148 项、启动器 48 项通过，类型检查及构建通过。真实管理助手完成 context、Skill 与原生 bash 的目录读取；旧会话通过原生有效目录变更恢复，历史 header 保留。DSH 指令发现仅加载管理 HOME；证据位于 `.local/acceptance/physical-manager-workspace/`。该验证覆盖目录迁移及受影响路径，不提升业务 Evaluation 或 Research Release 状态。

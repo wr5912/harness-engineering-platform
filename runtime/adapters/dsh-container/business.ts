@@ -7,6 +7,7 @@ import { isUnrestrictedBusinessAccess } from '../../../platform/plugin/src/busin
 import { createBusinessRuntimePatch } from '../../../platform/plugin/src/business-control/patch.ts'
 import { platformGroupUrl } from '../../../platform/plugin/src/business-control/group-link.ts'
 import { businessGatewayEntry, checkBusinessGatewayEntry } from '../../../platform/plugin/src/business-control/entry.ts'
+import { effectiveBusinessAccess } from '../../../platform/plugin/src/business-control/runtime-address.ts'
 import { resolveBusinessInstance } from '../../../platform/plugin/src/business-control/instance.ts'
 import { deleteBusinessInstance, preflightGatewayRegistration, updateGatewayRegistration } from '../../../platform/plugin/src/business-control/registration.ts'
 import { instanceStateRoot } from '../../../platform/plugin/src/workspace.ts'
@@ -107,7 +108,7 @@ export function businessSourceDigest(paths: Record<string, string>): string {
 
 /** 启动配置只定位程序、事实源和受信通道，不复制授权规则或连接清单。 */
 export function readBusinessLaunchConfig(file: string, target?: BusinessTarget): BusinessLaunchConfig {
-  const saved = JSON.parse(readFileSync(file, 'utf8')) as BusinessLaunchConfig & { gateway?: { publicOrigin?: string; sharedSecretFile?: string } }
+  const saved = effectiveBusinessAccess(dirname(dirname(file)), JSON.parse(readFileSync(file, 'utf8'))) as BusinessLaunchConfig & { gateway?: { publicOrigin?: string; sharedSecretFile?: string } }
   // 平台以业务访问配置作为唯一可编辑来源；历史独立 launch 文件仍可用于既有实例。
   const assetRoot = dirname(dirname(file)), secretFile = saved.gateway?.sharedSecretFile
   const config: BusinessLaunchConfig = saved.gateway ? {

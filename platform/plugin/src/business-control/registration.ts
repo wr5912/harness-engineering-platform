@@ -6,12 +6,13 @@ import { promisify } from 'node:util'
 import { instanceStateRoot, programRoot, workspaceConfigPath } from '../workspace.ts'
 import { prepareBusinessRuntimeFile } from './secret-file.ts'
 import { validateBusinessGateway } from './configuration.ts'
+import { effectiveBusinessAccess } from './runtime-address.ts'
 import { isUnrestrictedBusinessAccess } from './contracts.ts'
 
 export function businessAccessPath(assetRoot: string): string { return workspaceConfigPath(assetRoot, 'business-access.json') }
 
 export async function businessAccess(assetRoot: string, validate = true): Promise<Record<string, unknown> & { gateway: Record<string, unknown> }> {
-  const access = JSON.parse(await readFile(businessAccessPath(assetRoot), 'utf8')) as Record<string, unknown>
+  const access = effectiveBusinessAccess(assetRoot, JSON.parse(await readFile(businessAccessPath(assetRoot), 'utf8'))) as Record<string, unknown>
   const gateway = access.gateway
   if (access.schemaVersion !== 1 || typeof access.enabled !== 'boolean' || !gateway || typeof gateway !== 'object'
     || Array.isArray(gateway) || !Array.isArray((gateway as Record<string, unknown>).instances)) {

@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { managerHome } from '../manager-home.mts'
+import { platformAddressArgs } from '../plugin/src/business-control/runtime-address.ts'
 
 export interface RelocateOptions {
   prefix: string
@@ -101,7 +102,7 @@ export async function relocate(options: RelocateOptions) {
   const sessions = state ? await sessionSnapshot(state.url, fromDataRoot) : []
   const fstab = mode === 'bind' ? fstabForBind(readFileSync('/etc/fstab', 'utf8'), fromDataRoot, dataRoot) : undefined
   const report = { ...plan, status: 'planned', sessionsPreserved: sessions.length, sessionIds: sessions,
-    platform: state ? { host: state.host, port: state.port, publicUrl: state.publicUrl ?? state.url } : undefined,
+    platform: state ? { host: state.host, port: state.port, url: state.url, publicUrl: state.publicUrl ?? state.url } : undefined,
     restarted: false, backup: undefined as string | undefined }
   if (mode === 'existing') {
     if (json(locator).assetRoot !== dataRoot || !originalEnv.includes(`HARNESS_ASSET_ROOT:-${quote(dataRoot)}`)) throw new Error('目标已挂载但启动定位未匹配；请根据上次迁移回执恢复后重试')
@@ -119,7 +120,7 @@ export async function relocate(options: RelocateOptions) {
       if (options.dryRun) return { ...receipt, status: 'resume-planned' }
       if (!state) {
         if (!receipt.platform) throw new Error('恢复回执缺少原平台地址；未使用默认地址启动')
-        platformCommand(prefix, dataRoot, ['start', '--host', receipt.platform.host, '--port', String(receipt.platform.port), '--public-url', receipt.platform.publicUrl], join(backup, 'lifecycle.log'))
+        platformCommand(prefix, dataRoot, ['start', ...platformAddressArgs(receipt.platform)], join(backup, 'lifecycle.log'))
       }
       const next = lifecycle.managedState(dataRoot, prefix)
       if (!next || !lifecycle.ownsPort(next.pid, next.host, next.port)) throw new Error('恢复后平台进程归属核对失败')
@@ -192,7 +193,7 @@ export async function relocate(options: RelocateOptions) {
     command(['prepare', '--offline'], dataRoot)
     if (state) {
       startAttempted = true
-      command(['start', '--host', state.host, '--port', String(state.port), '--public-url', state.publicUrl ?? state.url], dataRoot)
+      command(['start', ...platformAddressArgs(state)], dataRoot)
       report.restarted = true
       const next = lifecycle.managedState(dataRoot, prefix)
       if (!next || !lifecycle.ownsPort(next.pid, next.host, next.port)) throw new Error('迁移后平台进程归属核对失败')
@@ -225,7 +226,7 @@ export async function relocate(options: RelocateOptions) {
       if (fstab !== undefined && existsSync('/run/systemd/system')) execFileSync('systemctl', ['daemon-reload'], { stdio: 'pipe' })
       if (existsSync(dataRoot) && !targetExisted && readdirSync(dataRoot).length === 0) rmSync(dataRoot, { recursive: true })
       if (targetExisted && !existsSync(dataRoot)) mkdirSync(dataRoot)
-      if (state && stopped) command(['start', '--host', state.host, '--port', String(state.port), '--public-url', state.publicUrl ?? state.url], fromDataRoot)
+      if (state && stopped) command(['start', ...platformAddressArgs(state)], fromDataRoot)
       save(join(backup, 'receipt.json'), { ...report, status: 'rolled-back' })
     } catch (recoveryError) {
       writeFileSync(log, `\n恢复失败：${recoveryError instanceof Error ? recoveryError.stack : String(recoveryError)}\n`, { mode: 0o600, flag: 'a' })
@@ -240,6 +241,7 @@ export async function relocate(options: RelocateOptions) {
 export function relocationSource(): string {
   return readFileSync(fileURLToPath(import.meta.url), 'utf8')
     .replace("import { managerHome } from '../manager-home.mts'", managerHome.toString())
+    .replace("import { platformAddressArgs } from '../plugin/src/business-control/runtime-address.ts'", platformAddressArgs.toString())
 }
 
 export function relocateRemote(target: string, options: RelocateOptions): number {

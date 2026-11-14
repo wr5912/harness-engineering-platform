@@ -1,6 +1,6 @@
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { managedState, ownsPort } from '../lifecycle.mts'
 import { inspectBundle, install, type InstallOptions, type InstallReport } from './install.mts'
@@ -8,11 +8,14 @@ import { activationSnapshot } from './remote-update.mts'
 import { readUpdateActivity } from './update.mts'
 import { verifyDeployment } from './verify.mts'
 import { prepareDeploymentFirewall } from './firewall.mts'
+import { workspaceTargets } from './workspace.mts'
+import { platformAddressArgs } from '../plugin/src/business-control/runtime-address.ts'
 
 /** 完整快照替换业务资产；现场配置与原生运行状态从备份恢复。 */
 export async function updateBundle(options: InstallOptions): Promise<InstallReport> {
   const { manifest, report } = inspectBundle(options, true)
   const { prefix, dataRoot } = report
+  const targets = workspaceTargets(manifest, prefix, dataRoot)
   if (!manifest.data) throw new Error('全量更新需要同时包含程序和数据仓库')
   for (const path of [prefix, dataRoot]) {
     if (!existsSync(path) || !lstatSync(path).isDirectory() || realpathSync(path) !== resolve(path)) throw new Error(`更新目标必须是已有的独立真实目录：${path}`)
@@ -30,9 +33,14 @@ export async function updateBundle(options: InstallOptions): Promise<InstallRepo
     if (busy.length) throw new Error(`目标存在在途任务，未更新：${JSON.stringify(busy)}`)
   }
   const suffix = `.backup-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`
-  report.backups = { prefix: prefix + suffix, dataRoot: dataRoot + suffix }
+  report.backups = targets ? {
+    workspace: targets.root + suffix,
+    prefix: join(targets.root + suffix, relative(targets.root, prefix)),
+    dataRoot: join(targets.root + suffix, relative(targets.root, dataRoot)),
+    managerHome: join(targets.root + suffix, relative(targets.root, targets.managerHome)),
+  } : { prefix: prefix + suffix, dataRoot: dataRoot + suffix }
   if (options.dryRun) return report
-  const lock = prefix + '.update-lock'
+  const lock = (targets?.root ?? prefix) + '.update-lock'
   mkdirSync(lock, { mode: 0o700 })
   const moved: Array<{ path: string; backup: string; mode: number }> = []
   const command = (args: string[]) => {
@@ -42,7 +50,7 @@ export async function updateBundle(options: InstallOptions): Promise<InstallRepo
     if (result.error || result.status !== 0) throw new Error(`平台 ${args[0]} 失败（退出码 ${result.status}）`)
   }
   const address = options.host ? ['--host', options.host, '--port', String(options.port), ...(options.publicUrl ? ['--public-url', options.publicUrl] : [])]
-    : state ? ['--host', state.host, '--port', String(state.port), '--public-url', state.publicUrl ?? state.url] : []
+    : state ? platformAddressArgs(state) : []
   let stopped = false
   let installing = false
   try {
@@ -51,7 +59,7 @@ export async function updateBundle(options: InstallOptions): Promise<InstallRepo
       if (busy.length) throw new Error('目标刚启动了新任务，未更新')
       command(['stop']); stopped = true
     }
-    for (const path of [prefix, dataRoot]) {
+    for (const path of targets ? [targets.root] : [prefix, dataRoot]) {
       const mode = lstatSync(path).mode & 0o777, backup = path + suffix
       renameSync(path, backup); moved.push({ path, backup, mode }); chmodSync(backup, 0o700)
     }
@@ -82,7 +90,7 @@ export async function updateBundle(options: InstallOptions): Promise<InstallRepo
       }
       for (const entry of moved.reverse()) { renameSync(entry.backup, entry.path); chmodSync(entry.path, entry.mode) }
       if (stopped) {
-        command(['start', '--host', state!.host, '--port', String(state!.port), '--public-url', state!.publicUrl ?? state!.url])
+        command(['start', ...platformAddressArgs(state!)])
         const restored = await activationSnapshot({ prefix, dataRoot })
         if (before?.sessions.some(id => !restored.sessions.includes(id))) throw new Error('恢复后管理会话清单不完整')
       }

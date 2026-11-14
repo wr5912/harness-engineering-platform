@@ -12,6 +12,7 @@ import type {
 import { isUnrestrictedBusinessAccess, retiredLocalRiskFact, validAgentToolPolicies } from './contracts.js'
 import { HttpAuthenticationProvider, HttpIdentityTrustProvider, HttpRiskAssessmentProvider, HttpAccessAuthorizationProvider } from './providers.js'
 import { resolveBusinessSecretFile } from './secret-file.ts'
+import { effectiveBusinessAccess } from './runtime-address.ts'
 import { REPLICA_BATCH_BYTES } from './replica.ts'
 
 export * from './contracts.js'
@@ -165,7 +166,7 @@ export class BusinessControl {
     const path = join(this.assetRoot, 'config', 'business-access.json')
     if (!existsSync(path)) return { schemaVersion: 1, enabled: false, agents: [] }
     let value: BusinessAccessConfig
-    try { value = JSON.parse(readFileSync(path, 'utf8')) } catch { return error('control_config_invalid', 503) }
+    try { value = effectiveBusinessAccess(this.assetRoot, JSON.parse(readFileSync(path, 'utf8'))) } catch { return error('control_config_invalid', 503) }
     if (value.schemaVersion !== 1 || typeof value.enabled !== 'boolean' || !Array.isArray(value.agents)
       || value.agents.some(rule => !rule.agentId || typeof rule.enabled !== 'boolean' || !Array.isArray(rule.subjects) || !Array.isArray(rule.actions)
         || (rule.agentAuthentication !== undefined && (!rule.agentAuthentication || rule.agentAuthentication.method !== 'hmac-sha256' || typeof rule.agentAuthentication.enabled !== 'boolean'))

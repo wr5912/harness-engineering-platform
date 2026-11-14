@@ -1,11 +1,20 @@
 import { cpSync, existsSync, lstatSync, mkdirSync, readlinkSync, symlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { networkInterfaces } from 'node:os'
 import { run, safeRelative } from './fsutil.mts'
+
+export function repositoryOrigin(source: string): string {
+  const remotes = run('git', ['-C', source, 'remote']).trim().split('\n')
+  const internal = Object.values(networkInterfaces()).flat().some(address => address?.family === 'IPv4' && address.address.startsWith('172.16.'))
+  const preferred = internal ? 'gitlab' : 'github'
+  const name = remotes.includes(preferred) ? preferred : remotes.includes('origin') ? 'origin' : remotes[0]
+  return run('git', ['-C', source, 'remote', 'get-url', name]).trim()
+}
 
 export function snapshotRepository(source: string, target: string, bundle: string, workingTree = false): { commit: string; dirty: boolean; origin: string } {
   const commit = run('git', ['-C', source, 'rev-parse', 'HEAD']).trim()
   const dirty = Boolean(run('git', ['-C', source, 'status', '--porcelain']).trim())
-  const origin = run('git', ['-C', source, 'remote', 'get-url', 'origin']).trim()
+  const origin = repositoryOrigin(source)
   if (/^https?:/.test(origin)) {
     const url = new URL(origin)
     if (url.username || url.password || url.search) throw new Error('Git origin 不能含凭据')
@@ -16,7 +25,7 @@ export function snapshotRepository(source: string, target: string, bundle: strin
     mkdirSync(target, { recursive: true })
     mkdirSync(join(bundle, '..'), { recursive: true })
     // bundle 保留原始历史；工作树快照不会生成提交或带入被忽略的缓存和 HOME。
-    run('git', ['-C', source, 'bundle', 'create', bundle, 'HEAD'])
+    run('git', ['-C', source, 'bundle', 'create', bundle, 'HEAD', '--tags'])
     restoreRepository(target, bundle, commit, origin, !workingTree)
     if (workingTree) {
       const files = new Set(run('git', ['-C', source, 'ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean))
@@ -42,7 +51,7 @@ export function restoreRepository(target: string, bundle: string, commit: string
   if (existsSync(join(target, '.git'))) throw new Error(`目标已有 Git 元数据：${target}`)
   const git = (args: string[]) => run('git', ['-c', 'core.hooksPath=/dev/null', '-C', target, ...args])
   git(['init', '--quiet', '-b', 'main'])
-  git(['fetch', '--quiet', bundle, 'HEAD'])
+  git(['fetch', '--quiet', bundle, 'HEAD', 'refs/tags/*:refs/tags/*'])
   git(['reset', checkout ? '--hard' : '--mixed', commit])
   git(['remote', 'add', 'origin', origin])
 }

@@ -10,6 +10,7 @@ import { snapshotRepository } from './repository.mts'
 import { collectPlatformKnowledge } from './knowledge/platform.mts'
 import { copyDataState } from './state.mts'
 import { managerHome } from '../manager-home.mts'
+import { packWorkspace } from './workspace.mts'
 
 export interface PackOptions {
   programRoot: string
@@ -71,18 +72,19 @@ function copyProgram(programRoot: string, staging: string, assetsDir?: string, w
   }
 }
 
-function copyData(dataRoot: string, staging: string, assets: string, workingTree = false): ReturnType<typeof snapshotRepository> {
+function copyData(dataRoot: string, staging: string, assets: string, workingTree = false, externalHome = false): ReturnType<typeof snapshotRepository> {
   const target = join(staging, 'data')
   const repository = snapshotRepository(dataRoot, target, join(staging, 'repositories/data.bundle'), workingTree)
   removeTree(join(target, '.git'))
-  copyDataState(dataRoot, target)
-  const profile = '.local/platform-home/profiles/harness-platform'
+  copyDataState(dataRoot, target, !externalHome)
+  const profile = externalHome ? '../workspace/platform-manager-dsh-home/profiles/harness-platform' : '.local/platform-home/profiles/harness-platform'
+  const resourceProfile = '.local/platform-home/profiles/harness-platform'
   const sourceProfile = join(managerHome(dataRoot), 'profiles/harness-platform')
   const manifest = join(sourceProfile, 'package.json')
   if (existsSync(manifest)) {
     const dependencies = Object.keys(JSON.parse(readFileSync(manifest, 'utf8')).dependencies || {})
     if (dependencies.length) {
-      const prepared = join(assets, 'data', profile)
+      const prepared = join(assets, 'data', resourceProfile)
       for (const name of ['package.json', 'pnpm-lock.yaml']) {
         const source = join(sourceProfile, name), resource = join(prepared, name)
         if (!existsSync(source) || !existsSync(resource) || !readFileSync(source).equals(readFileSync(resource))) {
@@ -203,10 +205,11 @@ export function pack(options: PackOptions): { archive: string; size: number } {
   console.error('pack: 正在生成程序和数据仓库快照')
   copyProgram(programRoot, staging, options.assetsDir, options.includeWorkingTree)
   copyTree(join(staging, 'program/platform/deploy/install.sh'), join(staging, 'install.sh'))
+  const workspace = dataRoot ? packWorkspace(programRoot, dataRoot, staging, options.includeWorkingTree) : undefined
   if (dataRoot) {
     dataCheck = assertRealWorkspace(dataRoot, options.allowFixtureData)
-    dataRepository = copyData(dataRoot, staging, options.assetsDir!, options.includeWorkingTree)
-    copyDataDependencies(join(staging, 'data'), options.assetsDir!)
+    dataRepository = copyData(dataRoot, staging, options.assetsDir!, options.includeWorkingTree, Boolean(workspace))
+    if (!workspace) copyDataDependencies(join(staging, 'data'), options.assetsDir!)
     const knowledge = collectPlatformKnowledge(staging, options.knowledgeDir ?? join(options.assetsDir!, 'knowledge'))
     if (knowledge) runtime.knowledge = knowledge
   }
@@ -234,10 +237,11 @@ export function pack(options: PackOptions): { archive: string; size: number } {
       dataOrigin: dataRepository?.origin,
     },
     files,
+    workspace,
     runtime,
     image,
     data: dataRoot && dataCheck ? { commit: dataRepository?.commit, dirty: dataRepository?.dirty, sensitive: true, kind: dataCheck.kind, workspaceId: dataCheck.workspaceId, skills: dataCheck.skills } : undefined,
-    sensitivePaths: options.includeData ? ['data/.local', 'data/mcp/.local'] : undefined,
+    sensitivePaths: options.includeData ? ['data/.local', 'data/mcp/.local', ...(workspace ? ['workspace/platform-manager-dsh-home'] : [])] : undefined,
   }
   writeManifest(join(staging, 'manifest.json'), manifest)
   const archive = join(out, `${packageName}.tar.gz`)

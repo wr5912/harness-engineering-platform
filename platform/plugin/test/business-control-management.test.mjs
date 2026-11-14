@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import vm from 'node:vm'
 import { build } from 'esbuild'
+import { bindPlatformEntry } from '../src/business-control/runtime-address.ts'
 
 const require = createRequire(import.meta.url)
 const buildRoot = mkdtempSync(join(tmpdir(), 'business-control-management-build-'))
@@ -75,6 +76,17 @@ test('管理读取与写入均要求实际 owner Peer，缺失及请求自报身
   }
   assert.equal(f.remote.riskCalls.length, 0)
   assert.equal(f.control.status().restrictions.length, 0)
+})
+
+test('运行中覆盖旧配置后，管理页面和执行器使用相同的当前平台工具地址', async t => {
+  const f = await fixture(t)
+  const entry = 'http://127.0.0.1:18121/hep/'
+  bindPlatformEntry(f.root, entry)
+  f.config.gateway.managementUrl = 'http://10.0.160.32:18120/hep/'
+  f.config.operations[0].target = 'http://10.0.160.32:18120/hep/mcp/groups/soc/v2'
+  writeFileSync(f.path, JSON.stringify(f.config))
+  assert.equal((await f.call('status')).value.configuration.operations[0].target, entry + 'mcp/groups/soc/v2')
+  assert.equal(f.control.config().operations[0].target, entry + 'mcp/groups/soc/v2')
 })
 
 test('状态只返回可编辑公开投影、真实 ACK 和定时任务未覆盖边界', async t => {

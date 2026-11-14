@@ -8,6 +8,17 @@ import { Context } from '@deepseek-ai/cordis'
 import { build } from 'esbuild'
 import { platformEntryUrl, platformGroupUrl } from '../src/business-control/group-link.ts'
 import { initializeBusinessGateway } from '../src/business-control/configuration.ts'
+import { effectiveBusinessAccess, platformAddressArgs, processBirth, runningPlatformEntry } from '../src/business-control/runtime-address.ts'
+
+test('内部恢复自动入口不把地址标成显式；反代和用户指定的公开入口保持', () => {
+  const state = { host: '127.0.0.1', port: 18121, url: 'http://127.0.0.1:18121/hep/', publicUrl: 'http://127.0.0.1:18121/hep/' }
+  const local = ['--host', state.host, '--port', '18121']
+  assert.deepEqual(platformAddressArgs(state), local)
+  assert.deepEqual(platformAddressArgs({ ...state, url: undefined }), local, '兼容旧迁移回执')
+  assert.deepEqual(platformAddressArgs(state, true), [...local, '--public-url', state.publicUrl])
+  const nat = { ...state, publicUrl: 'http://192.0.2.1:18121/hep/' }
+  assert.deepEqual(platformAddressArgs(nat), [...local, '--public-url', nat.publicUrl])
+})
 
 test('空白工作区由实际启动入口初始化，默认启用完整业务网关', t => {
   const root = mkdtempSync(join(tmpdir(), 'hep-empty-entry-'))
@@ -69,7 +80,11 @@ test('平台入口保留域名、反代和子路径，所有分组由同一入�
     writeFileSync(join(root, 'config/business-access.json'), JSON.stringify({ schemaVersion: 1, enabled: true, agents: [], gateway: { managementUrl: configured } }))
     assert.equal(platformEntryUrl(root, { publicUrl: configured, host: '0.0.0.0', fallback: `http://0.0.0.0:18120${base}` }), configured)
     assert.equal(JSON.parse(readFileSync(join(root, 'config/business-access.json'))).gateway.host, '0.0.0.0')
+    assert.equal(new URL(JSON.parse(readFileSync(join(root, 'config/business-access.json'))).gateway.publicOrigin).hostname, new URL(configured).hostname)
     assert.equal(platformGroupUrl(root, 'test'), `${configured}mcp/groups/test/v2`)
+    const access = JSON.parse(readFileSync(join(root, 'config/business-access.json')))
+    access.gateway.managementUrlMode = 'explicit'
+    writeFileSync(join(root, 'config/business-access.json'), JSON.stringify(access))
     assert.throws(() => platformEntryUrl(root, { publicUrl: 'https://other.example/', fallback: configured }), /不一致/)
   }
   writeFileSync(join(root, 'config/sites.json'), JSON.stringify({ platform: '/hep/' }))
@@ -78,6 +93,57 @@ test('平台入口保留域名、反代和子路径，所有分组由同一入�
     assert.equal(platformEntryUrl(root, { fallback: `${origin}/hep/` }), `${origin}/hep/`)
     assert.equal(platformGroupUrl(root, 'test'), `${origin}/hep/mcp/groups/test/v2`)
     assert.equal(JSON.parse(readFileSync(join(root, 'config/business-access.json'))).gateway.managementUrl, `${origin}/hep/`)
+  }
+})
+
+test('启动以实际地址迁移历史 IP；运行中覆盖旧配置不改变网页与 MCP 入口', t => {
+  const root = mkdtempSync(join(tmpdir(), 'hep-entry-sync-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  mkdirSync(join(root, 'config'))
+  const file = join(root, 'config/business-access.json')
+  const old = { schemaVersion: 1, enabled: false, agents: [], gateway: {
+    host: '0.0.0.0', port: 53106, publicOrigin: 'http://10.0.160.32:53106',
+    managementUrl: 'http://10.0.160.32:18120/hep/', instances: [],
+  }, operations: [
+    { target: 'http://10.0.160.32:18120/hep/mcp/groups/ops/v2' },
+    { target: 'http://10.0.160.32:8000/v1' },
+  ] }
+  writeFileSync(file, JSON.stringify(old))
+  const entry = 'http://172.16.138.228:18121/hep/'
+  assert.equal(platformEntryUrl(root, { publicUrl: entry, fallback: entry, host: '0.0.0.0' }), entry)
+  const migrated = JSON.parse(readFileSync(file))
+  assert.equal(migrated.operations[0].target, `${entry}mcp/groups/ops/v2`, '启动迁移同时更新指向本平台的操作')
+  assert.equal(migrated.operations[1].target, old.operations[1].target)
+  writeFileSync(file, JSON.stringify(old))
+  assert.equal(platformEntryUrl(root), entry)
+  assert.equal(platformGroupUrl(root, 'ops'), `${entry}mcp/groups/ops/v2`)
+  const effective = effectiveBusinessAccess(root, JSON.parse(readFileSync(file)))
+  assert.equal(effective.gateway.publicOrigin, 'http://172.16.138.228:53106')
+  assert.equal(effective.gateway.managementUrl, entry)
+  assert.equal(effective.operations[0].target, `${entry}mcp/groups/ops/v2`)
+  assert.equal(effective.operations[1].target, old.operations[1].target)
+  assert.deepEqual(JSON.parse(readFileSync(file)), old, '读取不回写，不能覆盖并发登记')
+  for (const publicOrigin of ['https://business.example', 'http://business.example', 'http://192.0.2.1:8080']) {
+    const custom = effectiveBusinessAccess(root, { gateway: { ...old.gateway, publicOrigin, publicOriginMode: 'explicit' } })
+    assert.equal(custom.gateway.publicOrigin, publicOrigin)
+  }
+  const explicit = { ...old, gateway: { ...old.gateway, managementUrl: entry, managementUrlMode: 'explicit', publicOriginMode: 'auto' } }
+  writeFileSync(file, JSON.stringify(explicit))
+  platformEntryUrl(root, { publicUrl: entry, fallback: entry })
+  assert.equal(JSON.parse(readFileSync(file)).gateway.managementUrlMode, 'explicit', '显式 HTTP IP 不能在初始化时变成自动入口')
+})
+
+test('独立 CLI 只复用存活的当前工作区入口，不采用复制来的进程状态', t => {
+  const root = mkdtempSync(join(tmpdir(), 'hep-entry-process-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  mkdirSync(join(root, '.local/platform-service'), { recursive: true })
+  const file = join(root, '.local/platform-service/state.json')
+  const state = { pid: process.pid, birth: processBirth(process.pid), dataRoot: root, publicUrl: 'http://127.0.0.1:18121/hep/' }
+  writeFileSync(file, JSON.stringify(state))
+  assert.equal(runningPlatformEntry(root), state.publicUrl)
+  for (const patch of [{ birth: 'old' }, { dataRoot: `${root}/another` }, { pid: 0 }]) {
+    writeFileSync(file, JSON.stringify({ ...state, ...patch }))
+    assert.equal(runningPlatformEntry(root), undefined)
   }
 })
 

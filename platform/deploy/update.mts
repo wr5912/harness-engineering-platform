@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { managedState, ownsPort, platformNodeOptions, processBirth, restoreManagedProcess, serviceOwner } from '../lifecycle.mts'
 import { workspaceIdentity, instanceStateRoot, workspaceLocalPath, workspaceOwnsCwd, mcpLocalPath } from '../plugin/src/workspace.ts'
 import { managerHome } from '../manager-home.mts'
+import { platformAddressArgs } from '../plugin/src/business-control/runtime-address.ts'
 
 export type UpdateOptions = { programRoot: string; dataRoot: string; dryRun?: boolean; interruptSessions?: boolean; clientOnly?: boolean }
 type ServiceState = NonNullable<ReturnType<typeof managedState>>
@@ -280,7 +281,7 @@ async function build(options: UpdateOptions, stage: string, inspection: UpdateIn
 async function lifecycle(action: 'stop' | 'start' | 'restore', options: UpdateOptions, inspection: UpdateInspection) {
   if (action === 'restore') { await restoreManagedProcess(inspection.state, inspection.command ?? [], inspection.environment); return }
   if (action === 'stop' && serviceOwner(options.dataRoot)) command(join(options.programRoot, 'platform/dsh-platform'), ['autostart', 'enable'], { cwd: options.programRoot, env: inspection.environment })
-  const args = action === 'start' ? ['start', '--host', inspection.state.host, '--port', String(inspection.state.port), '--public-url', inspection.state.publicUrl ?? inspection.state.url] : ['stop']
+  const args = action === 'start' ? ['start', ...platformAddressArgs(inspection.state)] : ['stop']
   command(join(options.programRoot, 'platform/dsh-platform'), args, { cwd: options.programRoot, env: inspection.environment, timeout: 120_000 })
 }
 const defaults: UpdateServices = { inspect, build, lifecycle, verify: inspect }

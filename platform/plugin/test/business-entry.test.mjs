@@ -8,6 +8,9 @@ import { startBusinessGateway } from '../lib/business-gateway.js'
 import { checkBusinessGatewayEntry } from '../src/business-control/entry.ts'
 import { BUSINESS_TRANSPORT_HEADER, BUSINESS_TRANSPORT_VERSION } from '../src/business-control/contracts.ts'
 import { checkRunningBusinessEntries } from '../../business-readiness.mts'
+import { platformGroupUrl } from '../src/business-control/group-link.ts'
+import { businessAccess } from '../src/business-control/registration.ts'
+import { bindPlatformEntry } from '../src/business-control/runtime-address.ts'
 
 async function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'business-entry-'))
@@ -16,6 +19,7 @@ async function fixture(t) {
   const sourceDigest = 'sha256:' + 'a'.repeat(64)
   const runtime = createServer((req, res) => {
     loaded.requests.push(req.headers)
+    if (loaded.hang) return
     if (loaded.version) res.setHeader(BUSINESS_TRANSPORT_HEADER, loaded.version)
     res.writeHead(loaded.status, { 'content-type': loaded.type, ...(loaded.status === 302 ? { location: '/unexpected' } : {}) })
     res.end(loaded.type === 'text/html' ? `<html><head>${loaded.metaVersion ? `<meta name="${BUSINESS_TRANSPORT_HEADER}" content="${loaded.metaVersion}">` : ''}</head>业务对话</html>` : '业务访问被拒绝')
@@ -28,23 +32,39 @@ async function fixture(t) {
   await new Promise(resolve => reserve.close(resolve))
   const config = { schemaVersion: 1, enabled: true, agents: [], authentication: { endpoint: 'http://127.0.0.1:1/auth' }, identityTrust: { endpoint: 'http://127.0.0.1:1/trust' }, gateway: {
     host: '127.0.0.1', port, publicOrigin: `http://127.0.0.1:${port}`, instances: [
-      { agentId: 'soc', instanceId: 'soc-business', sourceDigest, identityMode: 'development', accessMode: 'anonymous' },
+      { agentId: 'soc', instanceId: 'soc-business', sourceId: 'business:soc', sourceDigest, identityMode: 'development', accessMode: 'anonymous' },
     ],
   } }
   mkdirSync(join(root, 'config'))
   mkdirSync(join(root, '.local/instances/soc-business'), { recursive: true })
   writeFileSync(join(root, 'workspace.json'), JSON.stringify({ schemaVersion: 1, id: 'workspace-fixture' }))
   writeFileSync(join(root, '.local/instances/soc-business/instance.json'), JSON.stringify({
-    workspace_id: 'workspace-fixture', asset_root: root, agent_id: 'soc', web_base_path: '/agents/soc/instances/soc-business/',
+    workspace_id: 'workspace-fixture', asset_root: root, agent_id: 'soc', source_id: 'business:soc', web_base_path: '/agents/soc/instances/soc-business/',
     business_control: { runtime_generation: 'generation-fixture', source_digest: sourceDigest, origin: `http://127.0.0.1:${runtime.address().port}` },
   }))
   const save = () => writeFileSync(join(root, 'config/business-access.json'), JSON.stringify(config))
   save()
-  const gateway = await startBusinessGateway(root, config.gateway)
+  const gateway = await startBusinessGateway(root, structuredClone(config.gateway))
   t.after(() => gateway.close())
   const check = () => checkBusinessGatewayEntry(root, 'soc', 'soc-business')
   return { root, loaded, config, save, check, runtime }
 }
+
+test('运行中同步含旧 IP 的数据仓后，真实业务网关与实例入口仍可用', async t => {
+  const { root, loaded, config, save, check } = await fixture(t)
+  bindPlatformEntry(root, 'http://127.0.0.1:18121/hep/')
+  loaded.version = BUSINESS_TRANSPORT_VERSION
+  loaded.status = 200
+  loaded.type = 'text/html'
+  config.gateway.publicOrigin = `http://10.0.160.32:${config.gateway.port}`
+  config.gateway.managementUrl = 'http://10.0.160.32:18120/hep/'
+  save()
+  const result = await check()
+  assert.equal(result.ready, true, result.detail)
+  assert.equal(result.url, `http://127.0.0.1:${config.gateway.port}/agents/soc/instances/soc-business/`)
+  assert.equal(platformGroupUrl(root, 'soc'), 'http://127.0.0.1:18121/hep/mcp/groups/soc/v2')
+  assert.equal((await businessAccess(root)).gateway.publicOrigin, `http://127.0.0.1:${config.gateway.port}`)
+})
 
 test('新网关与未重载 Runtime 不得通过入口核验；重载后恢复且无需外部 MCP', async t => {
   const { root, loaded, check } = await fixture(t)
@@ -114,6 +134,19 @@ test('开启认证时既检查网关登录拒绝，也确认真实 Runtime 装�
   assert.equal(result.ready, true)
   assert.equal(result.httpStatus, 401)
   assert.equal(loaded.requests.at(-1).authorization, undefined, '检查不携带用户凭据')
+})
+
+test('入口检查超时显示实际失败阶段和地址，恢复后可直接重试', async t => {
+  const { config, save, loaded, check, runtime } = await fixture(t)
+  config.gateway.instances[0].accessMode = 'authenticated'; save()
+  loaded.hang = true
+  const result = await check()
+  assert.equal(result.ready, false)
+  assert.match(result.detail, /业务 Runtime检查超时（5 秒）/)
+  assert.ok(result.detail.includes(`http://127.0.0.1:${runtime.address().port}/agents/soc/instances/soc-business/`))
+  loaded.hang = false
+  loaded.version = BUSINESS_TRANSPORT_VERSION
+  assert.equal((await check()).ready, true)
 })
 
 test('网关拒绝发生在转发前时，不误报当前 Runtime 需要重载', async t => {

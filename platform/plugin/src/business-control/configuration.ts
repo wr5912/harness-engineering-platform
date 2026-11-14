@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { isIP } from 'node:net'
 import type { BusinessGatewayConfig } from './gateway.ts'
 import { ensureBusinessSecret, prepareBusinessRuntimeFile } from './secret-file.ts'
+import { automaticAddress, rebasePlatformOperations } from './runtime-address.ts'
 
 export function validateBusinessGateway(value: unknown): asserts value is BusinessGatewayConfig {
   const gateway = value as BusinessGatewayConfig | undefined
@@ -19,7 +20,7 @@ export function validateBusinessGateway(value: unknown): asserts value is Busine
 }
 
 /** 初始化缺失字段；保留用户明确关闭的开关、现有登记和自定义网关地址。 */
-export function initializeBusinessGateway(assetRoot: string, managementUrl: string, host?: string, port?: number): void {
+export function initializeBusinessGateway(assetRoot: string, managementUrl: string, host?: string, port?: number, managementMode?: 'auto' | 'explicit'): void {
   const path = join(assetRoot, 'config/business-access.json')
   const before = existsSync(path) ? readFileSync(path, 'utf8') : undefined
   const access = before ? JSON.parse(before) : { schemaVersion: 1, enabled: true, agents: [] }
@@ -44,15 +45,17 @@ export function initializeBusinessGateway(assetRoot: string, managementUrl: stri
   const legacyExplicitOrigin = gateway.publicOriginMode === undefined && legacyOrigin !== undefined
     && (legacyOrigin.protocol === 'https:' || (isIP(legacyOrigin.hostname) === 0 && !['localhost'].includes(legacyOrigin.hostname)))
   const explicitOrigin = gateway.publicOriginMode === 'explicit' || legacyExplicitOrigin
-  if (!explicitOrigin) gateway.publicOrigin = `http://${host ?? entry.hostname}:${gateway.port}`
+  if (!explicitOrigin) gateway.publicOrigin = `http://${entry.hostname}:${gateway.port}`
   // 保留旧版自定义入口的文件形状，避免仅为补充模式字段产生无意义配置漂移。
   if (!legacyExplicitOrigin) {
     gateway.publicOriginMode = explicitOrigin ? 'explicit' : 'auto'
-    gateway.managementUrlMode = entry.protocol === 'https:' ? 'explicit' : 'auto'
+    gateway.managementUrlMode = automaticAddress(managementUrl, gateway.managementUrlMode) ? 'auto' : 'explicit'
   }
   gateway.sharedSecretFile ??= '.local/credentials/business-shared.key'
   gateway.instances ??= []
+  if (automaticAddress(gateway.managementUrl, gateway.managementUrlMode)) rebasePlatformOperations(access, gateway.managementUrl, managementUrl)
   gateway.managementUrl = managementUrl
+  if (managementMode) gateway.managementUrlMode = managementMode
   validateBusinessGateway(gateway)
   if (access.enabled === true) {
     try { ensureBusinessSecret(assetRoot, gateway.sharedSecretFile) }

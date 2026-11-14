@@ -186,7 +186,7 @@ export async function startBusinessGateway(assetRoot: string, config: BusinessGa
       || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.instanceId)
       || item.accessMode !== undefined && !['authenticated', 'anonymous'].includes(item.accessMode)
       || item.identityMode !== undefined && !['development', 'published'].includes(item.identityMode)
-      || item.sourceId !== undefined && (typeof item.sourceId !== 'string' || !item.sourceId.startsWith('experiment:'))
+      || item.sourceId !== undefined && typeof item.sourceId !== 'string'
       || item.sourceDigest !== undefined && (typeof item.sourceDigest !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(item.sourceDigest)))) {
       throw new Error('业务实例网关登记无效')
     }

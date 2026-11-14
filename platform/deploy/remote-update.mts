@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { gzipSync, gunzipSync } from 'node:zlib'
 import { pathToFileURL } from 'node:url'
 import { dataStatePaths, isDataState } from './state.mts'
+import { platformAddressArgs } from '../plugin/src/business-control/runtime-address.ts'
 
 type Target = { prefix: string; dataRoot: string; dryRun?: boolean; installDeps?: boolean; minimalData?: boolean; start?: boolean; cancelPrepare?: number }
 type File = { path: string; before: string | null; accepted?: (string | null)[]; content: string | null; mode: number }
@@ -412,6 +413,7 @@ export function updateRemote(ssh: string | undefined, target: Target, programRoo
   if (ssh !== undefined && !/^(?:[a-zA-Z0-9._-]+@)?[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(ssh)) throw new Error('SSH 目标无效')
   const source = readFileSync(new URL('./remote-update.mts', import.meta.url), 'utf8')
     .replace("import { dataStatePaths, isDataState } from './state.mts'", `const dataStatePaths = ${JSON.stringify(dataStatePaths)}; const isDataState = ${isDataState.toString()}`)
+    .replace("import { platformAddressArgs } from '../plugin/src/business-control/runtime-address.ts'", platformAddressArgs.toString())
   const remote = (expression: string) => {
     const command = `HEP_ROOT=${quote(target.prefix)} . ${quote(join(target.prefix, 'bin/hep-env.sh'))} && ${quote(join(target.prefix, 'runtime/node/bin/node'))} --input-type=module-typescript -`
     return JSON.parse(run(ssh === undefined ? 'sh' : 'ssh', ssh === undefined ? ['-c', command] : ['-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', ssh, command], undefined,
@@ -547,7 +549,7 @@ export async function activateUpdate(target: Target) {
     writeFileSync(pending, JSON.stringify({ prefix: target.prefix, dataRoot: target.dataRoot, commit: head(target.prefix), snapshot: before }), { mode: 0o600 })
     command(['stop'])
   }
-  try { command(['start', '--host', before.state.host, '--port', String(before.state.port), '--public-url', before.state.publicUrl ?? before.state.url]) }
+  try { command(['start', ...platformAddressArgs(before.state)]) }
   catch (error) { throw new Error(`更新已保留，平台启动失败；可使用同一 update --start 重试：${error instanceof Error ? error.message : error}`) }
   const after = await activationSnapshot(target)
   if (before.sessions.some(id => !after.sessions.includes(id))) throw new Error('更新后会话清单不完整')

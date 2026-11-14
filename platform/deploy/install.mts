@@ -13,6 +13,7 @@ import { restoreRepository } from './repository.mts'
 import { prepareDeploymentFirewall } from './firewall.mts'
 import { validatePlatformEntryUrl } from '../plugin/src/business-control/group-link.ts'
 import { copyDataState } from './state.mts'
+import { copyManagerState, workspaceTargets } from './workspace.mts'
 
 export interface InstallOptions {
   bundleRoot: string
@@ -29,7 +30,7 @@ export interface InstallOptions {
   start: boolean
   dryRun: boolean
   json: boolean
-  preserveFrom?: { prefix: string; dataRoot: string }
+  preserveFrom?: { prefix: string; dataRoot: string; managerHome?: string }
 }
 
 export interface InstallReport {
@@ -46,7 +47,7 @@ export interface InstallReport {
   autostart: 'skipped' | 'enabled'
   pendingInstances: string[]
   sensitive: boolean
-  backups?: { prefix: string; dataRoot: string }
+  backups?: { prefix: string; dataRoot: string; managerHome?: string; workspace?: string }
 }
 
 function instanceNames(dataRoot: string): string[] {
@@ -60,6 +61,11 @@ export function inspectBundle(options: InstallOptions, updating = false) {
   const prefix = resolve(options.prefix)
   const dataRoot = resolve(options.dataRoot)
   const manifest = readManifest(join(bundleRoot, 'manifest.json'))
+  const workspace = workspaceTargets(manifest, prefix, dataRoot)
+  if (workspace && !updating && existsSync(workspace.root) && readdirSync(workspace.root).length) {
+    throw new Error(`五仓安装目录已存在且非空：${workspace.root}`)
+  }
+  if (workspace && (bundleRoot === workspace.root || bundleRoot.startsWith(workspace.root + sep))) throw new Error('安装包解包目录须在五仓安装目录之外')
   if (options.publicUrl && !options.host) throw new Error('--public-url 需要同时指定 --host')
   if (options.publicUrl) {
     if (new URL(options.publicUrl).hash) throw new Error('--public-url 不能包含片段')
@@ -109,9 +115,11 @@ export function install(options: InstallOptions): InstallReport {
   if (options.dryRun) return report
 
 
-  const targets = [prefix, ...(manifest.data ? [dataRoot] : [])].map(path => ({ path, existed: existsSync(path) }))
+  const workspace = workspaceTargets(manifest, prefix, dataRoot)
+  const targets = (workspace ? [workspace.root] : [prefix, ...(manifest.data ? [dataRoot] : [])]).map(path => ({ path, existed: existsSync(path) }))
   let env: NodeJS.ProcessEnv
   try {
+    if (workspace) copyTree(join(bundleRoot, 'workspace'), workspace.root)
     copyTree(join(bundleRoot, 'program'), prefix)
     let dataCheck: ReturnType<typeof assertRealWorkspace> | undefined
     if (manifest.data) {
@@ -124,7 +132,8 @@ export function install(options: InstallOptions): InstallReport {
       const mappings = [{ from: manifest.source.home, to: homedir() }]
       if (manifest.source.programRoot) mappings.push({ from: manifest.source.programRoot, to: prefix })
       if (manifest.source.dataRoot) mappings.push({ from: manifest.source.dataRoot, to: dataRoot })
-      if (manifest.source.managerDshHome) mappings.push({ from: manifest.source.managerDshHome, to: join(dataRoot, '.local/platform-home') })
+      if (manifest.source.managerDshHome) mappings.push({ from: manifest.source.managerDshHome, to: workspace?.managerHome ?? join(dataRoot, '.local/platform-home') })
+      if (workspace && manifest.workspace) mappings.push({ from: manifest.workspace.sourceRoot, to: workspace.root })
       const changedMappings = mappings.filter(mapping => mapping.from !== mapping.to)
       const rewritten = rewriteKnownPaths(dataRoot, mappings)
       report.rewritten = rewritten.changed
@@ -141,18 +150,19 @@ export function install(options: InstallOptions): InstallReport {
         rmSync(join(target, relative), { recursive: true, force: true })
         copyTree(join(source, relative), join(target, relative))
       }
-      copyDataState(options.preserveFrom.dataRoot, dataRoot)
+      copyDataState(options.preserveFrom.dataRoot, dataRoot, !workspace)
+      if (workspace && options.preserveFrom.managerHome) copyManagerState(options.preserveFrom.managerHome, workspace.managerHome)
       report.rewritten.push(...rewriteKnownPaths(dataRoot, [
         { from: options.preserveFrom.prefix, to: prefix },
         { from: options.preserveFrom.dataRoot, to: dataRoot },
         { from: managerHome(options.preserveFrom.dataRoot), to: managerHome(dataRoot) },
       ]).changed)
       const workspacePath = join(dataRoot, 'workspace.json')
-      const workspace = JSON.parse(readFileSync(workspacePath, 'utf8'))
+      const workspaceIdentity = JSON.parse(readFileSync(workspacePath, 'utf8'))
       const previous = JSON.parse(readFileSync(join(options.preserveFrom.dataRoot, 'workspace.json'), 'utf8'))
-      workspace.id = previous.id
-      workspace.legacyRoots = [...new Set([...(workspace.legacyRoots ?? []), ...(previous.legacyRoots ?? [])])]
-      writeFileSync(workspacePath, JSON.stringify(workspace, null, 2) + '\n')
+      workspaceIdentity.id = previous.id
+      workspaceIdentity.legacyRoots = [...new Set([...(workspaceIdentity.legacyRoots ?? []), ...(previous.legacyRoots ?? [])])]
+      writeFileSync(workspacePath, JSON.stringify(workspaceIdentity, null, 2) + '\n')
     }
     if (options.host && rewriteDeploymentAddress(dataRoot, options.host, options.port, options.gatewayPort, options.publicUrl)) {
       report.rewritten.push(join(dataRoot, 'config', 'business-access.json'))
@@ -189,6 +199,9 @@ export function install(options: InstallOptions): InstallReport {
     try {
       if (manifest.source.programOrigin) restoreRepository(prefix, join(bundleRoot, 'repositories/program.bundle'), manifest.package.commit, manifest.source.programOrigin)
       if (manifest.data?.commit && manifest.source.dataOrigin) restoreRepository(dataRoot, join(bundleRoot, 'repositories/data.bundle'), manifest.data.commit, manifest.source.dataOrigin)
+      if (workspace) for (const repository of manifest.workspace!.repositories) {
+        restoreRepository(join(workspace.root, repository.path), join(bundleRoot, `repositories/${repository.name}.bundle`), repository.commit, repository.origin)
+      }
     } finally { process.env.PATH = previousPath }
     if (options.skipPrepare) {
       warnings.push('按要求跳过 prepare；平台尚未构建，不能直接启动')

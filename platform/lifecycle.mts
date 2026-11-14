@@ -8,6 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { defaultAssetRoot } from './plugin/src/workspace.ts'
 import { platformEntryUrl, validatePlatformEntryUrl } from './plugin/src/business-control/group-link.ts'
 import { initializeBusinessGateway } from './plugin/src/business-control/configuration.ts'
+import { automaticAddress, platformAddressArgs, processBirth } from './plugin/src/business-control/runtime-address.ts'
 import { prepareBusinessRuntimeFile } from './plugin/src/business-control/secret-file.ts'
 import { reportBusinessReadiness } from './business-readiness.mts'
 import { managerHome } from './manager-home.mts'
@@ -64,12 +65,7 @@ function atomic(path: string, value: unknown, business = false) {
   renameSync(temporary, path)
 }
 
-export function processBirth(pid: number): string | undefined {
-  try {
-    const fields = readFileSync(`/proc/${pid}/stat`, 'utf8').split(') ').at(-1)!.split(' ')
-    return fields[0] === 'Z' ? undefined : fields[19]
-  } catch { return undefined }
-}
+export { processBirth } from './plugin/src/business-control/runtime-address.ts'
 
 export function managedState(dataRoot: string, expectedProgram = programRoot): State | undefined {
   const path = join(dataRoot, '.local/platform-service/state.json')
@@ -116,12 +112,13 @@ export function launchAddress(dataRoot: string, host?: string, port?: string, pu
   let configured: URL | undefined
   const access = join(dataRoot, 'config/business-access.json')
   if (existsSync(access) && json(access).gateway?.managementUrl !== undefined) configured = new URL(platformEntryUrl(dataRoot))
-  const autoConfigured = existsSync(access) && json(access).gateway?.managementUrlMode === 'auto' || existsSync(access) && json(access).gateway?.publicOriginMode === 'auto'
+  const gateway = existsSync(access) ? json(access).gateway : undefined
+  const autoConfigured = automaticAddress(gateway?.managementUrl, gateway?.managementUrlMode)
   const previous = previousState(dataRoot)
   const local = (value: string) => Object.values(networkInterfaces()).flat().some(item => item?.address === value)
-  const separate = configured && (autoConfigured || configured.protocol === 'https:' || !local(configured.hostname)
+  const separate = configured && (configured.protocol === 'https:' || !local(configured.hostname)
     || previous?.publicUrl === configured.href && previous.publicUrl !== previous.url)
-  if (!host && separate && previous && local(previous.host) && (!configured || local(configured.hostname))) host = previous.host
+  if (!host && separate && previous && local(previous.host)) host = previous.host
   if (!host && (!configured || separate)) {
     const route = spawnSync('ip', ['-j', '-4', 'route', 'get', '1.1.1.1'], { encoding: 'utf8', timeout: 5000 })
     try { host = JSON.parse(route.stdout)[0].prefsrc } catch { throw new Error('无法确定本机 IPv4，请指定 --host') }
@@ -129,15 +126,15 @@ export function launchAddress(dataRoot: string, host?: string, port?: string, pu
   host ??= configured!.hostname
   if (isIP(host) !== 4 || host === '0.0.0.0' || host === '255.255.255.255' || Number(host.split('.')[0]) >= 224) throw new Error('--host 必须是具体 IPv4 地址')
   if (!local(host)) throw new Error(`监听地址 ${host} 不属于本机；请用 --host 指定本机地址`)
-  const number = port === undefined ? Number(separate ? previous?.port ?? 18120 : configured?.port || (configured ? 80 : 18120)) : Number(port)
+  const configuredPort = configured?.port || (configured ? 80 : 18120)
+  const number = port === undefined ? Number(separate ? previous?.port ?? (autoConfigured ? configuredPort : 18120) : configuredPort) : Number(port)
   if (!Number.isInteger(number) || number < 1 || number > 65535) throw new Error('--port 必须是 1 至 65535 的整数')
   const sites = join(dataRoot, 'config/sites.json')
   const base = existsSync(sites) ? json(sites).platform : '/hep/'
   if (typeof base !== 'string' || !/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(base)) throw new Error('config/sites.json 的平台基址无效')
   const url = `http://${host}:${number}${base}`
   if (publicUrl && new URL(publicUrl).hash) throw new Error('--public-url 不能包含片段')
-  // 配置中的非本机地址属于旧的自动生成结果；只有显式 --public-url 才保留 NAT/反向代理入口。
-  const entry = validatePlatformEntryUrl(dataRoot, publicUrl ?? (configured && configured.protocol === 'https:' ? configured.href : !autoConfigured && separate && configured && local(configured.hostname) ? configured.href : url))
+  const entry = validatePlatformEntryUrl(dataRoot, publicUrl ?? (configured && (!autoConfigured || configured.protocol === 'https:') ? configured.href : url))
   if (new URL(entry).pathname !== base) throw new Error('平台管理入口与站点基址不一致')
   return { host, port: number, url, publicUrl: entry }
 }
@@ -430,7 +427,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
   const nodeHeapMb = command === 'stop' ? 8192 : Number(values['--max-old-space-size'] ?? previousState(dataRoot)?.nodeHeapMb ?? 8192)
   if (!Number.isSafeInteger(nodeHeapMb) || nodeHeapMb <= 0) throw new Error('--max-old-space-size 必须是正整数，单位 MiB（8 GiB = 8192 MiB）')
   if (flags.has('--recover') && (!insideService() || !flags.has('--foreground'))) throw new ConfigurationError('--recover 仅供平台 systemd 服务恢复已应用制品')
-  const startArgs = address ? ['start', ...(flags.has('--recover') ? ['--applied'] : []), '--host', address.host, '--port', String(address.port), '--public-url', address.publicUrl] : []
+  const startArgs = address ? ['start', ...(flags.has('--recover') ? ['--applied'] : []), ...platformAddressArgs(address, flags.has('--public-url'))] : []
   if (flags.has('--dry-run')) {
     console.log(JSON.stringify({ ...JSON.parse(runStartPreflight(startArgs)), node_heap_mb: nodeHeapMb }, null, 2))
     return 0
@@ -488,7 +485,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     let saved: string | undefined
     // 数据尚未初始化时由浏览器引导建立配置，不能预先制造不完整数据根。
     if (existsSync(join(dataRoot, 'workspace.json'))) {
-      initializeBusinessGateway(dataRoot, address!.publicUrl, address!.host)
+      initializeBusinessGateway(dataRoot, address!.publicUrl, address!.host, undefined, flags.has('--public-url') ? 'explicit' : undefined)
       rewritePlatformOwnedUrls(accessPath, before ? JSON.parse(before).gateway?.managementUrl : undefined, address!.publicUrl)
       rewritePlatformOwnedUrls(join(dataRoot, 'mcp/manager.json'), before ? JSON.parse(before).gateway?.managementUrl : undefined, address!.publicUrl)
       saved = readFileSync(accessPath, 'utf8')

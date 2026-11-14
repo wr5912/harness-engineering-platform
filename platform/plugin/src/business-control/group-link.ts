@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { workspaceConfigPath } from '../workspace.ts'
 import { initializeBusinessGateway } from './configuration.ts'
+import { automaticAddress, bindPlatformEntry, runningPlatformEntry } from './runtime-address.ts'
 
 /** 公开入口与站点基址共用校验；不写配置或访问网络。 */
 export function validatePlatformEntryUrl(assetRoot: string, configured: string): string {
@@ -16,17 +17,24 @@ export function validatePlatformEntryUrl(assetRoot: string, configured: string):
   return base.href
 }
 
-/** 管理入口是可编辑来源；浏览器链接、公告与业务 Runtime 共用它。 */
+/** 浏览器、MCP 和业务 Runtime 共用当前平台入口，自动地址不以历史配置为准。 */
 export function platformEntryUrl(assetRoot: string, startup?: { fallback: string; publicUrl?: string; host?: string }): string {
   const path = join(assetRoot, 'config', 'business-access.json')
   const access = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : { schemaVersion: 1, enabled: false, agents: [] }
-  const configured = access.gateway?.managementUrl || startup?.publicUrl || startup?.fallback
+  const saved = access.gateway?.managementUrl
+  const automatic = automaticAddress(saved, access.gateway?.managementUrlMode)
+  const configured = startup
+    ? automatic ? startup.publicUrl ?? startup.fallback : saved ?? startup.publicUrl ?? startup.fallback
+    : runningPlatformEntry(assetRoot) ?? saved
   if (typeof configured !== 'string') throw new Error('业务网关缺少平台管理入口')
   const entry = validatePlatformEntryUrl(assetRoot, configured)
   if (startup?.publicUrl && new URL(startup.publicUrl).href !== entry) {
     throw new Error('DSH publicUrl 与 config/business-access.json 的 gateway.managementUrl 不一致，请统一平台入口')
   }
-  if (startup) initializeBusinessGateway(assetRoot, entry, startup.host)
+  if (startup) {
+    initializeBusinessGateway(assetRoot, entry, startup.host)
+    bindPlatformEntry(assetRoot, entry)
+  }
   return entry
 }
 

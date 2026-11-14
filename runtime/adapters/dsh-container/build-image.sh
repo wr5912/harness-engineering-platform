@@ -6,6 +6,8 @@ task_repo_dir="$(cd "$task_adapter_dir/../../.." && pwd -P)"
 task_source_dir=""
 task_standalone_dir=""
 task_source_id=""
+task_arch=""
+task_base_image_archive=""
 task_evidence_file=""
 task_build_network="default"
 # 构建期 APT 默认使用 TUNA 主源和 Debian 官方 security；npm/pnpm 走 registry.npmmirror.com。
@@ -16,7 +18,7 @@ task_npm_registry="https://registry.npmmirror.com"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help)
-      printf 'Usage: %s [--source business:agent-id|EXP-agent-NNN-r12hex] [--evidence-output FILE] [--build-network host] [--apt-mirror http://mirrors.tuna.tsinghua.edu.cn/debian|http://deb.debian.org/debian]\n' "$0"
+      printf 'Usage: %s [--source business:agent-id] [--arch amd64|arm64] [--base-image-archive FILE] [--evidence-output FILE] [--build-network host] [--apt-mirror http://mirrors.tuna.tsinghua.edu.cn/debian|http://deb.debian.org/debian]\n' "$0"
       printf 'Build locked official DSH source. APT defaults to TUNA main with Debian official security;\n'
       printf 'the official Debian APT source is an explicit fallback when the mirror is unreachable.\n'
       printf 'Host network is opt-in for local build egress only.\n'
@@ -36,6 +38,16 @@ while [[ $# -gt 0 ]]; do
         exit 2
       fi
       task_source_id="$2"
+      shift 2
+      ;;
+    --arch)
+      [[ $# -ge 2 && ( "$2" == amd64 || "$2" == arm64 ) && -z "$task_arch" ]] || { printf 'Expected --arch amd64|arm64\n' >&2; exit 2; }
+      task_arch="$2"
+      shift 2
+      ;;
+    --base-image-archive)
+      [[ $# -ge 2 && -f "$2" && -z "$task_base_image_archive" ]] || { printf 'Expected --base-image-archive FILE\n' >&2; exit 2; }
+      task_base_image_archive="$2"
       shift 2
       ;;
     --build-network)
@@ -73,6 +85,12 @@ task_platform="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_
 task_cli_version="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.cli_version)"
 task_image_tag="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.local_image_tag)"
 task_image_build_fingerprint="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.build_fingerprint)"
+if [[ -n "$task_arch" ]]; then
+  task_platform="linux/$task_arch"
+  task_identity="$(python3 "$task_adapter_dir/source_contract.py" --image-identity-for "$task_platform")"
+  task_image_tag="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["tag"])' "$task_identity")"
+  task_image_build_fingerprint="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["fingerprint"])' "$task_identity")"
+fi
 task_image_input_digests="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --image-input-digests)"
 task_image_label_key="org.ai-agent-harness.dsh.image-build-fingerprint"
 task_source_repository="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.repository)"
@@ -114,13 +132,17 @@ rm -rf -- "$task_source_dir/.git"
 
 # 使用同一固定 Node 底座与 mirror 规则先签名核验 main/updates/security 索引。
 # 如果镜像缺 security、签名或 Valid-Until 不通过，不进入耗时的 DSH 构建。
-docker run --rm --platform "$task_platform" --network "$task_build_network" \
+if [[ -n "$task_base_image_archive" ]]; then
+  docker load -i "$task_base_image_archive"
+  # 按 digest 保存的 OCI 归档没有 RepoTags，恢复名称后才能离线解析同一固定引用。
+  docker tag "${task_node_base##*@}" "${task_node_base%@*}"
+fi
+docker run --rm -i --platform "$task_platform" --network "$task_build_network" \
   --env http_proxy --env https_proxy --env no_proxy \
   --env HTTP_PROXY --env HTTPS_PROXY --env NO_PROXY \
-  --mount "type=bind,src=$task_adapter_dir/apt-mirror.sh,dst=/opt/dsh-adapter/apt-mirror.sh,readonly" \
   --entrypoint sh \
   "$task_node_base" \
-  /opt/dsh-adapter/apt-mirror.sh "$task_apt_mirror"
+  -s -- "$task_apt_mirror" < "$task_adapter_dir/apt-mirror.sh"
 
 docker buildx build \
   --platform "$task_platform" \

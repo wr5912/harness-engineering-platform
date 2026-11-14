@@ -1,5 +1,4 @@
-# syntax=docker/dockerfile:1.7
-
+# 使用 Docker 内置 BuildKit frontend，离线构建无需额外拉取 Dockerfile 镜像。
 # 源码由 build-image.sh 以固定提交生成，并通过 BuildKit named context 提供。
 # Dockerfile 不从本仓库复制或隐式获取 DSH Runtime。
 ARG DSH_NODE_BASE

@@ -5,7 +5,7 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { launchAddress, managedState, platformNodeOptions, processBirth, processHeapMb, renderAutostartUnit } from './lifecycle.mts'
+import { launchAddress, managedState, ownsPort, platformNodeOptions, processBirth, processHeapMb, renderAutostartUnit } from './lifecycle.mts'
 import { handoffService } from './bootstrap/server.ts'
 import { platformGroupUrl } from './plugin/src/business-control/group-link.ts'
 
@@ -112,7 +112,7 @@ test('浏览器选择其他数据根后迁移受管进程记录和安装默认�
 test('统一入口后台启停、重复启动、重启、只读预检与端口冲突', async () => {
   const root = mkdtempSync(join(tmpdir(), 'hep-lifecycle-'))
   const repo = join(root, 'program with spaces'), data = join(root, 'data')
-  for (const file of ['platform/dsh-platform', 'platform/tool-env.sh', 'platform/lifecycle.mts', 'platform/business-readiness.mts', 'platform/manager-home.mts', 'platform/plugin/src/manager-home.ts', 'platform/plugin/src/workspace.ts', 'platform/plugin/src/version-id.ts', ...['configuration.ts', 'entry.ts', 'contracts.ts', 'instance.ts', 'group-link.ts', 'secret-file.ts'].map(file => `platform/plugin/src/business-control/${file}`)]) {
+  for (const file of ['platform/dsh-platform', 'platform/tool-env.sh', 'platform/lifecycle.mts', 'platform/business-readiness.mts', 'platform/manager-home.mts', 'platform/plugin/src/manager-home.ts', 'platform/plugin/src/workspace.ts', 'platform/plugin/src/version-id.ts', ...['configuration.ts', 'entry.ts', 'contracts.ts', 'instance.ts', 'group-link.ts', 'runtime-address.ts', 'secret-file.ts'].map(file => `platform/plugin/src/business-control/${file}`)]) {
     const target = join(repo, file)
     mkdirSync(dirname(target), { recursive: true })
     copyFileSync(new URL('../' + file, import.meta.url), target)
@@ -166,6 +166,7 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     assert.equal(state().nodeHeapMb, 8192)
     assert.match(readFileSync(join(data, 'fixture-node-options.txt'), 'utf8'), /--max-old-space-size=8192$/)
     assert.equal(state().status, 'running')
+    assert.equal(JSON.parse(readFileSync(join(data, 'config/business-access.json'))).gateway.managementUrlMode, 'auto', '自动入口经过子进程启动仍为自动模式')
     assert.equal(cli('start').status, 0)
     assert.equal(state().pid, pid)
     for (const mode of ['failed', 'stall']) {
@@ -207,6 +208,7 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     assert.equal(cli('restart').status, 0)
     assert.notEqual(state().pid, pid)
     assert.equal(state().nodeHeapMb, 6144, '未指定堆上限时沿用上次设置')
+    assert.equal(JSON.parse(readFileSync(join(data, 'config/business-access.json'))).gateway.managementUrlMode, 'auto', '重启保留自动入口模式')
     const publicUrl = 'https://platform.example/hep/'
     const nat = cli('restart', '--host', '127.0.0.1', '--port', String(port), '--public-url', publicUrl)
     assert.equal(nat.status, 0, nat.stderr || nat.stdout)
@@ -217,6 +219,15 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     assert.equal(cli('restart').status, 0)
     assert.equal(state().publicUrl, publicUrl)
     assert.equal(state().port, port)
+    assert.equal(state().host, '127.0.0.1', '反向代理公开域名不应改变已选的本机监听地址')
+    for (const explicit of ['http://platform.example/hep/', 'http://192.0.2.1:18121/hep/']) {
+      const changed = cli('restart', '--public-url', explicit)
+      assert.equal(changed.status, 0, changed.stderr || changed.stdout)
+      assert.equal(cli('restart').status, 0)
+      assert.equal(state().publicUrl, explicit, '显式 HTTP 域名和 NAT IP 在重启后保持')
+      assert.equal(state().host, '127.0.0.1')
+    }
+    assert.equal(cli('restart', '--public-url', publicUrl).status, 0)
     assert.equal(cli('stop').status, 0)
     assert.equal(state().status, 'stopped')
     assert.equal(cli('stop').status, 0)
@@ -247,7 +258,10 @@ http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
     await foregroundExit
     const occupied = spawn(process.env.HARNESS_PYTHON ?? 'python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { stdio: 'ignore' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 200))
+      for (let n = 0; n < 100 && occupied.exitCode === null && !ownsPort(occupied.pid, '127.0.0.1', port); n++) {
+        await new Promise(resolve => setTimeout(resolve, 20))
+      }
+      assert.ok(ownsPort(occupied.pid, '127.0.0.1', port), '冲突进程必须已实际监听被测端口')
       const before = readFileSync(file, 'utf8')
       assert.notEqual(cli('start').status, 0)
       assert.equal(readFileSync(file, 'utf8'), before)

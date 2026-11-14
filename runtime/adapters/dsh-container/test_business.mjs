@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { businessSourceDigest, readBusinessLaunchConfig, renderBusinessInstance, syncSourceMcp } from './business.ts'
 import { mcpCredentialPaths } from '../../../platform/plugin/src/mcp/credential-path.ts'
+import { bindPlatformEntry } from '../../../platform/plugin/src/business-control/runtime-address.ts'
 const require = createRequire(new URL('../../../platform/plugin/package.json', import.meta.url))
 const yaml = require('js-yaml')
 
@@ -185,6 +186,19 @@ test('业务访问配置中的相对密钥路径按当前数据根解析并用�
   assert.equal(config.assetRoot, f.config.assetRoot)
   assert.equal(config.sharedSecretFile, secret)
   assert.equal(config.coordinatorOrigin, 'http://host.docker.internal:53105')
+})
+
+test('运行中同步旧 IP 后，新实例装配使用当前协调器，不改写数据配置', t => {
+  const f = fixture(t), file = join(f.config.assetRoot, 'config/business-access.json')
+  const saved = JSON.stringify({ schemaVersion: 1, enabled: true, agents: [], gateway: {
+    port: 53106, publicOrigin: 'http://10.0.160.32:53106', managementUrl: 'http://10.0.160.32:18120/hep/',
+    instances: [],
+  } })
+  writeFileSync(file, saved)
+  bindPlatformEntry(f.config.assetRoot, 'http://172.16.138.228:18121/hep/')
+  const config = readBusinessLaunchConfig(file, { ...f.input, identityMode: 'development', accessMode: 'anonymous' })
+  assert.equal(config.coordinatorOrigin, 'http://172.16.138.228:53106')
+  assert.equal(readFileSync(file, 'utf8'), saved)
 })
 
 test('网页入口保留登记错误并隐藏配置解析细节', t => {

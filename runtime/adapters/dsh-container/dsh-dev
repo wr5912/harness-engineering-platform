@@ -960,7 +960,7 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
                    image_fingerprint: str | None = None, schedule_compat: bool = False,
                    managed_patch_compat: bool = False, harness_runtime: bool = False,
                    project_workspace: bool = False, dependency_mounts: list[dict] = (),
-                   asset_load_directory: str | None = None) -> str:
+                   asset_load_directory: str | None = None, workspace_env: bool = False) -> str:
     """把受控 Compose 模板渲染为隔离的业务或归因实例配置。"""
     if mode not in MODES:
         fail("mode 只能是 verification")
@@ -1054,6 +1054,15 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
     if text.count(relative_source) < 1:
         fail("Compose 模板缺少相对挂载源锚点")
     text = text.replace(relative_source, f"        source: {ADAPTER}/")
+    workspace_env_mount = (
+        "      - type: bind\n"
+        f"        source: {ADAPTER}/verification-home-controls/locked-bootstrap.env\n"
+        f"        target: {CONTAINER_WORKSPACE}/.env\n"
+        "        read_only: true\n"
+    )
+    # 只覆盖已有文件；在只读 Harness 下创建不存在的挂载点会使容器启动失败。
+    if not workspace_env or analysis_workspace:
+        text = text.replace(workspace_env_mount, "")
     if analysis_workspace:
         workspace_mount = (
             "      - type: bind\n"
@@ -1081,12 +1090,6 @@ def render_compose(template: str, *, mode: str, name: str, project: str, port: i
             "      - type: bind\n"
             "        source: ${DSH_MANAGED_HOST:?managed 根由所选来源注入}\n"
             "        target: /opt/dsh-managed\n"
-            "        read_only: true\n"
-            ),
-            (
-            "      - type: bind\n"
-            f"        source: {ADAPTER}/verification-home-controls/locked-bootstrap.env\n"
-            f"        target: {CONTAINER_WORKSPACE}/.env\n"
             "        read_only: true\n"
             ),
         ]
@@ -1411,6 +1414,7 @@ def write_instance(name: str, *, mode: str, contract: dict, port: int,
         project_workspace=bool(contract.get("project_workspace_host")) and not analysis_workspace,
         dependency_mounts=runtime_mounts(contract, analysis_workspace, target / "dsh-home/private"),
         asset_load_directory=str(target / "asset-load") if not analysis_workspace else None,
+        workspace_env=Path(contract["workspace"], ".env").is_file() if not analysis_workspace else False,
     )
     business = None
     if contract.get("business_control"):
@@ -3248,7 +3252,7 @@ def existing_instance(name: str) -> tuple[Path, dict] | None:
         return None
     manifest_path = target / "instance.json"
     if not manifest_path.is_file():
-        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml", "profile-compat", "asset-load", "runtime-presets", "harness-runtime.json", "project-workspace", "project-workspace-source.json", "project-workspace.pending", "sdk.lock", "sdk-launch.json", "sdk-runtime"}:
+        if set(path.name for path in target.iterdir()) <= {"dsh-home", "model.patch.yml", "profile-compat", "asset-load", "asset-file-cache.json", "runtime-presets", "harness-runtime.json", "project-workspace", "project-workspace-source.json", "project-workspace.pending", "sdk.lock", "sdk-launch.json", "sdk-runtime"}:
             return None
         fail(f"实例目录已存在但缺少 instance.json：{target}")
     return load_instance(name)
@@ -3307,6 +3311,7 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
             harness_runtime=bool(contract.get("harness_runtime")) and not analysis_workspace,
             project_workspace=bool(contract.get("project_workspace_host")) and not analysis_workspace,
             dependency_mounts=runtime_mounts(contract, analysis_workspace, instance_dir(args.name) / "dsh-home/private"),
+            workspace_env=Path(contract["workspace"], ".env").is_file() if not analysis_workspace else False,
         )
         business = None
         if contract.get("business_control"):

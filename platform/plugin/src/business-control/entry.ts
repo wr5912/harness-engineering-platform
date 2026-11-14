@@ -4,10 +4,11 @@ import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import { BUSINESS_TRANSPORT_HEADER, BUSINESS_TRANSPORT_VERSION } from './contracts.ts'
 import { resolveBusinessInstance } from './instance.ts'
+import { effectiveBusinessAccess } from './runtime-address.ts'
 
 /** CLI 与实例管理共用同一业务公开入口合同。 */
 export function businessGatewayEntry(assetRoot: string, agentId: string, instanceId: string): string {
-  const access = JSON.parse(readFileSync(join(assetRoot, 'config/business-access.json'), 'utf8'))
+  const access = effectiveBusinessAccess(assetRoot, JSON.parse(readFileSync(join(assetRoot, 'config/business-access.json'), 'utf8')))
   const gateway = access.gateway
   const selected = gateway?.instances?.find((value: { agentId: string; instanceId: string }) => value.agentId === agentId && value.instanceId === instanceId)
   if (!selected || access.enabled !== true && selected.accessMode !== 'anonymous') throw new Error('实例未向业务网关开放')
@@ -51,9 +52,10 @@ function entryResponse(url: string): Promise<{ status: number; type: string; ver
 
 export async function checkBusinessGatewayEntry(assetRoot: string, agentId: string, instanceId: string): Promise<BusinessEntryCheck> {
   const url = businessGatewayEntry(assetRoot, agentId, instanceId)
-  const access = JSON.parse(readFileSync(join(assetRoot, 'config/business-access.json'), 'utf8'))
+  const access = effectiveBusinessAccess(assetRoot, JSON.parse(readFileSync(join(assetRoot, 'config/business-access.json'), 'utf8')))
   const selected = access.gateway.instances.find((item: { agentId: string; instanceId: string }) => item.agentId === agentId && item.instanceId === instanceId)
   let stage = '业务网关'
+  let checkedUrl = url
   try {
     const entry = await entryResponse(url)
     const anonymous = selected.accessMode === 'anonymous'
@@ -72,12 +74,13 @@ export async function checkBusinessGatewayEntry(assetRoot: string, agentId: stri
     if (anonymous && !/^text\/html(?:;|$)/i.test(entry.type)) return { url, ready: false, httpStatus: entry.status, detail: '业务网关入口未返回 HTML 网页，请检查实例 Web 配置' }
     // 登录前的 401 由网关生成，另查受控内部地址才能确认 Runtime 实际装载版本。
     stage = '业务 Runtime'
-    const runtime = anonymous ? entry : await entryResponse(`${resolveBusinessInstance(assetRoot, selected).origin}${new URL(url).pathname}`)
+    if (!anonymous) checkedUrl = `${resolveBusinessInstance(assetRoot, selected).origin}${new URL(url).pathname}`
+    const runtime = anonymous ? entry : await entryResponse(checkedUrl)
     if (runtime.version !== BUSINESS_TRANSPORT_VERSION) return { url, ready: false, httpStatus: runtime.status, runtimeVersion: runtime.version,
       detail: `Runtime 接入版本${runtime.version ? `为 ${runtime.version}` : '未报告'}，当前需要 ${BUSINESS_TRANSPORT_VERSION}；请重载该实例后重试` }
     return { url, ready: true, httpStatus: entry.status, runtimeVersion: runtime.version, detail: anonymous ? '无需认证的网页入口可用' : '登录入口及 Runtime 接入版本已核对' }
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code
-    return { url, ready: false, detail: `${stage}${code === 'ABORT_ERR' ? '检查超时' : code === 'ECONNREFUSED' ? '连接被拒绝' : '连接失败'}；请检查监听状态和启动日志` }
+    return { url, ready: false, detail: `${stage}${code === 'ABORT_ERR' ? '检查超时（5 秒）' : code === 'ECONNREFUSED' ? '连接被拒绝' : '连接失败'}：${checkedUrl}${code ? `（${code}）` : ''}；请检查该地址的监听状态和启动日志` }
   }
 }

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { prepareBusinessRuntimeFile } from './secret-file.ts'
+import { effectiveBusinessAccess } from './runtime-address.ts'
 import { dirname, join } from 'node:path'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import { BusinessControlError, getBusinessControl } from './core.ts'
@@ -151,7 +152,8 @@ export function createBusinessControlHandler(assetRoot: string): ConnectionRpcHa
     return { config, revision: sha256(raw) }
   }
   function view(): BusinessControlManagementStatus {
-    const status = control.status(), { config, revision } = readConfiguration()
+    const status = control.status(), { config: stored, revision } = readConfiguration()
+    const config = effectiveBusinessAccess(assetRoot, stored)
     const registered = (config.gateway as { instances?: Array<{ agentId?: string; instanceId?: string; sourceDigest?: string; identityMode?: 'development' | 'published'; accessMode?: 'anonymous' | 'authenticated' }> } | undefined)?.instances ?? []
     const instances = status.instances.map(value => {
       const row = registered.find(item => item.agentId === value.agentId && item.instanceId === value.instanceId)

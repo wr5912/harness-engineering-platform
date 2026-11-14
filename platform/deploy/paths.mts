@@ -33,6 +33,9 @@ export function knownPathFiles(dataRoot: string): string[] {
   const files = [
     join(dataRoot, 'workspace.json'),
     join(dataRoot, 'config', 'business-access.json'),
+    join(dataRoot, 'config', 'repositories.json'),
+    join(dataRoot, 'config', 'assistant-workspace.json'),
+    join(dataRoot, 'locks', 'repositories.yaml'),
     join(home, 'storages/workspace.json'),
     join(home, 'profiles/harness-platform/cordis.patch.yml'),
     join(home, 'profiles/harness-platform/harness-platform.patch.yml'),
@@ -96,7 +99,7 @@ export function rewriteDeploymentAddress(dataRoot: string, host: string, port: n
   const management = new URL(publicUrl ? validatePlatformEntryUrl(dataRoot, publicUrl) : previous?.gateway?.managementUrl ?? `http://${host}:${port}${base}`)
   if (publicUrl && new URL(publicUrl).hash) throw new Error('--public-url 不能包含片段')
   if (!publicUrl) { management.hostname = host; management.port = String(port) }
-  initializeBusinessGateway(dataRoot, management.href, host, gatewayPort)
+  initializeBusinessGateway(dataRoot, management.href, host, gatewayPort, publicUrl ? 'explicit' : undefined)
   const access = JSON.parse(readFileSync(file, 'utf8'))
   const gateway = access.gateway
   gateway.host = host

@@ -6,6 +6,7 @@ import { managedState, ownsPort, restoreManagedProcess } from '../lifecycle.mts'
 import { readUpdateActivity } from './update.mts'
 import { readCompositions, compositionConfig } from '../plugin/src/mcp/compositions.ts'
 import { workspaceIdentity } from '../plugin/src/workspace.ts'
+import { platformAddressArgs } from '../plugin/src/business-control/runtime-address.ts'
 
 type Options = { programRoot: string; dataRoot: string; dryRun?: boolean }
 type Move = { from: string; to: string }
@@ -147,7 +148,7 @@ export async function migrateMcp(input: Options) {
     const receipt = await applyMcpMigration(plan, async () => {
       command(['prepare', '--offline'])
       if (state) {
-        command(['start', '--host', state.host, '--port', String(state.port), '--public-url', state.publicUrl ?? state.url])
+        command(['start', ...platformAddressArgs(state)])
         const current = managedState(options.dataRoot, options.programRoot)
         if (!current) throw new Error('迁移后的平台未启动')
         await readUpdateActivity(options, current, workspaceIdentity(options.dataRoot).id)
