@@ -154,8 +154,16 @@ export function renderAutostartUnit(root = programRoot, dataRoot = defaultAssetR
     `ExecStart=${systemdQuote(join(root, 'platform/dsh-platform'))} start --foreground --recover`, 'Restart=always', 'RestartPreventExitStatus=78', 'RestartSec=5s',
     'TimeoutStartSec=10min', 'TimeoutStopSec=45s', 'KillMode=control-group', '', '[Install]', 'WantedBy=default.target', ''].join('\n')
 }
+export function systemdUserEnvironment(env = process.env, uid = process.getuid?.()) {
+  if (uid === undefined) return env
+  const runtime = env.XDG_RUNTIME_DIR || `/run/user/${uid}`
+  return { ...env, XDG_RUNTIME_DIR: runtime, DBUS_SESSION_BUS_ADDRESS: env.DBUS_SESSION_BUS_ADDRESS || `unix:path=${runtime}/bus` }
+}
+function commandEnvironment(command: string, args: string[]) {
+  return command === 'systemctl' && args.includes('--user') ? systemdUserEnvironment() : process.env
+}
 function commandResult(command: string, args: string[]) {
-  const result = spawnSync(command, args, { encoding: 'utf8' })
+  const result = spawnSync(command, args, { encoding: 'utf8', env: commandEnvironment(command, args) })
   if (result.error) throw new Error(`无法执行 ${command}：${result.error.message}`)
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim()
   if (result.status !== 0) throw new Error(output || `${command} 退出码 ${result.status ?? '未知'}`)
@@ -213,7 +221,7 @@ function startupDiagnostic(log: string, offset = 0): string {
   }
 }
 function probe(command: string, args: string[]) {
-  const result = spawnSync(command, args, { encoding: 'utf8' })
+  const result = spawnSync(command, args, { encoding: 'utf8', env: commandEnvironment(command, args) })
   if (result.error) return { available: false, status: undefined, output: result.error.message }
   return { available: true, status: result.status, output: `${result.stdout ?? ''}${result.stderr ?? ''}`.trim() }
 }
@@ -250,7 +258,7 @@ function manageAutostart(subcommand: string, dataRoot: string, asJson: boolean) 
     systemctl(['disable', autostartService])
     console.log('平台自启动已停用（未停止当前平台进程）'); return 0
   }
-  systemctl(['show-environment']); ensureLinger(); mkdirSync(directory, { recursive: true, mode: 0o700 })
+  ensureLinger(); systemctl(['show-environment']); mkdirSync(directory, { recursive: true, mode: 0o700 })
   const temporary = `${unitPath}.${process.pid}.tmp`
   writeFileSync(temporary, renderAutostartUnit(programRoot, dataRoot), { mode: 0o600 })
   try { renameSync(temporary, unitPath); systemctl(['daemon-reload']); systemctl(['enable', autostartService]) }

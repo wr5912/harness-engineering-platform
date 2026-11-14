@@ -5,7 +5,7 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { launchAddress, managedState, ownsPort, platformNodeOptions, processBirth, processHeapMb, renderAutostartUnit } from './lifecycle.mts'
+import { launchAddress, managedState, ownsPort, platformNodeOptions, processBirth, processHeapMb, renderAutostartUnit, systemdUserEnvironment } from './lifecycle.mts'
 import { handoffService } from './bootstrap/server.ts'
 import { platformGroupUrl } from './plugin/src/business-control/group-link.ts'
 
@@ -53,6 +53,31 @@ test('自启动单元固定程序根、数据根和用户服务入口', () => {
   assert.match(unit, /ExecStart="\/opt\/hep root\/platform\/dsh-platform" start --foreground/)
   assert.match(unit, /WantedBy=default\.target/)
   assert.match(unit, /TimeoutStartSec=10min/)
+})
+
+test('无交互 SSH 使用目标用户总线，保留显式会话环境', () => {
+  assert.deepEqual(systemdUserEnvironment({ PATH: '/usr/bin' }, 0), {
+    PATH: '/usr/bin', XDG_RUNTIME_DIR: '/run/user/0', DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/0/bus',
+  })
+  assert.equal(systemdUserEnvironment({ XDG_RUNTIME_DIR: '/run/user/1006' }, 1006).DBUS_SESSION_BUS_ADDRESS, 'unix:path=/run/user/1006/bus')
+  const explicit = { XDG_RUNTIME_DIR: '/custom/runtime', DBUS_SESSION_BUS_ADDRESS: 'unix:abstract=custom' }
+  assert.deepEqual(systemdUserEnvironment(explicit, 1006), explicit)
+})
+
+test('自启动先启用用户驻留，再从无会话环境连接用户总线', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hep-autostart-'))
+  try {
+    const bin = join(root, 'bin'), state = join(root, 'linger'), calls = join(root, 'calls')
+    mkdirSync(bin)
+    writeFileSync(join(bin, 'loginctl'), `#!/bin/sh\nif [ "$1" = show-user ]; then test -f '${state}' && echo Linger=yes; else touch '${state}'; fi\n`, { mode: 0o755 })
+    writeFileSync(join(bin, 'systemctl'), `#!/bin/sh\ntest -f '${state}' || exit 8\ntest "$XDG_RUNTIME_DIR" = /run/user/$(id -u) || exit 9\ntest "$DBUS_SESSION_BUS_ADDRESS" = unix:path=$XDG_RUNTIME_DIR/bus || exit 10\necho "$*" >> '${calls}'\n`, { mode: 0o755 })
+    const env = { ...process.env, HOME: root, PATH: `${bin}:${process.env.PATH}`, HARNESS_ASSET_ROOT: join(root, 'data') }
+    delete env.XDG_RUNTIME_DIR; delete env.DBUS_SESSION_BUS_ADDRESS
+    const result = spawnSync(process.execPath, [join(import.meta.dirname, 'lifecycle.mts'), 'autostart', 'enable'], { env, encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(readFileSync(calls, 'utf8'), /--user show-environment\n--user daemon-reload\n--user enable harness-engineering-platform.service/)
+    assert.match(readFileSync(join(root, '.config/systemd/user/harness-engineering-platform.service'), 'utf8'), /HARNESS_ASSET_ROOT=/)
+  } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
 test('地址配置只读校验，允许已有多级站点基址', () => {
