@@ -282,7 +282,23 @@ test('打包前从 Docker 归档核对标签、配置摘要、架构和构建指
     assert.ok(verifyImageInfo({ ...info, ...changed }, { id: info.id, arch: 'arm64', fingerprint: 'expected' }).length, JSON.stringify(changed))
   }
   assert.match(verifyImageInfo(info, { fingerprint: 'wrong' }).join(''), /指纹不符/)
-  assert.throws(() => inspectImageArchive(archive, 'hep:poc'), /标准标签/)
+  assert.throws(() => inspectImageArchive(archive, 'hep:poc'), error => {
+    assert.ok(error.message.includes(archive))
+    assert.match(error.message, /期望 hep:poc 唯一匹配，实际匹配 0 项，归档标签 hep:standard/)
+    return true
+  })
+  write(join(dir, 'manifest.json'), JSON.stringify(Array(2).fill({ Config: `${digest}.json`, RepoTags: ['hep:standard'], Layers: [] })))
+  assert.equal(spawnSync('tar', ['-C', dir, '-cf', archive, 'manifest.json', `${digest}.json`]).status, 0)
+  assert.throws(() => inspectImageArchive(archive, 'hep:standard'), /实际匹配 2 项/)
+  write(join(dir, 'manifest.json'), JSON.stringify([{ Config: `${digest}.json`, RepoTags: ['hep:standard'], Layers: [] }]))
+  write(join(dir, `${digest}.json`), config + '\n')
+  assert.equal(spawnSync('tar', ['-C', dir, '-cf', archive, 'manifest.json', `${digest}.json`]).status, 0)
+  assert.throws(() => inspectImageArchive(archive, 'hep:standard'), error => {
+    assert.ok(error.message.includes(archive))
+    assert.ok(error.message.includes(`期望 sha256:${digest}，实际 sha256:${createHash('sha256').update(config + '\n').digest('hex')}`))
+    return true
+  })
+  write(join(dir, `${digest}.json`), config)
   const oci = JSON.stringify({ schemaVersion: 2, config: { digest: `sha256:${digest}` }, layers: [] })
   const ociDigest = createHash('sha256').update(oci).digest('hex')
   write(join(dir, 'blobs/sha256', ociDigest), oci)

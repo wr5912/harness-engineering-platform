@@ -52,12 +52,16 @@ export function inspectImageArchive(archive: string, tag: string): ImageInfo {
     RepoTags?: string[]
   }>
   const entries = Array.isArray(manifest) ? manifest.filter(entry => entry.RepoTags?.includes(tag)) : []
-  if (entries.length !== 1) throw new Error(`镜像归档必须包含且只包含一个标准标签：${tag}`)
+  if (entries.length !== 1) {
+    const actual = Array.isArray(manifest) ? manifest.flatMap(entry => entry.RepoTags ?? []) : []
+    throw new Error(`镜像归档 ${archive} 的标准标签不符：期望 ${tag} 唯一匹配，实际匹配 ${entries.length} 项，归档标签 ${actual.length ? actual.join(', ') : '缺失'}；请使用当前版本的标准 Runtime 镜像重新准备安装资源`)
+  }
   const configPath = entries[0].Config
   const match = /^(?:blobs\/sha256\/)?([0-9a-f]{64})(?:\.json)?$/.exec(configPath)
-  if (!match) throw new Error(`镜像归档配置路径无效：${configPath}`)
+  if (!match) throw new Error(`镜像归档 ${archive} 的配置路径无效：期望 <64位摘要>.json 或 blobs/sha256/<64位摘要>，实际 ${configPath}`)
   const content = run('tar', ['-xOf', archive, configPath])
-  if (sha256Text(content) !== match[1]) throw new Error('镜像归档配置摘要不符')
+  const actualDigest = sha256Text(content)
+  if (actualDigest !== match[1]) throw new Error(`镜像归档 ${archive} 的配置 ${configPath} 摘要不符：期望 sha256:${match[1]}，实际 sha256:${actualDigest}；请重新导出未损坏的标准镜像归档`)
   const config = JSON.parse(content) as {
     architecture?: string
     os?: string
@@ -69,16 +73,17 @@ export function inspectImageArchive(archive: string, tag: string): ImageInfo {
       manifests?: Array<{ digest: string }>
     }
     const readBlob = (digest: string): { config?: { digest?: string }; manifests?: Array<{ digest: string }> } => {
-      if (!/^sha256:[0-9a-f]{64}$/.test(digest)) throw new Error('镜像 OCI 清单摘要格式无效')
+      if (!/^sha256:[0-9a-f]{64}$/.test(digest)) throw new Error(`镜像归档 ${archive} 的 OCI 清单摘要格式无效：期望 sha256: 加 64 位小写十六进制，实际 ${digest}`)
       const body = run('tar', ['-xOf', archive, `blobs/sha256/${digest.slice(7)}`])
-      if (`sha256:${sha256Text(body)}` !== digest) throw new Error('镜像 OCI 清单摘要不符')
+      const actual = `sha256:${sha256Text(body)}`
+      if (actual !== digest) throw new Error(`镜像归档 ${archive} 的 OCI 清单摘要不符：期望 ${digest}，实际 ${actual}；请重新导出未损坏的标准镜像归档`)
       return JSON.parse(body)
     }
     const matches = (index.manifests ?? []).filter(entry => {
       const image = readBlob(entry.digest)
       return image.config?.digest === id || image.manifests?.some(child => readBlob(child.digest).config?.digest === id)
     })
-    if (matches.length !== 1) throw new Error('镜像 OCI 索引无法唯一定位标准镜像')
+    if (matches.length !== 1) throw new Error(`镜像归档 ${archive} 的 OCI 索引无法唯一定位标准镜像：期望配置 ${id} 唯一匹配，实际匹配 ${matches.length} 项`)
     id = matches[0].digest
   } catch (error) {
     if (!(error instanceof Error) || !error.message.includes('index.json')) throw error
