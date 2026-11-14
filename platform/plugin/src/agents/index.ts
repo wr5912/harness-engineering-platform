@@ -56,6 +56,7 @@ import { containsLiteralLlmKey } from '../tasks/llm-key.ts'
 import { materializeEvaluationSource, validateMcpFixture } from '../../../../runtime/adapters/dsh-container/evaluation-source.mts'
 import { createInstancesHandler } from '../instances/index.ts'
 import { inheritedLoadableAssets, assertVersionIdentity, versionIdentity, versionSource, versionSources } from './version-source.ts'
+import { businessList, businessSource, businessDetail, businessRead, businessAsset, businessEdit, businessIdentity, runtimeSource } from './business-source.ts'
 import { inspectLegacy, readResearchReference, validateResearch } from './research.ts'
 import { createVariantIdentityMigrationHandler, currentVariantProjection } from './variant-identity.ts'
 import { applyVersion027Migration, version027MigrationPreview } from './version-migration.ts'
@@ -271,24 +272,23 @@ function listAgents(root: string, experiments = listExperiments(root)) {
 /** 只投影已启用版本的资产描述；发现 Skill 不表示运行实例已装载或可执行。 */
 function agentDescription(root: string, payload: JsonMap) {
   const agentId = agentIdField(payload)
-  const manifest = readYamlMap(root, dataPath(root, `agents/${agentId}/manifest.yaml`))
-  const experimentId = typeof manifest.active_experiment === 'string' ? manifest.active_experiment : ''
-  if (!experimentId) return ok({ agentId, source: null, name: null, description: null, notes: null, skills: [] })
-  const source = sourceInfo(root, experimentId)
-  if (source.agent_id !== agentId) throw new RpcError('invalid_source', '已启用版本不属于该 Agent')
-  const base = `evolution/experiments/${experimentId}/candidate`
-  const harness = readYamlMap(root, dataPath(root, `${base}/harness.yaml`))
+  const selector = optionalString(payload, 'source_id') ?? `business:${agentId}`
+  const detail = businessDetail(root, selector)
+  if (detail.id !== agentId) throw new RpcError('invalid_source', '来源不属于该智能体')
+  const experimentId = detail.source_id, base = detail.path
+  const source = { candidate: base }
+  const harness = detail.harness
   const asset = harness.agent && typeof harness.agent === 'object' && !Array.isArray(harness.agent) ? harness.agent as JsonMap : {}
   const loadable = harness.loadable_assets && typeof harness.loadable_assets === 'object' && !Array.isArray(harness.loadable_assets) ? harness.loadable_assets as JsonMap : {}
   const presetRoot = typeof loadable.preset_root === 'string' ? loadable.preset_root : 'dsh/presets'
   const presetId = typeof loadable.preset_id === 'string' ? loadable.preset_id : agentId
-  const presetFile = dataPath(root, `${base}/${presetRoot}/${presetId}/preset.yml`)
-  const preset = existsSync(presetFile) ? readYamlMap(root, presetFile) : {}
+  const presetFile = dataPath(base, `${presetRoot}/${presetId}/preset.yml`)
+  const preset = existsSync(presetFile) ? readYamlMap(detail.repository, presetFile) : {}
   const workspace = typeof loadable.workspace === 'string' ? loadable.workspace : 'dsh/workspace'
   const prefix = `${workspace}/.agents/skills/`
   const skills = candidateFiles(source.candidate).filter(path => path.startsWith(prefix) && path.endsWith('/SKILL.md')).map(path => {
     const skillId = path.slice(prefix.length, -'/SKILL.md'.length)
-    const content = readFileSync(dataPath(root, `${base}/${path}`), 'utf8')
+    const content = readFileSync(dataPath(base, path), 'utf8')
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)
     let fields: JsonMap = {}
     if (frontmatter) {
@@ -298,7 +298,7 @@ function agentDescription(root: string, payload: JsonMap) {
     return { skillId, skillName: typeof fields.name === 'string' ? fields.name : null,
       skillDescription: typeof fields.description === 'string' ? fields.description : null, verification: 'discovered' as const }
   })
-  return ok({ agentId, source: { experimentId, basis: 'active_experiment' },
+  return ok({ agentId, source: { experimentId, basis: 'business-agents' },
     name: typeof asset.name === 'string' ? asset.name : null,
     notes: typeof asset.notes === 'string' ? asset.notes : null,
     description: typeof preset.description === 'string' ? preset.description : null, skills })
@@ -372,9 +372,10 @@ function casesFromEvaluation(parsed: unknown) {
   })
 }
 
-async function loadEvaluation(root: string, agentId: string, signal?: AbortSignal) {
-  const path = businessAgentPath(root, agentId, 'evaluation.md')
-  assertNoSymlinkPath(businessAgentsRoot(root), path)
+async function loadEvaluation(root: string, agentId: string, signal?: AbortSignal, selector = `business:${agentId}`) {
+  const source = businessSource(root, selector)
+  const path = dataPath(source.repository_root, `agents/${agentId}/evaluation.md`)
+  assertNoSymlinkPath(source.repository_root, path)
   const content = readText(path)
   // 原文、摘要及解析共享同一个快照，避免读取期间保存造成口径错配。
   const parsed = await parseJsonCommandAsync(root, ['-c', evaluationPreviewCode(root)], 'evaluation.md 合同解析失败', signal, content)
@@ -417,19 +418,35 @@ function assertUniqueResolved(edits: { rel: string }[]) {
 }
 
 function list(root: string) {
-  const source = catalog(root)
-  const allExperiments = listExperiments(root)
-  const experiments = allExperiments.filter(item => item.is_current)
+  const source = businessList(root)
+  const agents = source.agents.map(agent => ({ ...agent, source_id: agent.source_id, active_experiment: agent.source_id,
+    version_count: agent.versions.length, manifest: { name: agent.name, description: agent.notes, active_experiment: agent.source_id } }))
+  const experiments = source.agents.flatMap(agent => [
+    { id: agent.source_id, agent_id: agent.id, source_id: agent.source_id, label: '当前工作树', is_current: true, change: {} },
+    ...agent.versions.map(version => ({ id: version.source_id, agent_id: agent.id, ...version, label: version.tag, is_current: true, change: {} })),
+  ])
   return ok({
     schema_version: '1.0',
     root,
     observed_at: new Date().toISOString(),
-    agents: listAgents(root, experiments),
+    agents,
     experiments,
-    historical_experiments: allExperiments.filter(item => !item.is_current),
+    historical_experiments: [],
     releases: listDirs(join(root, 'releases')).map(id => ({ id, path: `releases/${id}` })),
-    source_catalog: { path: 'evolution/experiments/*/candidate/harness.yaml', schema_version: '2.0', count: Object.keys(source.parsed.sources ?? {}).length, errors: source.errors },
+    source_catalog: { path: `${source.repository}/agents/*/harness.yaml`, schema_version: '2.0', count: agents.length, errors: source.errors },
   })
+}
+
+async function businessManagementDetail(root: string, payload: JsonMap, signal?: AbortSignal) {
+  const id = agentIdField(payload), selector = optionalString(payload, 'source_id') ?? optionalString(payload, 'experiment_id') ?? `business:${id}`
+  if (!selector.startsWith('business:') || businessIdentity(selector).id !== id) throw new RpcError('invalid_request', '请选择该业务智能体的当前工作树或 Git tag')
+  const value = businessDetail(root, selector)
+  const evaluation = await loadEvaluation(root, id, signal, selector).catch(error => ({ path: `agents/${id}/evaluation.md`, cases: [], error: redact((error as Error).message) }))
+  return ok({ ...value, source_id: value.source_id, agent: { id, name: value.name, manifest: { description: value.notes } },
+    experiment: { id: value.source_id, agent_id: id, change: {} }, evaluation,
+    editable_files: value.files.map(path => `agents/${id}/${path}`), candidate_sha256: value.digest.slice(7),
+    versions: value.versions.map(version => ({ id: version.source_id, agent_id: id, ...version })),
+    baseline: { ref: value.commit ? `git:${value.commit}` : null }, verification: { runs: [] } })
 }
 
 export interface AgentFeature {
@@ -1515,14 +1532,17 @@ function caseFromEvaluation(evaluation: Awaited<ReturnType<typeof loadEvaluation
 }
 
 async function readCase(root: string, payload: JsonMap, signal?: AbortSignal) {
-  const agentId = payload.experiment_id === undefined ? agentIdField(payload) : experimentInfo(root, experimentIdField(payload)).agent_id
-  const evaluation = await loadEvaluation(root, agentId, signal)
+  const selector = optionalString(payload, 'experiment_id') ?? `business:${agentIdField(payload)}`
+  const agentId = businessIdentity(selector).id
+  const evaluation = await loadEvaluation(root, agentId, signal, selector)
   return ok({ case: caseFromEvaluation(evaluation, stringField(payload, 'case_id')), sha256: evaluation.sha256, path: evaluation.path })
 }
 
 async function updateCase(root: string, payload: JsonMap, signal?: AbortSignal) {
-  const experimentId = experimentIdField(payload)
-  const exp = experimentInfo(root, experimentId)
+  const experimentId = stringField(payload, 'experiment_id')
+  const source = runtimeSource(root, experimentId)
+  const exp = { agent_id: source.agent_id as string }
+  if (source.tag) throw new RpcError('read_only', 'Git tag 为只读快照')
   const caseId = stringField(payload, 'case_id')
   const evaluation = await loadEvaluation(root, exp.agent_id, signal)
   const previous = caseFromEvaluation(evaluation, caseId)
@@ -1552,7 +1572,7 @@ async function updateCase(root: string, payload: JsonMap, signal?: AbortSignal) 
     row?.scene !== previous.scene || row?.fast !== payload.fast || JSON.stringify(parsed.case_ids) !== JSON.stringify(evaluation.parsed.case_ids)) {
     throw new RpcError('invalid_request', '用例内容无法按评测合同完整保存，请检查输入和预期中的 Markdown 标题')
   }
-  await applyEdit(root, { experiment_id: experimentId, edits: [{ path: evaluation.path, content, expected_sha256: expected }] }, signal)
+  businessEdit(root, experimentId, [{ path: evaluation.path, content, expected_sha256: expected }])
   const saved = await loadEvaluation(root, exp.agent_id, signal)
   if (saved.sha256 !== sha256(content)) throw new RpcError('conflict', '保存后评测文件再次变化，请重新读取')
   return ok({ case: caseFromEvaluation(saved, caseId), sha256: saved.sha256, path: saved.path })
@@ -1624,19 +1644,10 @@ async function evalCommand(root: string, payload: JsonMap, dryRun: boolean, mode
   if (!isAbsolute(executionRoot) || !existsSync(join(executionRoot, DSH_EVAL))) throw new RpcError('invalid_request', 'program_root 必须是包含 dsh-eval 的程序根绝对路径')
   const args = (policy?: string, fixture?: string) => [join(executionRoot, DSH_EVAL), ...evalArgs(payload, dryRun, policy, fixture).slice(1)]
   const environment = { HARNESS_PROGRAM_ROOT: executionRoot }
-  const selectedId = typeof payload.source === 'string' ? payload.source.replace(/^experiment:/, '') : ''
-  if (!modelPolicy && payload.source_ref === undefined && payload.mcp_fixture === undefined) {
-    if (payload.model_selection !== undefined) throw new RpcError('model_policy_unavailable', '当前执行入口没有原生模型投影，无法应用 model_selection')
-    if (EXP_ID.test(selectedId) && existsSync(join(root, 'evolution/experiments', selectedId, 'candidate/harness.yaml'))
-      && versionSource(root, selectedId).profile === 'sdk') throw new RpcError('sdk_evaluation_unavailable', 'SDK 型版本请使用 SDK 调试入口；当前评测执行器使用 Web 会话协议')
-    return { executable: process.env.HARNESS_PYTHON || 'python3', args: args(), environment }
-  }
-  const ref = payload.source_ref
-  if (ref !== undefined && (typeof ref !== 'string' || !/^git:[a-f0-9]{40}$/.test(ref))) throw new RpcError('invalid_request', 'source_ref 必须是 git:<40位提交>')
-  const fixed = ref ? materializeEvaluationSource(root, selectedId, ref) : undefined
-  const source = fixed ? { id: selectedId, agent_id: fixed.agent_id, candidate: join(fixed.root, 'evolution/experiments', selectedId, 'candidate') }
-    : sourceInfo(root, stringField(payload, 'source'))
-  if (versionSource(fixed?.root ?? root, selectedId).profile === 'sdk') throw new RpcError('sdk_evaluation_unavailable', 'SDK 型版本请使用 SDK 调试入口；当前评测执行器使用 Web 会话协议')
+  const selector = stringField(payload, 'source')
+  const selected = runtimeSource(root, selector, optionalString(payload, 'source_ref'))
+  const source = { agent_id: selected.agent_id as string, candidate: join(selected.repository_root, 'agents', selected.agent_id) }
+  if (selected.profile === 'sdk') throw new RpcError('sdk_evaluation_unavailable', 'SDK 型智能体请使用 SDK 调试入口；当前评测执行器使用 Web 会话协议')
   const fixture = payload.mcp_fixture === undefined ? undefined : validateMcpFixture(payload.mcp_fixture)
   if (!modelPolicy && payload.model_selection !== undefined) throw new RpcError('model_policy_unavailable', '当前执行入口没有原生模型投影，无法应用 model_selection')
   let projected: Awaited<ReturnType<EvalModelPolicyProvider>> | undefined
@@ -1847,10 +1858,8 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
   })
   const trainingServers = createTrainingServersHandler(root)
   const caseManagement = createCaseManagementHandler(root, {
-    applyEvaluation: async (id, content, hash, signal) => {
-      const result = await applyEdit(root, { experiment_id: id, edits: [{ path: 'evaluation.md', content, expected_sha256: hash }] }, signal)
-      if (!result.ok) throw new RpcError(result.error.code, result.error.message)
-      return result
+    applyEvaluation: async (id, content, hash) => {
+      return ok(businessEdit(root, id, [{ path: 'evaluation.md', content, expected_sha256: hash }]))
     },
     readRun: async (runId, signal) => {
       const result = await runRecord(root, 'show', { run_id: runId }, signal)
@@ -1863,7 +1872,25 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
     if (endpoint.startsWith('deployment/') && deployment) return deployment(endpoint.slice('deployment/'.length), payload, signal, peer)
     try {
       const body = payload === undefined ? {} : requireObject(payload)
-      if (['assets/build', 'assets/dependencies/prepare'].includes(endpoint)) assertVersionEditable(root, experimentIdField(body))
+      if (/^(?:versions\/|features\/|fusion\/|compute-variants\/|migrations\/|research\/validate$|decision\/(?:preview|update)$)/.test(endpoint) || ['create', 'new'].includes(endpoint)) {
+        throw new RpcError('retired', '研究版本已停用；请在 business-agents 维护 Harness，通过 Git tag 管理版本')
+      }
+      if (endpoint.startsWith('edit/')) {
+        const selector = optionalString(body, 'source_id') ?? optionalString(body, 'experiment_id') ?? ''
+        if (!selector.startsWith('business:')) throw new RpcError('retired', '请选择 business-agents 中的 Harness 资产')
+        if (endpoint === 'edit/read') return ok(businessAsset(root, selector, stringField(body, 'path')))
+        if (endpoint === 'edit/preview' || endpoint === 'edit/apply') {
+          if (Array.isArray(body.edits)) for (const edit of body.edits as JsonMap[]) {
+            if (typeof edit.path === 'string' && /(?:^|\/)evaluation\.md$/.test(edit.path) && typeof edit.content === 'string') {
+              validateEvaluationEdit(root, readText(businessAgentPath(root, businessIdentity(selector).id, 'evaluation.md')), edit.content)
+            }
+          }
+          const result = businessEdit(root, selector, body.edits as JsonMap[], endpoint === 'edit/preview')
+          if (endpoint === 'edit/apply') onChange?.()
+          return ok(result)
+        }
+      }
+      if (endpoint === 'assets/build') assertVersionEditable(root, experimentIdField(body))
       if (endpoint.startsWith('documents/') && endpoint !== 'documents/read') return ok(documentOperation(root, endpoint.slice('documents/'.length), body))
       if (endpoint.startsWith('migrations/')) return await migrations(endpoint.slice('migrations/'.length) as any, body, signal)
       if (endpoint === 'assets/build-preview' || endpoint === 'assets/build') {
@@ -1888,6 +1915,9 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
           'details' in result.error ? result.error.details as JsonMap : undefined))
       }
       switch (endpoint) {
+        case 'business/list': return ok(businessList(root))
+        case 'business/detail': return ok(businessDetail(root, optionalString(body, 'source') ?? agentIdField(body)))
+        case 'business/read': return ok(businessRead(root, optionalString(body, 'source') ?? agentIdField(body), stringField(body, 'path')))
         case 'versions/migration-plan': return ok(version027MigrationPreview(root))
         case 'versions/migration-apply': {
           const result = await applyVersion027Migration(root, body)
@@ -1905,7 +1935,7 @@ export function createAgentsHandler(assetRoot: string, onChange?: () => void, ca
         }
         case 'list': return list(root)
         case 'description': return agentDescription(root, body)
-        case 'detail': return await detail(root, body, signal)
+        case 'detail': return await businessManagementDetail(root, body, signal)
         case 'create': return await createExperiment(root, body)
         case 'new': return await createAgent(root, body, signal)
         case 'assets/diff': return await readAssetDiff(root, body, signal)

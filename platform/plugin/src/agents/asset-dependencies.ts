@@ -2,7 +2,8 @@ import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
-import { candidateDigest, candidateFiles, dataPath, sourceInfo } from '../tasks/files.ts'
+import { candidateDigest, candidateFiles, dataPath, sourceInfo as experimentSource } from '../tasks/files.ts'
+import { businessSource } from './business-source.ts'
 import { programRoot } from '../workspace.ts'
 import { assertRuntimeCandidateOrigin } from '../models/harness-runtime.ts'
 
@@ -14,6 +15,12 @@ export type AssetCommand = (command: string, args: string[], options: { cwd?: st
 type Declaration = { kind: 'node' | 'python'; path: string; directory: string; files: { path: string; sha256: string }[] }
 const hash = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex')
 const omitted = ['.venv', 'venv', '.local', '.env']
+function sourceInfo(root: string, id: string) {
+  if (!id?.startsWith('business:')) return experimentSource(root, id)
+  const source = businessSource(root, id)
+  return { id: source.source_id as string, source: source.source_id as string, agent_id: source.agent_id as string,
+    candidate: resolve(source.repository_root, source.candidate_root, '..') }
+}
 class DependencyError extends Error {
   readonly code: string
   constructor(code: string, message: string) { super(message); this.code = code }
@@ -97,7 +104,7 @@ export function preparedAssetDependencyPackages(assetRoot: string, experimentId:
 export function resolvePreparedAssetDependencies(assetRoot: string, experimentId: string, expected: { image?: string; image_id?: string } = {}, candidatePath?: string): PreparedAssetDependencies {
   try {
     const source = candidatePath ? { id: experimentId, candidate: assertRuntimeCandidateOrigin(assetRoot, candidatePath) } : sourceInfo(assetRoot, experimentId)
-    if (candidatePath && basename(dirname(source.candidate)) !== experimentId) throw new Error('依赖来源版本不一致')
+    if (candidatePath && resolve(sourceInfo(assetRoot, experimentId).candidate) !== resolve(source.candidate)) throw new Error('依赖来源版本不一致')
     const items = declarations(source.candidate)
     if (!items.length) return { status: 'ready', reasons: [], mounts: [], environment: {} }
     const root = dependencyRoot(assetRoot, source.id), pointer = JSON.parse(readFileSync(join(root, 'current.json'), 'utf8'))
@@ -226,6 +233,7 @@ export function createAssetDependenciesHandler(assetRoot: string, options: { com
       const before = candidateDigest(source.candidate)
       if (body.expected_candidate_sha256 && body.expected_candidate_sha256 !== before) throw new DependencyError('conflict', 'Candidate 已变化，请重新读取依赖声明')
       const items = declarations(source.candidate)
+      if (id.startsWith('business:') && businessSource(root, id).tag && items.some(item => !existsSync(dataPath(source.candidate, `${item.directory}/${item.kind === 'node' ? 'package-lock.json' : 'requirements.lock.txt'}`)))) throw new DependencyError('dependency_pending', 'Git tag 缺少锁文件，请先在业务仓工作树准备依赖并创建包含锁文件的 tag')
       if (body.declaration_paths !== undefined && (!Array.isArray(body.declaration_paths) || body.declaration_paths.some((path: unknown) => typeof path !== 'string')
         || JSON.stringify([...body.declaration_paths].sort()) !== JSON.stringify(items.map(item => item.path).sort()))) throw new DependencyError('invalid_request', 'declaration_paths 必须与自动发现的完整依赖声明一致；请先移除不属于目标运行的来源依赖')
       if (!items.length) return { ok: true as const, value: { experiment_id: id, ...resolvePreparedAssetDependencies(root, id) } }

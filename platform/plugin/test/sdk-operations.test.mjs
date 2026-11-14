@@ -14,12 +14,16 @@ const { createSdkHandler } = await import(`file://${join(compiled, 'operations.m
 process.env.HARNESS_PROGRAM_ROOT = program
 process.env.HARNESS_PYTHON ??= 'python3'
 const source = 'experiment:EXP-sdk-test-001-r123456abcdef'
-function fixture(t, { slow = false, fail = false, linger = false, modelPolicy } = {}) {
+function fixture(t, { slow = false, fail = false, linger = false, business = false, modelPolicy } = {}) {
   const root = mkdtempSync(join(base, 'workspace-'))
-  const candidate = join(root, 'evolution/experiments', source.slice(11), 'candidate')
+  const candidate = business ? join(root, 'business/agents/sdk-test') : join(root, 'evolution/experiments', source.slice(11), 'candidate')
+  if (business) {
+    mkdirSync(join(root, 'config'), { recursive: true })
+    writeFileSync(join(root, 'config/repositories.json'), JSON.stringify({ repositories: [{ id: 'business-agents', path: join(root, 'business') }] }))
+  }
   mkdirSync(join(candidate, 'sdk'), { recursive: true })
   writeFileSync(join(candidate, '../change.yaml'), `agent_id: sdk-test\nexperiment_id: ${source.slice(11)}\n`)
-  writeFileSync(join(candidate, 'harness.yaml'), 'loadable_assets:\n  profile: sdk\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: sdk-test\n  profile_patch: dsh/managed/sdk.patch.yml\ncredential_environment_keys: []\n')
+  writeFileSync(join(candidate, 'harness.yaml'), 'agent: {id: sdk-test}\nloadable_assets:\n  profile: sdk\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: sdk-test\n  profile_patch: dsh/managed/sdk.patch.yml\ncredential_environment_keys: []\n')
   writeFileSync(join(candidate, 'sdk/README.md'), '# SDK 接入\n唯一指南正文。\n')
   writeFileSync(join(candidate, 'sdk/example.ts'), "import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client'\n")
   const cli = join(root, 'fake-cli.py')
@@ -191,4 +195,24 @@ test('SDK stderr跨UTF8字节解码并在完整诊断上脱敏，不把未知写
   assert.equal(done.status, 'unknown'); assert.match(done.error, /中文诊断😀/)
   assert.equal(done.error.includes(secret), false)
   assert.equal(readFileSync(join(fx.root, '.local/sdk-operations/sdk-stderr-utf8/operation.json'), 'utf8').includes(secret), false)
+})
+
+
+test('业务仓 SDK 入口读取当前主线并将真实资产目录交给模型投影', async t => {
+  let projected
+  const fx = fixture(t, { business: true, modelPolicy: async (_id, _selection, candidate) => {
+    projected = candidate
+    return { policy: {}, environment: {} }
+  } })
+  const selected = 'business:sdk-test'
+  const guide = await fx.rpc('guide', { source: selected })
+  assert.equal(guide.ok, true, JSON.stringify(guide))
+  assert.equal(guide.value.source, selected)
+  assert.match(guide.value.markdown, /唯一指南正文/)
+  const started = await fx.rpc('start', request('sdk-business-main', { source: selected }))
+  assert.equal(started.ok, true, JSON.stringify(started))
+  assert.equal(projected, fx.candidate)
+  assert.equal((await terminal(fx.rpc, 'sdk-business-main')).status, 'completed')
+  assert.equal((await fx.rpc('list', { source: selected })).value.length, 1)
+  assert.equal((await fx.rpc('list', { source })).value.length, 0)
 })

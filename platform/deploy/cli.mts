@@ -57,6 +57,7 @@ function flag(options: Options, name: string): boolean {
 function validateOptions(command: string, options: Options): void {
   const values: Record<string, string[]> = {
     'agent-refresh-linked': ['prefix', 'program-root', 'dependency-projection'],
+    'agent-runtime-update': ['prefix', 'program-root'],
     'agent-cleanup': ['prefix'],
     'agent-preview': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'prefix'],
     'agent-pack': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'out', 'seed-file', 'expected-candidate-sha256'],
@@ -71,6 +72,7 @@ function validateOptions(command: string, options: Options): void {
   }
   const flags: Record<string, string[]> = {
     'agent-refresh-linked': [],
+    'agent-runtime-update': [],
     'agent-cleanup': [],
     'agent-preview': ['update-assets'], 'agent-pack': [], 'agent-prepare': [],
     pack: ['no-image', 'no-data', 'allow-dirty', 'include-working-tree', 'allow-fixture-data', 'keep-staging'],
@@ -106,6 +108,7 @@ function installPort(value: string | undefined, name: string, fallback: number):
 
 function usage(): string {
   return `用法：
+  dsh-deploy agent-runtime-update --prefix <安装目录> [--program-root <目录>]
   dsh-deploy agent-refresh-linked --prefix <旧版软链接实例目录> [--program-root <目录>] [--dependency-projection <旧依赖投影目录>]
     从已链接的原生 Harness 刷新投影和挂载来源，保留配置、HOME、镜像和链接源；随后用 agent restart 生效。
 
@@ -217,6 +220,18 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     const { command, options } = parse(argv)
     if (!command || command === '--help' || flag(options, 'help')) { console.log(usage()); return 0 }
     validateOptions(command, options)
+    if (command === 'agent-runtime-update') {
+      const prefix = text(options, 'prefix'), program = resolve(text(options, 'program-root', REPO)!)
+      if (!prefix) throw new Error('agent-runtime-update 需要 --prefix')
+      const installed = resolve(prefix), manifest = JSON.parse(readFileSync(join(installed, 'manifest.json'), 'utf8'))
+      const { expectedImage, inspectImage, verifyImageInfo } = await import('./image.mts')
+      const expected = expectedImage(program, manifest.package.arch), image = inspectImage(expected.tag)
+      const problems = verifyImageInfo(image, { arch: manifest.package.arch, fingerprint: expected.fingerprint })
+      if (problems.length) throw new Error(`标准镜像不可用：${problems.join('；')}`)
+      const { updateAgentRuntime } = await import('./agent/runtime/update.mts')
+      console.log(JSON.stringify(await updateAgentRuntime(installed, program, { ...expected, id: image.id }), null, 2))
+      return 0
+    }
     if (command === 'agent-refresh-linked') {
       const prefix = text(options, 'prefix')
       if (!prefix) throw new Error('agent-refresh-linked 需要 --prefix')
@@ -271,12 +286,12 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     }
     if (['agent-preview', 'agent-pack', 'agent-prepare'].includes(command)) {
       const agentId = text(options, 'agent-id'), source = text(options, 'source')
-      if (!agentId || !source?.startsWith('experiment:')) throw new Error('独立包需要 --agent-id 和 --source experiment:<ID>')
+      if (!agentId || !source?.startsWith('business:')) throw new Error('独立包需要 --agent-id 和 --source business:<智能体ID>[@<Git tag>]')
       const mode = text(options, 'mode', 'online')
       if (mode !== 'online' && mode !== 'offline') throw new Error('--mode 只能是 online 或 offline')
       const input = {
         programRoot: resolve(text(options, 'program-root', REPO)!), assetRoot: resolve(text(options, 'data-root', defaultAssetRoot())!),
-        agentId, experimentId: source.slice('experiment:'.length), arch: archOf(text(options, 'arch')), mode,
+        agentId, experimentId: source, arch: archOf(text(options, 'arch')), mode,
         resourcesDir: text(options, 'resources-dir'), out: text(options, 'out'), expectedCandidateSha256: text(options, 'expected-candidate-sha256'),
       }
       if (command === 'agent-preview') {
@@ -318,10 +333,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         } else {
           const { createDeploymentSeed } = await import('../plugin/src/deployment/seed.ts')
           const { readBusinessDefault } = await import('../plugin/src/models/business-default.ts')
+          const { platformGroupUrl } = await import('../plugin/src/business-control/group-link.ts')
           const project = createDeploymentSeed(input.assetRoot, async () => {
             const defaults = readBusinessDefault(input.assetRoot)
             return { policy: { patch: [], default: defaults.default }, environment: {} }
-          })
+          }, id => platformGroupUrl(input.assetRoot, id))
           const projected = await project({ agent_id: input.agentId, experiment_id: input.experimentId }, controller.signal)
           seed = projected.seed
           for (const notice of projected.notices) console.error(`agent-pack: ${notice}`)

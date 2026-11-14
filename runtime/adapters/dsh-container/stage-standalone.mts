@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const runtimeFiles = ['standalone-bootstrap.js', 'standalone-plugin.js', 'standalone-bridge.js', 'standalone-connection.js', 'standalone-knowledge.js', 'model-binding-runtime.js']
-export const sdkFiles = ['sdk-runner.mts', 'sdk-preset.mts', 'sdk-profile.patch.yml', 'sdk-module-links.mts', 'prepare-verification-home.mjs']
+export const sdkFiles = ['sdk-runner.mts', 'sdk-preset.mts', 'sdk-profile.patch.yml', 'sdk-module-links.mts', 'prepare-verification-home.mjs', 'runtime-packages.mjs']
 export function stageStandalone(target: string, program = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')) {
   mkdirSync(target, { recursive: true })
   for (const file of runtimeFiles) cpSync(join(program, 'platform/plugin/lib', file), join(target, file))

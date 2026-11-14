@@ -1,4 +1,5 @@
-import { instanceDesiredSource, versionSource, versionSources, VERSION_ID } from '../agents/version-source.ts'
+import { instanceDesiredSource, versionSources, VERSION_ID } from '../agents/version-source.ts'
+import { businessSources, businessVersions, runtimeSource } from '../agents/business-source.ts'
 import { instanceStateRoot, programRoot, workspaceOwnsInstance } from '../workspace.ts'
 import { businessGatewayEntry } from '../business-control/entry.ts'
 import { businessAccessPath, businessAccess, preflightGatewayRegistration, deleteBusinessInstance } from '../business-control/registration.ts'
@@ -261,6 +262,7 @@ async function readJson(path: string): Promise<Record<string, unknown> | null> {
 }
 
 function instanceSourceRef(manifest?: Record<string, unknown> | null): string | undefined {
+  if (typeof manifest?.source_id === 'string' && manifest.source_id.startsWith('experiment:')) return undefined
   const ref = manifest?.source_ref
   if (ref === undefined) return undefined
   if (typeof ref !== 'string' || !/^git:[a-f0-9]{40}$/.test(ref)) throw new Error('实例固定来源必须是 git:<40位提交>')
@@ -269,8 +271,8 @@ function instanceSourceRef(manifest?: Record<string, unknown> | null): string | 
 
 function workspaceCapability(assetRoot: string, source: string | undefined, manifest?: Record<string, unknown> | null): WorkspaceCapability {
   const runtime = manifest?.harness_runtime && typeof manifest.harness_runtime === 'object' && !Array.isArray(manifest.harness_runtime)
-    ? manifest.harness_runtime as Record<string, unknown> : source?.startsWith('experiment:')
-      ? versionSource(assetRoot, source.slice('experiment:'.length), instanceSourceRef(manifest)?.slice(4)).harness_runtime as Record<string, unknown> | undefined
+    ? manifest.harness_runtime as Record<string, unknown> : source
+      ? runtimeSource(assetRoot, source, instanceSourceRef(manifest)?.slice(4)).harness_runtime as Record<string, unknown> | undefined
       : undefined
   const project = runtime?.project_workspace && typeof runtime.project_workspace === 'object' && !Array.isArray(runtime.project_workspace)
     ? runtime.project_workspace as Record<string, unknown> : undefined
@@ -292,7 +294,7 @@ function assertWorkspaceCapability(requested: InstanceActionRequest['workspace_m
 }
 
 async function ensureRealSource(assetRoot: string, source: string, sourceRef?: string): Promise<string> {
-  return versionSource(assetRoot, source.replace(/^experiment:/, ''), sourceRef?.replace(/^git:/, '')).agent_id
+  return runtimeSource(assetRoot, source, sourceRef?.replace(/^git:/, '')).agent_id
 }
 
 async function runUpWithModelPolicy(assetRoot: string, args: string[], request: InstanceActionRequest & { manifest?: Record<string, unknown> }, agentId: string, provider: ModelPolicyProvider | undefined,
@@ -304,7 +306,10 @@ async function runUpWithModelPolicy(assetRoot: string, args: string[], request: 
   const version = request.source!.replace(/^experiment:/, '')
   const ref = instanceSourceRef(request.manifest)
   const sourceRoot = ref ? materializeEvaluationSource(assetRoot, version, ref).root : assetRoot
-  const projected = await provider(agentId, selected, join(sourceRoot, 'evolution/experiments', version, 'candidate'))
+  const source = runtimeSource(assetRoot, request.source!, ref?.slice(4))
+  const candidate = request.source!.startsWith('business:') ? join(source.repository_root, 'agents', agentId)
+    : join(sourceRoot, 'evolution/experiments', version, 'candidate')
+  const projected = await provider(agentId, selected, candidate)
   const policy = projected.policy && typeof projected.policy === 'object' && !Array.isArray(projected.policy)
     ? projected.policy as Record<string, unknown> : {}
   const effective = modelSelection(policy.default)
@@ -324,18 +329,21 @@ async function runUpWithModelPolicy(assetRoot: string, args: string[], request: 
 }
 
 async function listSources(assetRoot: string): Promise<{ sources: RegisteredSource[]; business_gateway_available: boolean }> {
-  const catalog = versionSources(assetRoot)
-  const sources: RegisteredSource[] = [...new Set([...Object.keys(catalog.sources), ...Object.keys(catalog.errors)])].sort().map(experimentId => ({
-    source_id: `experiment:${experimentId}`, experiment_id: experimentId,
-    agent_id: catalog.sources[experimentId]?.agent_id ?? VERSION_ID.exec(experimentId)![1],
-    profile: catalog.sources[experimentId]?.profile === 'sdk' ? 'sdk' : 'web',
-    selectable: !catalog.errors[experimentId],
-    reason: catalog.errors[experimentId] ?? '版本装载声明可读取；预览时核对 Runtime 与当前模型配置',
-    ...(catalog.sources[experimentId]?.harness_runtime?.model_bindings?.main
-      ? { model_binding: catalog.sources[experimentId].harness_runtime!.model_bindings!.main } : {}),
-  }))
+  const sources: RegisteredSource[] = []
+  const business = businessSources(assetRoot)
+  for (const id of [...new Set([...Object.keys(business.sources), ...Object.keys(business.errors)])].sort()) {
+    const source = business.sources[id]
+    for (const version of [{ source_id: `business:${id}`, tag: '当前工作树' }, ...(source ? businessVersions(assetRoot, id) : [])]) sources.push({
+      source_id: version.source_id, experiment_id: version.source_id, agent_id: id,
+      profile: source?.profile === 'sdk' ? 'sdk' : 'web', selectable: !business.errors[id],
+      reason: business.errors[id] ?? `业务仓 · ${version.tag}`,
+      ...(source?.harness_runtime?.model_bindings?.main ? { model_binding: source.harness_runtime.model_bindings.main } : {}),
+    })
+  }
   const businessGatewayAvailable = await businessAccess(assetRoot).then(() => true, () => false)
-  return { sources: sources.sort((a, b) => a.agent_id.localeCompare(b.agent_id) || b.experiment_id.localeCompare(a.experiment_id, 'en', { numeric: true })),
+  return { sources: sources.sort((a, b) => a.agent_id.localeCompare(b.agent_id)
+      || Number(b.source_id.startsWith('business:')) - Number(a.source_id.startsWith('business:'))
+      || b.experiment_id.localeCompare(a.experiment_id, 'en', { numeric: true })),
     business_gateway_available: businessGatewayAvailable }
 }
 
@@ -391,8 +399,8 @@ async function requestForUp(assetRoot: string, request: InstanceActionRequest, r
   const requestedSource = request.source || (manifest ? instanceDesiredSource(assetRoot, manifest) : undefined)
   const workspace = workspaceCapability(assetRoot, requestedSource, manifest)
   assertWorkspaceCapability(request.workspace_mode, workspace)
-  if (manifest?.profile === 'sdk' || typeof requestedSource === 'string' && requestedSource.startsWith('experiment:')
-    && versionSource(assetRoot, requestedSource.slice(11), instanceSourceRef(manifest)?.slice(4)).profile === 'sdk') {
+  if (manifest?.profile === 'sdk' || typeof requestedSource === 'string'
+    && runtimeSource(assetRoot, requestedSource, instanceSourceRef(manifest)?.slice(4)).profile === 'sdk') {
     throw new Error('SDK 型智能体由 TypeScript 应用启动，请使用 SDK 调试入口提交输入；不创建 Web 实例')
   }
   const registeredDefault = manifest?.model_policy && typeof manifest.model_policy === 'object' && !Array.isArray(manifest.model_policy)

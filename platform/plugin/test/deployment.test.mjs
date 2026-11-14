@@ -14,7 +14,7 @@ function withProgram(t, program) {
 }
 const signal = () => new AbortController().signal
 
-for (const id of ['EXP-alpha-001', 'EXP-alpha-027-m-raaaaaaaaaaaa', 'EXP-alpha-027-f-rbbbbbbbbbbbb']) test(`独立导出 ${id} 的预览、异步打包、状态恢复与流式下载，公开回执不包含凭据`, async t => {
+for (const id of ['business:alpha', 'business:alpha@v1', 'business:alpha@release%2Fv2']) test(`独立导出 ${id} 的预览、异步打包、状态恢复与流式下载，公开回执不包含凭据`, async t => {
   const f = fixture(t, 'amd64', id)
   withProgram(t, f.program)
   cpSync(f.resources, join(f.program, '.local/deploy-assets/amd64'), { recursive: true })

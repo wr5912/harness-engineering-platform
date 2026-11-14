@@ -1,10 +1,10 @@
 /** 官方包由同镜像安装闭包生成链接，业务源码不安装另一份 Runtime。 */
 import { existsSync, lstatSync, mkdirSync, realpathSync, symlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { installationClosure, validateFallback } from './prepare-verification-home.mjs'
+import { runtimeInstallationClosure, validateFallback } from './prepare-verification-home.mjs'
 
 export function prepareSdkModuleLinks(destination: string): void {
-  const packages = installationClosure('/opt/dsh/apps/cli/package.json')
+  const packages = runtimeInstallationClosure()
   mkdirSync(destination, { recursive: true })
   validateFallback(destination, packages, true)
   for (const [name, installed] of packages) {

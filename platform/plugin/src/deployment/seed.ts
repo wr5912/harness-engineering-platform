@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseEnv } from 'node:util'
 import { McpConfigStore } from '../mcp/store.ts'
-import { versionSource, assertStandaloneVersionSupported } from '../agents/version-source.ts'
+import { assertStandaloneVersionSupported } from '../agents/version-source.ts'
+import { runtimeSource } from '../agents/business-source.ts'
 import { workspaceConfigPath } from '../workspace.ts'
 import { harnessMcpConnections } from '../standalone/connections.ts'
 
@@ -12,10 +13,10 @@ type ModelProjection = (agentId: string, selection?: { provider: string; model: 
 export function createDeploymentSeed(assetRoot: string, modelProjection: ModelProjection, platformGroupUrl?: (id: string) => string) {
   return async (input: { agent_id: string; experiment_id: string }, signal: AbortSignal) => {
     signal.throwIfAborted()
-    const source = versionSource(assetRoot, input.experiment_id)
+    const source = runtimeSource(assetRoot, input.experiment_id)
     assertStandaloneVersionSupported(source)
     if (source.agent_id !== input.agent_id) throw new Error('所选版本不属于当前智能体')
-    const candidate = join(assetRoot, source.candidate_root)
+    const candidate = join(source.repository_root, source.candidate_root)
     const environment: Record<string, string> = {}
     const envFile = join(candidate, 'workspace/.env')
     if (existsSync(envFile)) Object.assign(environment, parseEnv(readFileSync(envFile, 'utf8')))
@@ -23,7 +24,7 @@ export function createDeploymentSeed(assetRoot: string, modelProjection: ModelPr
     const notices: string[] = []
     let projected: Awaited<ReturnType<ModelProjection>> | undefined
     try {
-      projected = await modelProjection(input.agent_id, undefined, join(assetRoot, 'evolution/experiments', input.experiment_id, 'candidate'))
+      projected = await modelProjection(input.agent_id, undefined, join(candidate, '..'))
       Object.assign(environment, projected.environment)
     } catch {
       signal.throwIfAborted()

@@ -1014,7 +1014,12 @@ def bootstrap_state():
     try:
         result = subprocess.run([node, str(REPO / "platform/bootstrap/server.ts"), "--check", str(asset_root())],
                                 capture_output=True, text=True, check=True, timeout=15)
-        return json.loads(result.stdout)
+        state = json.loads(result.stdout)
+        missing = [item["id"] for item in state.get("checks", [])
+                   if item["id"] in {"dsh", "pnpm", "git"} and item["status"] != "ok"]
+        if missing:
+            raise PlatformError("启动依赖不可用：" + ", ".join(missing) + "；请恢复命令后重试。")
+        return state
     except (OSError, ValueError, subprocess.SubprocessError):
         raise PlatformError("无法检查数据工作区；请核对 Node.js 24.9 及以上版本、Git 与数据目录读取权限。") from None
 

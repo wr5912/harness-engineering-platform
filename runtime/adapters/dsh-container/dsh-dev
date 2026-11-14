@@ -1287,7 +1287,7 @@ def assert_asset_dependencies(contract: dict, image_id: str | None = None) -> No
                contract["image"]["local_image_tag"]]
     if image_id:
         command.append(image_id)
-    if contract.get("source_ref"):
+    if contract.get("source_ref") or contract.get("source_kind") == "business":
         if not image_id:
             command.append("")
         command.append(str(Path(contract["candidate_root"]).parent))
@@ -2027,7 +2027,7 @@ def asset_command(operation: str, contract: dict, manifest: dict, **extra):
 
 def asset_contract(manifest: dict) -> dict:
     contract = resolve(instance_desired_source(manifest, repo=REPO), repo=REPO,
-                       **({"source_ref": manifest["source_ref"]} if manifest.get("source_ref") else {}))
+                       **({"source_ref": manifest["source_ref"]} if manifest.get("source_ref") and str(manifest.get("source_id", "")).startswith("business:") else {}))
     assert_asset_dependencies(contract)
     return contract
 
@@ -2162,6 +2162,8 @@ def reload_one(args: argparse.Namespace) -> None:
         reload_manifest=manifest, expected_asset_digest=args.expected_asset_digest,
         apply_source_mcp=getattr(args, "apply_source_mcp", False),
         expected_generation_digest=args.expected_generation_digest)
+    if str(manifest.get("source_id", "")).startswith("experiment:"):
+        launch.source_ref = None
     if launch.port is None:
         fail("实例缺少原端口，不能精确重载")
     # fixture 原始路径不属于实例登记；只重建已登记的显式映射，不回退到真实 MCP。
@@ -3323,7 +3325,7 @@ def preflight_new_instance(args: argparse.Namespace, contract: dict) -> None:
 
 
 def check_managed_plugin_dependencies(contract: dict, external_modules: str | None = None) -> None:
-    """本地插件的运行依赖必须能从已挂载目录解析。"""
+    """插件运行依赖由挂载目录或同一标准 Runtime 镜像提供。"""
     managed = Path(contract["managed"])
     runtime_dependencies = None
     for manifest in managed.glob("*/package.json"):
@@ -3331,8 +3333,11 @@ def check_managed_plugin_dependencies(contract: dict, external_modules: str | No
         dependencies = set((package.get("dependencies") or {}).keys())
         lock_files = ("package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock")
         lock_file = next((name for name in lock_files if (manifest.parent / name).is_file()), None)
-        hint = f"请在 {manifest.parent} 按 {lock_file} 恢复锁定依赖后重试" if lock_file else \
-            f"请在 {manifest.parent} 准备与 package.json 匹配的 node_modules 后重试"
+        hint = "请核对标准 Runtime 的依赖锁并重建共享镜像"
+        if external_modules:
+            hint = f"请在显式指定的 {external_modules} 提供完整运行依赖"
+        elif lock_file:
+            hint += f"；插件专有依赖可在 {manifest.parent} 按 {lock_file} 准备"
         for name in dependencies:
             roots = (manifest.parent / "node_modules", managed / "node_modules")
             if external_modules:
@@ -3349,8 +3354,8 @@ def check_managed_plugin_dependencies(contract: dict, external_modules: str | No
                             "--mount", f"type=bind,source={ADAPTER},target=/opt/dsh-adapter,readonly",
                             "--entrypoint", "node", contract["image"]["local_image_tag"],
                             "--input-type=module", "-e",
-                            "import { installationClosure } from '/opt/dsh-adapter/prepare-verification-home.mjs';"
-                            "console.log(JSON.stringify([...installationClosure('/opt/dsh/apps/cli/package.json').keys()]))",
+                            "import { runtimeInstallationClosure } from '/opt/dsh-adapter/prepare-verification-home.mjs';"
+                            "console.log(JSON.stringify([...runtimeInstallationClosure().keys()]))",
                         ])
                         runtime_dependencies = set(json.loads(result.stdout))
                     if name in runtime_dependencies:

@@ -235,7 +235,7 @@ def verify_run_source(repo: Path, manifest: dict, inputs: dict) -> dict:
     def current_tree(name: str) -> str:
         if contract is None:
             raise ValueError("Run source can no longer be resolved")
-        return snapshot_digest(tree_digest(repo, Path(contract[name])))
+        return snapshot_digest(external_tree_digest(Path(contract[name])))
 
     for name in ("workspace", "presets", "managed"):
         frozen = trees.get(name) if isinstance(trees, dict) else None
@@ -882,27 +882,7 @@ def agent_experiments(repo: Path, agent: str, errors: list[dict] | None = None) 
     errors = errors if errors is not None else []
     experiments = []
     for root in sorted((repo / "evolution/experiments").glob("*")):
-        match = EXPERIMENT_RE.fullmatch(root.name)
-        if not root.is_dir() or root.is_symlink() or not match or match.group(1) != agent:
-            continue
-        change_path = root / "change.yaml"
-        if not change_path.exists():
-            try:
-                visible = subprocess.run(
-                    ["git", "ls-files", "--cached", "--others", "--exclude-standard", "--",
-                     root.relative_to(repo).as_posix()],
-                    cwd=repo, text=True, capture_output=True, check=False, timeout=5,
-                )
-            except (OSError, subprocess.TimeoutExpired):
-                visible = None
-            if visible is not None and visible.returncode == 0 and not visible.stdout.strip():
-                continue
-        try:
-            change = read_change_yaml(change_path)
-        except (OSError, ValueError, yaml.YAMLError) as exc:
-            errors.append({"agent_id": agent, "experiment_id": root.name,
-                           "path": change_path.relative_to(repo).as_posix(),
-                           "error": f"版本清单暂不可读（{type(exc).__name__}）"})
+        if not root.is_dir() or root.is_symlink():
             continue
         runs = []
         for path in sorted((root / "runs").glob("run-*/run.yaml")):
@@ -910,13 +890,16 @@ def agent_experiments(repo: Path, agent: str, errors: list[dict] | None = None) 
                 continue
             try:
                 manifest = read_run_manifest(path)
-                runs.append({**{key: manifest.get(key) for key in ("run_id", "status", "created_at", "finished_at")},
+                if manifest.get("agent_id") != agent:
+                    continue
+                runs.append({**{key: manifest.get(key) for key in ("run_id", "status", "created_at", "finished_at", "source_id")},
                              **run_index_facts(path.parent, manifest)})
             except (OSError, ValueError, TypeError, KeyError) as exc:
                 errors.append({"agent_id": agent, "experiment_id": root.name, "run_id": path.parent.name,
                                "path": path.relative_to(repo).as_posix(),
                                "error": f"运行记录暂不可读（{type(exc).__name__}）"})
-        experiments.append({"experiment_id": root.name, "status": change.get("status"), "runs": runs})
+        if runs:
+            experiments.append({"experiment_id": root.name, "runs": runs})
     return experiments
 
 
@@ -933,16 +916,17 @@ def command_overview(repo: Path) -> None:
     """一次列出全部 Agent 的 Run 索引；页面汇总读取不按 Agent 重复启动解析进程。"""
     agents = []
     errors = []
-    for path in sorted((repo / "agents").glob("*")):
-        agent = path.name
-        if not path.is_dir() or path.is_symlink() or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", agent):
-            continue
+    identities = set()
+    for path in (repo / "evolution/experiments").glob("*/runs/run-*/run.yaml"):
         try:
-            experiments = agent_experiments(repo, agent, errors)
-            agents.append({"agent_id": agent, "evaluation_path": f"agents/{agent}/evaluation.md", "experiments": experiments})
-        except (OSError, ValueError) as exc:
-            errors.append({"agent_id": agent, "path": f"agents/{agent}",
-                           "error": f"智能体记录暂不可读（{type(exc).__name__}）"})
+            agent = read_run_manifest(path).get("agent_id")
+            if isinstance(agent, str) and re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", agent):
+                identities.add(agent)
+        except (OSError, ValueError):
+            errors.append({"path": path.relative_to(repo).as_posix(), "error": "运行记录暂不可读"})
+    for agent in sorted(identities):
+        experiments = agent_experiments(repo, agent, errors)
+        agents.append({"agent_id": agent, "evaluation_path": f"agents/{agent}/evaluation.md", "experiments": experiments})
     print(json.dumps({"agents": agents, "errors": errors}, ensure_ascii=False, indent=2))
 
 
@@ -970,14 +954,17 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
                        **({"evaluation_source": args.evaluation_source} if getattr(args, "evaluation_source", None) else {}))
     experiment_id = contract.get("experiment_id")
     agent_id = contract.get("agent_id")
-    match = EXPERIMENT_RE.fullmatch(experiment_id or "")
-    if not match or match.group(1) != agent_id:
-        raise ValueError("source must resolve to a consistent Experiment and Agent")
+    business = contract["source_kind"] == "business"
     experiment = repo / "evolution/experiments" / experiment_id
-    if not experiment.is_dir() or experiment.is_symlink():
-        raise ValueError(f"unknown experiment: {experiment_id}")
-    change = read_change_yaml(Path(contract.get("change_path", experiment / "change.yaml")))
-    baseline_ref = args.baseline_ref or change.get("baseline_ref", "")
+    if business:
+        experiment.mkdir(parents=True, exist_ok=True)
+        change = {}
+    else:
+        match = EXPERIMENT_RE.fullmatch(experiment_id or "")
+        if not match or match.group(1) != agent_id or not experiment.is_dir() or experiment.is_symlink():
+            raise ValueError("source must resolve to a consistent Experiment and Agent")
+        change = read_change_yaml(Path(contract.get("change_path", experiment / "change.yaml")))
+    baseline_ref = args.baseline_ref or change.get("baseline_ref", "none:first-experiment")
     if not valid_baseline_ref(baseline_ref):
         raise ValueError("baseline_ref must be git:<commit>, release:<id> or none:first-experiment")
     evaluation_relative = Path("agents") / agent_id / "evaluation.md"
@@ -1031,9 +1018,9 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
             "candidate_sha256": source_digest,
             "created_at": utc_now(),
             "harness_trees": {
-                "workspace": tree_digest(repo, Path(contract["workspace"])),
-                "presets": tree_digest(repo, Path(contract["presets"])),
-                "managed": tree_digest(repo, Path(contract["managed"])),
+                "workspace": external_tree_digest(Path(contract["workspace"])) if business else tree_digest(repo, Path(contract["workspace"])),
+                "presets": external_tree_digest(Path(contract["presets"])) if business else tree_digest(repo, Path(contract["presets"])),
+                "managed": external_tree_digest(Path(contract["managed"])) if business else tree_digest(repo, Path(contract["managed"])),
             },
             "reference_tree": external_tree_digest(Path(contract["reference_root"])) if contract.get("reference_root") else None,
             "evaluation_sha256": cases_digest(cases),
@@ -1078,7 +1065,12 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
         if contract.get("source_ref"):
             inputs.update({"source_ref": contract["source_ref"], "source_snapshot_root": Path(contract["source_snapshot_root"]).relative_to(repo).as_posix(),
                            "candidate_path": candidate.relative_to(repo).as_posix()})
-        inputs["harness_review"] = build_review_evidence(Path(contract.get("source_snapshot_root", repo)), experiment_id, change, source_digest)
+        if business:
+            inputs["business_origin"] = {"repository": contract["business_repository"], "tag": contract.get("source_tag"),
+                                         "commit": contract.get("source_ref") or git_version(Path(contract["business_repository"]))["commit"],
+                                         "dirty": False if contract.get("source_tag") else git_version(Path(contract["business_repository"]))["dirty"]}
+        else:
+            inputs["harness_review"] = build_review_evidence(Path(contract.get("source_snapshot_root", repo)), experiment_id, change, source_digest)
         if candidate_digest(candidate) != source_digest:
             raise ValueError("Candidate changed while locking review inputs")
         fixture_path = getattr(args, "mcp_fixture", None)

@@ -124,7 +124,7 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
   }
   function experiments() {
     const path = join(root, 'evolution/experiments')
-    return existsSync(path) ? readdirSync(path, { withFileTypes: true }).filter(item => VERSION_ID.test(item.name) && item.isDirectory() && !item.isSymbolicLink()).map(item => item.name) : []
+    return existsSync(path) ? readdirSync(path, { withFileTypes: true }).filter(item => item.isDirectory() && !item.isSymbolicLink()).map(item => item.name) : []
   }
   function inspectRun(path: string, id: string): Run | undefined {
     const manifestPath = join(path, 'run.yaml'), inputPath = join(path, 'inputs.lock.json')

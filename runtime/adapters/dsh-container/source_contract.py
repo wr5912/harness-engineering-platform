@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""将 DSH-only 来源（实验候选）解析为单一、无秘密的运行数据合同，并按角色生成挂载计划。
-
-来源只剩 `experiment:<id>` 一种。早期 `snapshot:<id>` 兼容入口已退役：它把当前镜像当作
-历史组合使用，并按 `rsplit('/', 1)` 重建容器路径，会丢掉 preset 的 Agent 子目录。
-历史快照内容改由 Git 恢复，映射见 evolution/experiments/<id>/snapshots/README.md。
-"""
+"""将业务仓工作树或 Git tag 解析为 DSH 运行合同，保留历史证据读取。"""
 
 from __future__ import annotations
 
@@ -74,7 +69,7 @@ def image_build_input_digests(*, lock_path: Path = LOCK, adapter: Path = ADAPTER
         for path in sorted(directory.rglob("*")):
             if path.is_file() and "node_modules" not in path.parts:
                 paths[str(path.relative_to(adapter))] = path
-    for name in ("sdk-runner.mts", "sdk-preset.mts", "sdk-profile.patch.yml", "sdk-module-links.mts", "prepare-verification-home.mjs"):
+    for name in ("sdk-runner.mts", "sdk-preset.mts", "sdk-profile.patch.yml", "sdk-module-links.mts", "prepare-verification-home.mjs", "runtime-packages.mjs"):
         paths[name] = adapter / name
     program = adapter.parent.parent.parent
     for name in ("standalone-bootstrap.js", "standalone-plugin.js", "standalone-bridge.js", "standalone-connection.js", "standalone-knowledge.js", "model-binding-runtime.js"):
@@ -183,17 +178,19 @@ def _experiment_contract(
     lock_path: Path,
     profile_manifest: Path,
     require_assets: bool,
+    business_root: Path | None = None,
 ) -> dict:
-    expected = Path("evolution/experiments") / source_id / "candidate/dsh"
+    expected = Path("agents") / item["agent_id"] / "dsh" if business_root else Path("evolution/experiments") / source_id / "candidate/dsh"
     if safe_relative(item["candidate_root"]) != expected:
         raise ValueError("candidate root does not belong to selected experiment")
     for key in ("patch", "preset"):
         safe_relative(item[key])
     if item["guard"] is not None:
         safe_relative(item["guard"])
-    root = repo / expected
+    owner = business_root or repo
+    root = owner / expected
     if require_assets:
-        for parent in (repo / Path(*expected.parts[:depth]) for depth in range(1, len(expected.parts) + 1)):
+        for parent in (owner / Path(*expected.parts[:depth]) for depth in range(1, len(expected.parts) + 1)):
             if parent.is_symlink() or not parent.is_dir():
                 raise ValueError(f"missing or symlinked source ancestor: {parent}")
         for directory in (root, root / "workspace", root / "presets", root / "managed"):
@@ -233,12 +230,12 @@ def _experiment_contract(
     )
     contract = {
         "schema_version": "2.1",
-        "source_kind": "experiment",
-        "source_id": "experiment:" + source_id,
-        "experiment_id": source_id,
+        "source_kind": "business" if business_root else "experiment",
+        "source_id": item["source_id"] if business_root else "experiment:" + source_id,
+        "experiment_id": item["agent_id"] if business_root else source_id,
         "agent_id": item["agent_id"],
         "candidate_root": str(root),
-        "experiment_root": str(root.parents[1]),
+        "experiment_root": str(repo / "evolution/experiments" / item["agent_id"]) if business_root else str(root.parents[1]),
         "workspace": str(root / "workspace"),
         "presets": str(root / "presets"),
         "managed": str(root / "managed"),
@@ -273,6 +270,12 @@ def _experiment_contract(
         contract["candidate_source_root"] = str(candidate)
         contract["workspace_path"] = "/work/project" if runtime.get("project_workspace") else "/work/harness/workspace"
     contract.update(_agent_asset_roots(repo, item["agent_id"]))
+    if business_root:
+        contract.update({"reference_root": str(business_root / "agents" / item["agent_id"]),
+                         "candidate_source_root": str(root.parent), "business_repository": item["business_repository"]})
+        if item.get("tag"):
+            contract.update({"source_ref": "git:" + item["source_commit"], "source_tag": item["tag"],
+                             "source_snapshot_root": str(business_root)})
     return contract
 
 
@@ -295,17 +298,19 @@ def _resolve_experiment(source_id: str, *, repo: Path, sources: Path, lock_path:
     if result.returncode:
         raise ValueError(result.stderr.strip() or "版本装载声明读取失败")
     item = json.loads(result.stdout)
-    experiment_root = Path("evolution/experiments") / source_id / "candidate"
+    business_root = Path(item["repository_root"]) if item.get("source_kind") == "business" else None
+    owner = business_root or repo
+    experiment_root = Path("agents") / item["agent_id"] if business_root else Path("evolution/experiments") / source_id / "candidate"
     profile_manifest = ADAPTER / "verification-home-controls" / f"{item['profile']}-profile.package.json"
     if "profile_manifest" in item:
         relative = safe_relative(item["profile_manifest"])
         if relative != experiment_root / f"dsh/managed/{item['profile']}-profile.package.json" \
-                or not real_file_below(repo, relative):
+                or not real_file_below(owner, relative):
             raise ValueError("invalid experiment profile manifest")
-        profile_manifest = repo / relative
+        profile_manifest = owner / relative
     lock = _read_source_lock(lock_path)
     contract = _experiment_contract(source_id, item, repo=repo, lock=lock, lock_path=lock_path,
-                                    profile_manifest=profile_manifest, require_assets=require_assets)
+                                    profile_manifest=profile_manifest, require_assets=require_assets, business_root=business_root)
     if contract.get("reference_root"):
         contract["evaluation_path"] = str(Path(contract["reference_root"]) / "evaluation.md")
     return contract
@@ -345,24 +350,16 @@ def _resolve_release(release_name: str, *, repo: Path) -> dict:
 
 
 def instance_desired_source(manifest: dict, *, repo: Path = REPO) -> str:
-    """保留实际加载登记，只在下一次未固定来源的装载中跟随当前身份。"""
+    """历史装载记录保持原样；下一次装载改用业务仓当前资产。"""
     source = manifest["source_id"]
-    if manifest.get("source_ref") or not source.startswith("experiment:"):
+    if not source.startswith("experiment:"):
         return source
     identity = source.removeprefix("experiment:")
-    if not EXPERIMENT.fullmatch(identity):
-        raise ValueError("实例来源身份无效")
-    change = yaml.safe_load((repo / "evolution/experiments" / identity / "change.yaml").read_text(encoding="utf-8"))
-    target = change.get("current_version_id")
-    if not target:
-        return source
-    match = EXPERIMENT.fullmatch(target) if isinstance(target, str) else None
-    if not match or change.get("experiment_id") != identity or match[1] != change.get("agent_id"):
-        raise ValueError("实例来源的迁移指向无效，请核对版本身份")
-    current = yaml.safe_load((repo / "evolution/experiments" / target / "change.yaml").read_text(encoding="utf-8"))
-    if current.get("experiment_id") != target or current.get("agent_id") != change.get("agent_id") or current.get("current_version_id") or current.get("assets_retired"):
-        raise ValueError("实例来源的迁移指向无效，请核对版本身份")
-    return f"experiment:{target}"
+    match = EXPERIMENT.fullmatch(identity)
+    agent_id = manifest.get("agent_id") or (match[1] if match else None)
+    if not isinstance(agent_id, str) or not NAME.fullmatch(agent_id):
+        raise ValueError("实例来源缺少业务智能体身份")
+    return f"business:{agent_id}"
 
 
 def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path | None = None,
@@ -371,6 +368,14 @@ def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path
     repo = repo.expanduser().resolve()
     if evaluation_source not in {"source", "current"}:
         raise ValueError("evaluation_source 必须是 source 或 current")
+    if source_id.startswith("business:"):
+        contract = _resolve_experiment(source_id, repo=repo, sources=sources or source_catalog(repo), lock_path=lock_path,
+                                       require_assets=require_assets, web_bootstrap=web_bootstrap)
+        if source_ref and source_ref != contract.get("source_ref"):
+            raise ValueError("固定提交与业务 Git tag 不一致；当前工作树不接受 source_ref")
+        if evaluation_source == "current":
+            contract["evaluation_path"] = str(Path(contract["business_repository"]) / "agents" / contract["agent_id"] / "evaluation.md")
+        return contract
     if source_ref:
         experiment_id = source_id.removeprefix("experiment:")
         try:
@@ -392,12 +397,12 @@ def resolve(source_id: str = DEFAULT_SOURCE, *, repo: Path = REPO, sources: Path
         return contract
     sources = sources if sources is not None else source_catalog(repo)
     if not source_id:
-        manifest = yaml.safe_load((repo / "agents/security-operations-expert/manifest.yaml").read_text(encoding="utf-8"))
-        source_id = manifest.get("active_experiment") if isinstance(manifest, dict) else None
-        if not isinstance(source_id, str) or not EXPERIMENT.fullmatch(source_id):
-            raise ValueError("默认智能体没有有效的 active_experiment；请通过 --source 指定来源")
+        return resolve("business:security-operations-expert", repo=repo, lock_path=lock_path,
+                       require_assets=require_assets, web_bootstrap=web_bootstrap)
     if source_id.startswith("experiment:"):
         return _resolve_experiment(source_id[len("experiment:"):], repo=repo, sources=sources, lock_path=lock_path, require_assets=require_assets, web_bootstrap=web_bootstrap)
+    if source_id.startswith("business:"):
+        return _resolve_experiment(source_id, repo=repo, sources=sources, lock_path=lock_path, require_assets=require_assets, web_bootstrap=web_bootstrap)
     if source_id.startswith("release:"):
         return _resolve_release(source_id[len("release:"):], repo=repo)
     if ":" in source_id:

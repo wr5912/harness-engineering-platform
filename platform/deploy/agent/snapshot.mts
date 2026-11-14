@@ -3,8 +3,9 @@ import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { runtimeSource } from '../../plugin/src/agents/business-source.ts'
 import { candidateFiles } from '../../plugin/src/tasks/files.ts'
-import { versionSource, assertStandaloneVersionSupported } from '../../plugin/src/agents/version-source.ts'
+import { assertStandaloneVersionSupported } from '../../plugin/src/agents/version-source.ts'
 import { assetDependencyDeclarations, preparedAssetDependencyPackages } from '../../plugin/src/agents/asset-dependencies.ts'
 import { expectedImage } from '../image.mts'
 import { collectEntries, sha256File } from '../manifest.mts'
@@ -176,15 +177,16 @@ function dependencyPackages(candidate: string, input: AgentPackageInput, extraDi
 export function inspectAgentSnapshot(input: AgentPackageInput, targetImage?: { tag: string; id: string }): AgentSourceSnapshot {
   if (!['amd64', 'arm64'].includes(input.arch) || !['online', 'offline'].includes(input.mode)) throw new Error('部署架构或模式无效')
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.agentId)) throw new Error('智能体身份无效')
-  const source = versionSource(input.assetRoot, input.experimentId)
+  const source = runtimeSource(input.assetRoot, input.experimentId)
+  const repository = source.repository_root
   assertStandaloneVersionSupported(source)
   if (source.agent_id !== input.agentId) throw new Error('所选版本不属于当前智能体')
-  const candidate = resolve(input.assetRoot, source.candidate_root, '..')
+  const candidate = resolve(repository, source.candidate_root, '..')
   const { load } = createRequire(join(input.programRoot, 'platform/plugin/package.json'))('js-yaml')
   const harness = load(readFileSync(join(candidate, 'harness.yaml'), 'utf8')) as any
   source.preset_id = harness.loadable_assets.preset_id
   if (source.profile === 'sdk' && source.profile_manifest) {
-    const profile = JSON.parse(readFileSync(join(input.assetRoot, source.profile_manifest), 'utf8'))
+    const profile = JSON.parse(readFileSync(join(repository, source.profile_manifest), 'utf8'))
     const bundles = profile.dsh?.profile?.bundles
     if (!Array.isArray(bundles) || JSON.stringify(bundles) !== JSON.stringify(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-sdk-app'])) throw new Error('当前 SDK 独立运行包只支持原生 dsh-base 与 dsh-sdk-app Profile；额外或不同的 bundle 尚未承接，请使用平台实例运行')
     if (Object.keys(profile.dependencies ?? {}).some(name => !['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-sdk-app'].includes(name))) throw new Error('当前 SDK 独立运行包尚未承接额外的 Profile 插件依赖，请使用平台实例运行')
@@ -231,7 +233,7 @@ export function inspectAgentSnapshot(input: AgentPackageInput, targetImage?: { t
     dependency.ready = false; dependency.reason = '已准备业务依赖对应另一标准镜像，需要针对当前运行资源重新准备'
   }
   return { agentId: input.agentId, experimentId: input.experimentId, candidate, candidateSha256: digest, source, files, omitted,
-    dependencies, git: gitState(input.assetRoot) }
+    dependencies, git: { ...gitState(source.business_repository), ...(source.source_commit ? { commit: source.source_commit, dirty: false } : {}) } }
 }
 
 export function copyAgentSnapshot(snapshot: AgentSourceSnapshot, staging: string, signal?: AbortSignal): void {

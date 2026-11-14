@@ -57,6 +57,9 @@ services:
     security_opt: ["no-new-privileges:true"]
     pids_limit: 256
     stop_grace_period: 20s
+    env_file:
+      - path: ./.env
+        required: false
     tmpfs:
       - /tmp:rw,exec,nosuid,nodev,size=64m,mode=1777
     environment:
@@ -65,6 +68,7 @@ services:
       - DSH_HARNESS_MODE=verification
       - DSH_PERMISSION_MODE=read-only
       - DSH_TELEMETRY_DISABLED=1
+      - NODE_USE_ENV_PROXY=1
       - DSH_EVAL_TARGET_PRESET=${DSH_EVAL_TARGET_PRESET:?业务 Preset 由所选来源注入}
     command:
       - --profile

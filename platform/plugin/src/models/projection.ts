@@ -195,7 +195,7 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
   }
   let dependencies: PreparedAssetDependencies | undefined
   if (candidatePath) {
-    const id = basename(dirname(candidatePath))
+    const id = basename(candidatePath) === 'candidate' ? basename(dirname(candidatePath)) : `business:${agentId}`
     if (runtime || existsSync(join(assetRoot, '.local/asset-dependencies', id, 'current.json'))) {
       dependencies = resolvePreparedAssetDependencies(assetRoot, id, {}, candidatePath)
       if (dependencies.status !== 'ready') throw new Error(`业务依赖尚未准备：${dependencies.reasons.join('；')}`)

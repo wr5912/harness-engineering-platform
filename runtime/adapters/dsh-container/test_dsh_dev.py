@@ -846,6 +846,30 @@ class EvaluationModeContractTest(unittest.TestCase):
             (plugin / "node_modules" / "@deepseek-ai/schemastery").mkdir()
             dev.check_managed_plugin_dependencies(contract)
 
+    def test_candidate_without_node_modules_uses_standard_runtime_extensions(self):
+        with tempfile.TemporaryDirectory() as temp, mock.patch.object(
+            dev, "run", return_value=subprocess.CompletedProcess(
+                [], 0, stdout='["pinyin-pro","sherpa-onnx-node"]', stderr=""
+            )
+        ) as probe:
+            managed = Path(temp)
+            plugin = managed / "dsh-voice-hub"
+            plugin.mkdir()
+            (plugin / "package.json").write_text(
+                '{"dependencies":{"pinyin-pro":"^3.29.4","sherpa-onnx-node":"^1.13.6"}}', encoding="utf-8"
+            )
+            contract = self.contract(managed=str(managed))
+            dev.check_managed_plugin_dependencies(contract)
+            self.assertEqual(probe.call_count, 1)
+            command = probe.call_args.args[0]
+            self.assertIn(contract["image"]["local_image_tag"], command)
+            self.assertIn("runtimeInstallationClosure()", command[-1])
+            self.assertFalse((plugin / "node_modules").exists())
+            probe.return_value.stdout = '[]'
+            with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.check_managed_plugin_dependencies(contract)
+            self.assertIn("标准 Runtime", error.getvalue())
+
     def test_only_eval_mode_is_supported(self):
         self.assertEqual(dev.normalize_mode("eval"), "verification")
         self.assertEqual(dev.normalize_mode("verification"), "verification")
@@ -935,7 +959,7 @@ class EvaluationModeContractTest(unittest.TestCase):
     def test_adapter_scripts_are_mounted_not_baked_into_the_image(self):
         """回归：脚本改动只需重启实例，不必重建镜像。"""
         dockerfile = (ADAPTER / "Dockerfile").read_text(encoding="utf-8")
-        for name in ("verify-load.mjs", "tree-digest.mjs", "prepare-verification-home.mjs"):
+        for name in ("verify-load.mjs", "tree-digest.mjs", "prepare-verification-home.mjs", "runtime-packages.mjs"):
             self.assertNotIn(f"/opt/dsh-adapter/{name}", dockerfile)
         self.assertIn("RUN mkdir -p /opt/dsh-adapter", dockerfile)
         rendered = dev.render_compose(

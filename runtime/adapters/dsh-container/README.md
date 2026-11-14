@@ -14,6 +14,8 @@ export HARNESS_ASSET_ROOT="$HOME/harness-engineering-platform-data"
 
 程序保留 `source.lock.json`、运行适配器与校验 Skill；数据工作区保留 `workspace.json`、`config/`、`agents/` 和 `evolution/`。当前装载不依赖全局来源表；固定历史提交的恢复只兼容该提交自身的旧声明，具体合同见[版本身份与装载声明](../../../docs/platform-design/03_存储架构与数据契约.md#版本身份与装载声明)。校验器从程序侧读取规范与实现，不要求把程序文档复制到数据仓库。评测工具使用 Python 3.10 或更新版本，TypeScript 入口需要 Node.js 24.9 或更新版本；检查 PATH 时应同时核对这两个版本。
 
+标准 Runtime 镜像不内置代理，也不继承宿主构建代理。需要代理时在实例 `compose.yaml` 同目录的 `.env` 中配置 `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY`（兼容小写），重建容器后生效。host 网络可使用 `http://127.0.0.1:7897`；平台业务实例默认使用 bridge 网络，连接宿主代理应使用 `http://host.docker.internal:7897`，并确保代理监听地址对容器可达。内网模型和 MCP 地址应加入 `NO_PROXY`。
+
 ## SDK 无界面调用
 
 新建时使用 `dsh-dev init <agent-id> --profile sdk`；省略该选项仍创建 Web 版本。SDK 版本通过官方 TypeScript SDK 启动同一标准容器内的 DSH 子进程，保留独立 HOME，不发布业务 HTTP 端口。
@@ -65,9 +67,9 @@ APT 索引使用 `Error-Mode=any`、单次重试、30 秒 HTTP 连接超时和 I
 
 评测实例不挂载 `evaluation.md` 或其他判分材料；`verify-load.mjs` 与 `test_home_submounts.mjs` 对此做负向断言。Harness 修改由宿主开发会话完成，容器只负责装载和评测。
 
-Managed 插件从自身目录向上解析 Node 依赖。主容器在 `/opt/node_modules` 只读复用原生 Profile 已初始化的镜像依赖卷；它与镜像指纹绑定，不安装另一份 DSH。插件自己的 `node_modules/` 仍优先使用。镜像未提供的独立依赖按插件锁文件在目标主机准备，不能为补齐 Runtime 包直接安装旧插件的开发版 DSH。`dsh-dev` 在停止旧实例前核对显式运行依赖，完整导入和插件激活仍由实际装载核验。
+Managed 插件从自身目录向上解析 Node 依赖。主容器在 `/opt/node_modules` 只读复用标准镜像的 CLI 与 `standalone-deps/package-lock.json` 锁定的扩展依赖；启动检查、Web 和 SDK 使用同一依赖集合。依赖卷与镜像指纹绑定，不安装另一份 DSH。插件自己的 `node_modules/` 仍优先使用。镜像未提供的插件专有依赖可按插件锁文件在目标主机准备；共享依赖变更须更新标准镜像的依赖锁。`dsh-dev` 在停止旧实例前核对显式运行依赖，完整导入和插件激活仍由实际装载核验。
 
-`node_modules/` 已被 Git 忽略，不得把 AMD64 主机的依赖复制到 ARM64 主机。当前 `security-operations-expert` 的 `dsh-voice-hub` 使用 `sherpa-onnx-node` 原生包，须在目标主机准备并在容器内核对原生模块和浏览器语音功能；目录存在只表示依赖已放置。显式使用 `dsh-dev up --plugin-node-modules PATH` 时，该只读目录替代默认 `/opt/node_modules` 投影，须同时提供插件所需的共享依赖。
+`node_modules/` 已被 Git 忽略，不得把 AMD64 主机的依赖复制到 ARM64 主机。`dsh-voice-hub` 的 `pinyin-pro`、`sherpa-onnx-node` 等运行依赖由对应架构的标准镜像提供，无需在 Candidate 安装；语音功能仍需核对原生模块装载和浏览器交互。显式使用 `dsh-dev up --plugin-node-modules PATH` 时，该只读目录替代默认 `/opt/node_modules` 投影，须同时提供插件所需的共享依赖。
 
 `locked-user.patch.yml` 只读覆盖 HOME 级用户 Patch；Web Profile 的 `cordis.patch.yml` 留在实例 HOME 卷中，由 DSH Web 保存当前实例的设置（新版 DSH 的设置写入要求对该文件原子替换）。真正 **0 字节**的 `locked-global.AGENTS.md` 和只含注释的 `locked-bootstrap.env` 分别只读覆盖全局 Agent instructions 与 Boot 环境文件。模型/MCP Endpoint 和凭据只能由调用环境或 Runtime 受控凭据提供，不能由 Candidate 工作区改变。复用实例时须把 Web Profile 设置视为运行状态，而非 Candidate 资产；评估前核对其摘要或使用新实例。
 

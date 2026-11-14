@@ -4,6 +4,8 @@
 
 `deployment.env` 保存端口、访问主机、运行用户和容器项目名。同一主机部署多个 Web 副本时，分别设置 `AGENT_PORT`；容器项目名默认按安装路径区分，也可用 `COMPOSE_PROJECT_NAME` 指定。`compose.yaml` 使用标准镜像，保持 HOME 可写；通常无需修改。
 
+标准镜像不内置代理。可在 `deployment.env` 或包根 `.env` 中设置 `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY`（兼容小写），修改后重启。默认 bridge 网络连接宿主机代理应使用 `http://host.docker.internal:7897`，代理需监听容器可达的地址；使用 host 网络或容器内代理时才用 `http://127.0.0.1:7897`。`NO_PROXY` 中加入模型及 MCP 的内网地址可让这些请求直连。
+
 默认 Harness 为包内 `harness/`，保留 `harness.yaml`、`dsh/` 和版本声明的 SDK 资产。可在启动时指定 `--harness-root /绝对路径`，或设置 `AGENT_HARNESS_ROOT`；所选目录必须有 `harness.yaml` 和原生 `dsh/`，Web、SDK 及本地工具使用同一来源。资产更新工具只更新包内、未被现场修改的 Harness，不覆盖外部目录。
 
 `seed/standalone.json` 是首次运行的模型与 MCP 配置种子；`seed/environment.llm-api-key` 是环境键到字符串值的 JSON，仅保存模型等连接凭据。包可能含凭据，应作为私有文件传递。初始化后，修改种子不会覆盖已保存配置。

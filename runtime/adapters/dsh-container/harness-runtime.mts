@@ -6,7 +6,7 @@ import { VERSION_ID } from '../../../platform/plugin/src/version-id.ts'
 try {
   const [candidate, destination, runtimeFile] = process.argv.slice(2)
   if (candidate === '--private-files') {
-    if (!destination || !runtimeFile || !VERSION_ID.test(runtimeFile)) throw new Error('私有运行文件缺少有效的来源版本')
+    if (!destination || !runtimeFile || !(VERSION_ID.test(runtimeFile) || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(runtimeFile))) throw new Error('私有运行文件缺少有效的来源版本')
     const parent = resolve(destination, '.local/verification-private-files'), folder = join(parent, runtimeFile)
     const privateDirectory = (path: string) => {
       const stat = lstatSync(path)

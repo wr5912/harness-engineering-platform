@@ -4,7 +4,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from '
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { decodeMountPath, fileSnapshot } from './tree-digest.mjs'
-import { installationClosure, validateFallback } from './prepare-verification-home.mjs'
+import { runtimeInstallationClosure, validateFallback } from './prepare-verification-home.mjs'
 
 const mode = process.env.DSH_HARNESS_MODE
 if (mode !== 'verification') {
@@ -16,8 +16,8 @@ try {
 } catch {
   throw new Error('missing or invalid selected DSH source contract')
 }
-const sourceSelector = /^experiment:(?!VAR-.*-[0-9]{3}-[mf]-r[0-9a-f]{12}$)(?:EXP|VAR)-[a-z0-9]+(?:-[a-z0-9]+)*-[0-9]{3}(?:-[mf]-r[0-9a-f]{12}|(?:-r[0-9a-f]{12})?)$/
-const sourceKinds = new Set(['experiment'])
+const sourceSelector = /^(?:business:[a-z0-9]+(?:-[a-z0-9]+)*|experiment:(?!VAR-.*-[0-9]{3}-[mf]-r[0-9a-f]{12}$)(?:EXP|VAR)-[a-z0-9]+(?:-[a-z0-9]+)*-[0-9]{3}(?:-[mf]-r[0-9a-f]{12}|(?:-r[0-9a-f]{12})?))$/
+const sourceKinds = new Set(['experiment', 'business'])
 if (source?.schema_version !== '2.1' || !sourceSelector.test(source.source_id) || !sourceKinds.has(source.source_kind)
   || source.profile !== 'web' || !source.patch?.startsWith('/opt/dsh-managed/')
   || source.evaluation_patch !== '/opt/dsh-adapter/evaluation-registry.patch.yml'
@@ -215,7 +215,7 @@ const fallbackMount = mounts.find(entry => entry.target === fallbackPath)
 if (!fallbackMount || !fallbackMount.options.includes('ro')) {
   throw new Error('trusted installation fallback is not an exact read-only volume mount')
 }
-const closure = installationClosure('/opt/dsh/apps/cli/package.json')
+const closure = runtimeInstallationClosure()
 const linkedFallback = validateFallback(fallbackPath, closure, true)
 const profileRequire = createRequire('/var/lib/dsh/profiles/web/cordis.yml')
 const criticalModules = [

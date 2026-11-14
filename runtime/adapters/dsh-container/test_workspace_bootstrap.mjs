@@ -60,13 +60,23 @@ test('宿主用户初始化全新依赖卷后，Managed 插件只读复用同一
     assert.match(initialized.stdout, /controlled-home-targets-prepared/)
   }
   const resolved = run(['--user', `${uid}:${gid}`, '--mount', `type=volume,src=${volume},dst=/opt/node_modules,readonly`,
+    '--mount', `type=bind,src=${adapter},dst=/opt/dsh-adapter,readonly`, '--tmpfs', '/tmp',
     '--entrypoint', 'node', image, '--input-type=module', '-e', `
       import assert from 'node:assert/strict';
       import {createRequire} from 'node:module';
-      import {writeFileSync} from 'node:fs';
+      import {readFileSync,writeFileSync} from 'node:fs';
+      import {prepareSdkModuleLinks} from '/opt/dsh-adapter/sdk-module-links.mts';
       assert.equal(process.getuid(),${uid});
       const require=createRequire('/opt/dsh-managed/probe.cjs');
       for(const name of ['@deepseek-ai/schemastery','@deepseek-ai/dsh-llm','@deepseek-ai/cordis']) assert.ok(require.resolve(name));
+      const shared=JSON.parse(readFileSync('/opt/dsh-standalone/dependencies/package.json','utf8')).dependencies;
+      for(const name of Object.keys(shared)) assert.ok(require.resolve(name),name);
+      assert.equal(require('pinyin-pro').pinyin('中国'),'zhōng guó');
+      assert.equal(typeof require('sherpa-onnx-node').OfflineRecognizer,'function');
+      prepareSdkModuleLinks('/tmp/sdk/node_modules');
+      prepareSdkModuleLinks('/tmp/sdk/node_modules');
+      const sdkRequire=createRequire('/tmp/sdk/probe.cjs');
+      for(const name of ['@deepseek-ai/dsh-app-boot',...Object.keys(shared)]) assert.ok(sdkRequire.resolve(name),name);
       assert.throws(()=>writeFileSync('/opt/node_modules/probe','forbidden'),e=>['EROFS','EACCES'].includes(e.code));
     `])
   assert.equal(resolved.status, 0, resolved.stderr)

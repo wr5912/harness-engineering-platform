@@ -30,6 +30,8 @@ export async function writeCompactRuntime(staging: string, options: RuntimeBundl
     init: { ...common, user: '0:0', network_mode: 'none', entrypoint: ['/bin/sh', '-c'],
       command: [`node ${runtime}/standalone-bootstrap.js init && chown -R $$STANDALONE_UID:$$STANDALONE_GID /var/lib/dsh`] },
     dsh: { ...common, user: '${AGENT_UID:-1000}:${AGENT_GID:-1000}', init: true,
+      environment: { ...common.environment, NODE_USE_ENV_PROXY: '1' },
+      env_file: [{ path: './config/deployment.env', required: false }, { path: './.env', required: false }],
       depends_on: { init: { condition: 'service_completed_successfully' } },
       entrypoint: ['node', `${runtime}/standalone-bootstrap.js`],
       command: sdk ? ['sdk-run', '/var/lib/dsh/standalone/input.json'] : ['start'],
@@ -37,5 +39,5 @@ export async function writeCompactRuntime(staging: string, options: RuntimeBundl
       extra_hosts: ['host.docker.internal:host-gateway'], stop_grace_period: '20s' },
   } }
   writeFileSync(join(staging, 'config/compose.yaml'), JSON.stringify(compose, null, 2) + '\n')
-  writeFileSync(join(staging, 'config/deployment.env'), `# 修改后运行 ./agent restart；首次启动自动导入随包镜像。\nAGENT_ID=${options.agentId}\nAGENT_ARCH=${options.arch}\nAGENT_PROFILE=${options.profile ?? 'web'}\nIMAGE_TAG=${options.imageTag}\nIMAGE_ID=${options.imageId ?? ''}\n# AGENT_PORT=18500\n# AGENT_HOST=192.168.1.10\n# AGENT_HARNESS_ROOT=/absolute/path/to/harness\n# AGENT_UID=1000\n# AGENT_GID=1000\n# COMPOSE_PROJECT_NAME=hep-agent-${options.agentId}\n`)
+  writeFileSync(join(staging, 'config/deployment.env'), `# 修改后运行 ./agent restart；首次启动自动导入随包镜像。\nAGENT_ID=${options.agentId}\nAGENT_ARCH=${options.arch}\nAGENT_PROFILE=${options.profile ?? 'web'}\nIMAGE_TAG=${options.imageTag}\nIMAGE_ID=${options.imageId ?? ''}\n# AGENT_PORT=18500\n# AGENT_HOST=192.168.1.10\n# AGENT_HARNESS_ROOT=/absolute/path/to/harness\n# AGENT_UID=1000\n# AGENT_GID=1000\n# COMPOSE_PROJECT_NAME=hep-agent-${options.agentId}\n# HTTP_PROXY=http://host.docker.internal:7897\n# HTTPS_PROXY=http://host.docker.internal:7897\n# NO_PROXY=localhost,127.0.0.1,host.docker.internal\n`)
 }

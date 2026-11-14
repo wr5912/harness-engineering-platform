@@ -149,6 +149,8 @@ def validation_check(script: Path, target: str, *options: str) -> dict:
 
 
 def validate_before_run(contract: dict) -> dict:
+    if contract["source_kind"] == "business":
+        return {}
     selected_root = Path(contract.get("source_snapshot_root", REPO))
     selected_experiment = selected_root / "evolution/experiments" / contract["experiment_id"] if contract.get("source_ref") else Path(contract["experiment_root"])
     return {
@@ -159,6 +161,8 @@ def validate_before_run(contract: dict) -> dict:
 
 
 def validate_after_run(contract: dict) -> None:
+    if contract["source_kind"] == "business":
+        return
     selected_experiment = Path(contract["source_snapshot_root"]) / "evolution/experiments" / contract["experiment_id"] if contract.get("source_ref") else Path(contract["experiment_root"])
     check = validation_check(VALIDATE_EXPERIMENT, str(selected_experiment))
     if not check["valid"]:
@@ -1053,7 +1057,7 @@ def main() -> None:
     global _cancel_requested, _cancel_reason, REPO
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=REPO, help="用户数据工作区根目录")
-    parser.add_argument("--source", required=True, help="experiment:<id> 或已登记 Experiment ID")
+    parser.add_argument("--source", required=True, help="business:<agent-id> 或 business:<agent-id>@<Git-tag>")
     parser.add_argument("--run-id", help="预分配的 run-UUIDv4；省略时生成新的 Run ID")
     parser.add_argument("--instance-name", help="复用来源及实际装载一致的既有实例；完成或取消均不停止该实例")
     parser.add_argument("--source-ref", help="固定来源 git:<40位提交>，角色、Case 与运行资产读取同一提交")

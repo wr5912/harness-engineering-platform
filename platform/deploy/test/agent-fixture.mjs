@@ -10,23 +10,25 @@ const hash = value => createHash('sha256').update(value).digest('hex')
 export function write(path, text, mode) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text, mode ? { mode } : {}) }
 export function command(name, args, cwd) { const result = spawnSync(name, args, { cwd, encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr); return result.stdout.trim() }
 export function elf(arch) { const bytes = Buffer.alloc(64); bytes.set([0x7f, 0x45, 0x4c, 0x46, 2, 1]); bytes.writeUInt16LE(arch === 'arm64' ? 183 : 62, 18); return bytes }
-export function fixture(t, arch = 'amd64', id = 'EXP-alpha-001') {
-  const root = mkdtempSync(join(tmpdir(), 'standalone-pack-')), program = join(root, 'program'), data = join(root, 'data'), resources = join(root, 'resources'), out = join(root, 'out')
+export function fixture(t, arch = 'amd64', id = 'business:alpha') {
+  const root = mkdtempSync(join(tmpdir(), 'standalone-pack-')), program = join(root, 'program'), data = join(root, 'data'), business = join(root, 'business'), resources = join(root, 'resources'), out = join(root, 'out')
   const before = process.env.HARNESS_PYTHON
   process.env.HARNESS_PYTHON = process.execPath
   t.after(() => { if (before === undefined) delete process.env.HARNESS_PYTHON; else process.env.HARNESS_PYTHON = before; rmSync(root, { recursive: true, force: true }) })
-  const candidate = join(data, 'evolution/experiments', id, 'candidate'), fingerprint = 'f'.repeat(64), tag = `dsh:fixture-${arch}`
-  write(join(data, 'evolution/experiments', id, 'change.yaml'), `experiment_id: ${id}\nagent_id: alpha\n`)
-  write(join(candidate, 'harness.yaml'), 'loadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: alpha-main\n  profile_patch: dsh/managed/alpha.patch.yml\ncredential_environment_keys: [TEST_MODEL_KEY]\n')
+  const candidate = join(business, 'agents/alpha'), fingerprint = 'f'.repeat(64), tag = `dsh:fixture-${arch}`
+  write(join(data, 'config/repositories.json'), JSON.stringify({ repositories: [{ id: 'business-agents', path: business }] }))
+  write(join(business, 'manifest.yaml'), 'agents:\n- {agent_id: alpha, path: agents/alpha, status: active}\n')
+  write(join(candidate, 'harness.yaml'), 'agent: {id: alpha}\nloadable_assets:\n  workspace: dsh/workspace\n  preset_root: dsh/presets\n  managed_root: dsh/managed\n  preset_id: alpha-main\n  profile_patch: dsh/managed/alpha.patch.yml\ncredential_environment_keys: [TEST_MODEL_KEY]\n')
   write(join(candidate, 'dsh/workspace/AGENTS.md'), '# 初版\n')
   write(join(candidate, 'dsh/workspace/.env'), 'TEST_MODEL_KEY="synthetic-fixture-value"\n')
   write(join(candidate, 'dsh/presets/alpha-main/agent.cordis.yml'), '[]\n')
   write(join(candidate, 'dsh/managed/alpha.patch.yml'), '[]\n')
   write(join(data, 'agents/other/private.md'), '其他业务资料，不应进入包')
   write(join(candidate, 'RuntimeHOME/sessions/private.jsonl'), '旧会话，不应进入包')
-  command('git', ['init', '-q'], data)
-  command('git', ['add', '.'], data)
-  command('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', '原始测试资产'], data)
+  command('git', ['init', '-q'], business)
+  command('git', ['add', '.'], business)
+  command('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', '原始测试资产'], business)
+  if (id.includes('@')) command('git', ['tag', decodeURIComponent(id.split('@')[1])], business)
   write(join(candidate, 'dsh/workspace/AGENTS.md'), '# 当前已保存且未提交的业务规则\n')
   write(join(program, 'runtime/adapters/dsh-container/source_contract.py'), `console.log(JSON.stringify({tag:${JSON.stringify(tag)},fingerprint:${JSON.stringify(fingerprint)}}))`)
   for (const name of ['standalone-bootstrap.js', 'standalone-plugin.js', 'standalone-bridge.js', 'standalone-connection.js', 'standalone-knowledge.js']) write(join(program, 'platform/plugin/lib', name), 'export {}\n')
@@ -51,7 +53,7 @@ export function fixture(t, arch = 'amd64', id = 'EXP-alpha-001') {
   write(join(resources, 'docker/docker-compose'), elf(arch), 0o755)
   const resourceManifest = { schemaVersion: 1, arch, createdAt: '2026-10-29T00:00:00Z', image: { tag, id: `sha256:${imageId}`, arch, fingerprint, archive: 'images/dsh-runtime.tar' }, docker: { files: collectEntries(join(resources, 'docker')) }, dependencies: [] }
   write(join(resources, 'resources.json'), JSON.stringify(resourceManifest))
-  return { root, candidate, program, data, resources, out, id, input: { programRoot: program, assetRoot: data, agentId: 'alpha', experimentId: id, arch, mode: 'online', resourcesDir: resources, out } }
+  return { root, candidate, program, data, business, resources, out, id, input: { programRoot: program, assetRoot: data, agentId: 'alpha', experimentId: id, arch, mode: 'online', resourcesDir: resources, out } }
 }
 
 export function catalog(f, dependencies = {}, python = '') {

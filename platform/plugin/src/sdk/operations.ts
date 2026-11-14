@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
-import { versionSource } from '../agents/version-source.ts'
+import { runtimeSource } from '../agents/business-source.ts'
 import { dataPath, sourceInfo } from '../tasks/files.ts'
 import { instanceStateRoot, programRoot, workspaceIdentity, workspaceLocalPath, workspaceOwnsInstance } from '../workspace.ts'
 import { redactRunText } from '../agents/run-files.ts'
@@ -86,12 +86,15 @@ export function createSdkHandler(root: string, options: { modelPolicy?: SdkModel
     try {
       const body = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload as Record<string, unknown> : {}
       if (endpoint === 'status') return { ok: true, value: read(operationId(body.operation_id)) }
-      if (endpoint === 'list') return { ok: true, value: list().filter(item => !body.source || item.source === String(body.source).replace(/^(?!experiment:)/, 'experiment:')) }
+      if (endpoint === 'list') return { ok: true, value: list().filter(item => !body.source || item.source === (/^(business|experiment):/.test(String(body.source)) ? String(body.source) : `experiment:${body.source}`)) }
       if (endpoint === 'guide' || endpoint === 'start') {
-        const source = sourceInfo(root, text(body, 'source'))
-        if (versionSource(root, source.id).profile !== 'sdk') throw new Error('该版本使用 Web 方式，请选择 TypeScript SDK 版本')
+        const selector = text(body, 'source'), contract = runtimeSource(root, selector)
+        const source = selector.startsWith('business:')
+          ? { id: selector, source: selector, agent_id: contract.agent_id as string, candidate: join(contract.repository_root, 'agents', contract.agent_id) }
+          : sourceInfo(root, selector)
+        if (contract.profile !== 'sdk') throw new Error('该版本使用 Web 方式，请选择 TypeScript SDK 版本')
         if (endpoint === 'guide') {
-          const readAsset = (file: string) => readFileSync(dataPath(root, `evolution/experiments/${source.id}/candidate/${file}`), 'utf8')
+          const readAsset = (file: string) => readFileSync(dataPath(source.candidate, file), 'utf8')
           return { ok: true, value: { workspace_id: workspace.id, profile: 'sdk', source: source.source,
             markdown: readAsset('sdk/README.md'), example: readAsset('sdk/example.ts') } }
         }

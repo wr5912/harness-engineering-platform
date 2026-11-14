@@ -65,6 +65,7 @@ function fixture() {
     'runtime/adapters/dsh-container/source_contract.py',
     'runtime/adapters/dsh-container/version-source.mts',
     'platform/plugin/src/agents/version-source.ts',
+    'platform/plugin/src/agents/business-source.ts',
     'platform/plugin/src/agents/candidate-assets.ts',
     'platform/plugin/src/tasks/files.ts',
     'platform/plugin/src/tasks/asset-error.ts',
@@ -82,8 +83,12 @@ function fixture() {
     'runtime/research/inspect_source.py',
   ]) copyFixtureFile(root, rel)
   symlinkSync(join(plugin, 'node_modules'), join(root, 'platform/plugin/node_modules'), 'dir')
-  for (const name of ['Dockerfile', 'apt-mirror.sh', 'build-image.sh', 'dsh-cli.sh']) {
+  // 此测试不构建镜像，但来源合同仍需要完整的镜像输入身份。
+  for (const name of ['Dockerfile', 'apt-mirror.sh', 'build-image.sh', 'dsh-cli.sh', 'stage-standalone.mts', 'sdk-runner.mts', 'sdk-preset.mts', 'sdk-profile.patch.yml', 'sdk-module-links.mts', 'prepare-verification-home.mjs']) {
     write(join(root, 'runtime/adapters/dsh-container', name), `${name}\n`)
+  }
+  for (const name of ['standalone-bootstrap.js', 'standalone-plugin.js', 'standalone-bridge.js', 'standalone-connection.js', 'standalone-knowledge.js', 'model-binding-runtime.js']) {
+    write(join(root, 'platform/plugin/lib', name), `${name}\n`)
   }
   write(join(root, 'runtime/adapters/dsh-container/source.lock.json'), JSON.stringify({
     schema_version: '1.1',

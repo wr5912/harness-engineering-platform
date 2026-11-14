@@ -280,7 +280,12 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
   }
   useEffect(() => { if (detail && isSdk(detail.instance) && detailTab === 'embed') setDetailTab('overview') }, [detail, sourceById, detailTab])
   const agentName = (id?: string) => agents.find(item => item.id === id)?.name || id || '未记录智能体'
-  const versionLabel = (sourceId?: string) => { const id = sourceById.get(sourceId || '')?.experiment_id || sourceId; const number = id?.match(/-(\d{3})(?:-r[0-9a-f]{12})?$/)?.[1]; return number ? `v${number}` : id || '未记录来源' }
+  const versionLabel = (sourceId?: string) => {
+    if (sourceId?.startsWith('business:')) return '业务仓当前主线'
+    const id = sourceById.get(sourceId || '')?.experiment_id || sourceId
+    const number = id?.match(/-(\d{3})(?:-[mf])?(?:-r[0-9a-f]{12})?$/)?.[1]
+    return number ? `研究快照 v${number}` : id || '未记录来源'
+  }
   const sourceLabel = (id?: string) => {
     if (!id) return '未记录来源'
     const source = sourceById.get(id)
@@ -1152,7 +1157,7 @@ export function InstancesPage({ rpc, updates, onContext, target, onNavigate, act
             </div>
             }<div className="instance-session-note"><strong>会话与数据</strong><p>{detail.session_scope.note || '未记录会话说明。'}</p></div>
 
-            {onNavigate && <button type="button" className="instance-run-link" onClick={() => onNavigate({ page: 'evaluation', tab: 'runs', agent_id: detail.instance.agent_id, experiment_id: detail.instance.source_id?.startsWith('experiment:') ? detail.instance.source_id.slice('experiment:'.length) : sourceById.get(detail.instance.source_id || '')?.experiment_id })}>查看来源版本评测</button>}
+            {onNavigate && detail.instance.source_id?.startsWith('experiment:') && <button type="button" className="instance-run-link" onClick={() => onNavigate({ page: 'evaluation', tab: 'runs', agent_id: detail.instance.agent_id, experiment_id: detail.instance.source_id?.startsWith('experiment:') ? detail.instance.source_id.slice('experiment:'.length) : sourceById.get(detail.instance.source_id || '')?.experiment_id })}>查看来源版本评测</button>}
           </section>
 
           {!isSdk(detail.instance) && <section id="instance-panel-embed" role="tabpanel" aria-labelledby="instance-tab-embed" hidden={detailTab !== 'embed'} className="instance-detail-body">

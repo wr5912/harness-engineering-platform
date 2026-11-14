@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { DEFAULT_SCHEMA, Type, dump, load } from 'js-yaml'
+import { businessAgentsRoot } from '../workspace.ts'
 
 export type HarnessModelSelection = { provider: string; model: string; reasoningEffort?: string }
 export interface HarnessRuntime {
@@ -87,6 +88,16 @@ export function assertCandidatePath(candidate: string, file: string, directory =
 
 export function assertRuntimeCandidateOrigin(assetRoot: string, candidatePath: string): string {
   const candidate = resolve(candidatePath), root = resolve(assetRoot)
+  const business = businessAgentsRoot(assetRoot), businessPath = relative(business, candidate)
+  if (/^agents\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(businessPath)) {
+    assertCandidatePath(business, businessPath, true)
+    return candidate
+  }
+  const cached = relative(root, candidate)
+  if (/^\.local\/business-sources\/[a-f0-9]{40}\/[a-z0-9-]+\/agents\/[a-z0-9-]+$/.test(cached)) {
+    assertCandidatePath(root, cached, true)
+    return candidate
+  }
   const selected = relative(root, candidate), current = /^evolution\/experiments\/([^/]+)\/candidate$/.exec(selected)
   if (!current) {
     const fixed = /^\.local\/evaluation-sources\/([a-f0-9]{40})\/([^/]+)\/evolution\/experiments\/([^/]+)\/candidate$/.exec(selected)
@@ -101,8 +112,9 @@ export function assertRuntimeCandidateOrigin(assetRoot: string, candidatePath: s
 export function resolveHarnessRuntime(assetRoot: string, agentId: string, candidatePath?: string): HarnessRuntime | undefined {
   if (!candidatePath) return undefined
   const candidate = assertRuntimeCandidateOrigin(assetRoot, candidatePath)
-  const change = object(load(readFileSync(assertCandidatePath(dirname(candidate), 'change.yaml'), 'utf8')))
-  if (change.agent_id !== agentId) throw new Error('运行绑定的来源 Agent 不一致')
+  const business = candidate === join(businessAgentsRoot(assetRoot), 'agents', agentId) || /^\.local\/business-sources\/[a-f0-9]{40}\//.test(relative(resolve(assetRoot), candidate))
+  const identity = object(load(readFileSync(assertCandidatePath(business ? candidate : dirname(candidate), business ? 'harness.yaml' : 'change.yaml'), 'utf8')))
+  if ((business ? object(identity.agent).id : identity.agent_id) !== agentId) throw new Error('运行绑定的来源 Agent 不一致')
   const runtime = parseHarnessRuntime(readFileSync(assertCandidatePath(candidate, 'harness.yaml'), 'utf8'))
   if (!runtime) return undefined
   for (const file of Object.values(runtime.preset_files)) assertCandidatePath(candidate, file)

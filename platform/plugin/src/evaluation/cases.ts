@@ -1,3 +1,4 @@
+import { runtimeSource } from '../agents/business-source.ts'
 import { suggestCaseId, validateCaseIds } from './case-ids.ts'
 import { VERSION_ID } from '../version-id.ts'
 import { businessAgentPath, businessAgentsRoot, programRoot } from '../workspace.ts'
@@ -94,17 +95,12 @@ export async function parseEvaluationDocument(root: string, content: string, sig
 async function documentFor(root: string, body: JsonMap, signal?: AbortSignal) {
   cancelled(signal)
   const experimentId = field(body, 'experiment_id')
-  if (!EXPERIMENT_ID.test(experimentId)) throw new CaseError('invalid_request', 'Experiment ID 格式无效')
-  const changePath = join(root, 'evolution/experiments', experimentId, 'change.yaml')
-  await noLinks(root, changePath)
-  const change = loadYaml(await readFile(changePath, 'utf8')) as JsonMap
-  const agentId = change?.agent_id
-  if (typeof agentId !== 'string' || !AGENT_ID.test(agentId)) throw new CaseError('invalid_request', 'Experiment 身份不一致')
-  try { assertVersionIdentity(experimentId, change) }
-  catch { throw new CaseError('invalid_request', 'Experiment 身份不一致') }
+  const source = runtimeSource(root, experimentId)
+  if (source.tag) throw new CaseError('read_only', 'Git tag 为只读快照；请编辑当前工作树')
+  const agentId = source.agent_id as string
   const path = `agents/${agentId}/evaluation.md`
-  const file = businessAgentPath(root, agentId, 'evaluation.md')
-  await noLinks(businessAgentsRoot(root), file)
+  const file = join(source.repository_root, path)
+  await noLinks(source.repository_root, file)
   const content = await readFile(file, 'utf8')
   const parsed = await parseEvaluationDocument(root, content, signal)
   return { experimentId, agentId, path, content, parsed, sha256: digest(content) }

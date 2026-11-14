@@ -7,3 +7,9 @@ if ! command -v node >/dev/null 2>&1 || ! node -e 'const [major, minor] = proces
   echo "hep: 需要可执行的 Node.js 24.9 或更新版本" >&2
   exit 2
 fi
+
+# 开发工作树可使用初始化安装的 CLI；所有入口继承同一 PATH。
+if [ -x "$HEP_ROOT/.local/dsh-cli/node_modules/.bin/dsh" ]; then
+  PATH="$HEP_ROOT/.local/dsh-cli/node_modules/.bin:$PATH"
+  export PATH
+fi

@@ -16,7 +16,7 @@ task_npm_registry="https://registry.npmmirror.com"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help)
-      printf 'Usage: %s [--source EXP-agent-NNN-r12hex] [--evidence-output FILE] [--build-network host] [--apt-mirror http://mirrors.tuna.tsinghua.edu.cn/debian|http://deb.debian.org/debian]\n' "$0"
+      printf 'Usage: %s [--source business:agent-id|EXP-agent-NNN-r12hex] [--evidence-output FILE] [--build-network host] [--apt-mirror http://mirrors.tuna.tsinghua.edu.cn/debian|http://deb.debian.org/debian]\n' "$0"
       printf 'Build locked official DSH source. APT defaults to TUNA main with Debian official security;\n'
       printf 'the official Debian APT source is an explicit fallback when the mirror is unreachable.\n'
       printf 'Host network is opt-in for local build egress only.\n'
@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 (cd "$task_repo_dir/platform/plugin" && pnpm run build)
-task_source_id="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field experiment_id)"
+task_source_id="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field source_id)"
 task_source_commit="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.commit)"
 task_source_tree="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.tree)"
 task_lock_sha="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.pnpm_lock_sha256)"
@@ -76,9 +76,14 @@ task_image_build_fingerprint="$(python3 "$task_adapter_dir/source_contract.py" -
 task_image_input_digests="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --image-input-digests)"
 task_image_label_key="org.ai-agent-harness.dsh.image-build-fingerprint"
 task_source_repository="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.repository)"
-task_experiment_root="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field experiment_root)"
 if [[ -z "$task_evidence_file" ]]; then
-  task_evidence_file="$task_experiment_root/evaluation/evidence/dsh-image-build-$(date -u +%Y%m%dT%H%M%SZ)-$$.json"
+  if [[ "$task_source_id" == business:* ]]; then
+    task_asset_root="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field asset_root)"
+    task_evidence_file="$task_asset_root/.local/image-build/dsh-image-build-$(date -u +%Y%m%dT%H%M%SZ)-$$.json"
+  else
+    task_experiment_root="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field experiment_root)"
+    task_evidence_file="$task_experiment_root/evaluation/evidence/dsh-image-build-$(date -u +%Y%m%dT%H%M%SZ)-$$.json"
+  fi
 fi
 
 task_cleanup() {

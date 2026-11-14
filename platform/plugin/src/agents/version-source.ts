@@ -44,15 +44,13 @@ export function assertVersionIdentity(id: string, change: MapValue) {
   if (id.startsWith('VAR-') && (!change.compute_variant || typeof change.compute_variant !== 'object' || Array.isArray(change.compute_variant))) throw new Error('VAR 版本必须声明 compute_variant')
 }
 
-/** 实例仍记录实际加载身份；只有未固定的来源在下次装载时跟随身份迁移。 */
+/** 保留实际装载登记，下一次装载选择业务仓资产。 */
 export function instanceDesiredSource(root: string, manifest: MapValue): string {
   const source = manifest.source_id
-  if (manifest.source_ref || typeof source !== 'string' || !source.startsWith('experiment:')) return source
-  const id = source.slice(11), identity = versionIdentity(root, id)
-  if (!identity.current_version_id) return source
-  const target = versionIdentity(root, identity.current_version_id)
-  if (target.agent_id !== identity.agent_id || target.current_version_id || target.assets_retired) throw new Error('实例来源的迁移指向无效，请核对版本身份')
-  return `experiment:${identity.current_version_id}`
+  if (typeof source !== 'string' || !source.startsWith('experiment:')) return source
+  const id = manifest.agent_id ?? /^experiment:(?:EXP|VAR)-(.+)-[0-9]{3}(?:-[mf]-r[0-9a-f]{12}|-r[0-9a-f]{12})?$/.exec(source)?.[1]
+  if (typeof id !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) throw new Error('实例来源缺少业务智能体身份')
+  return `business:${id}`
 }
 
 /** 普通派生与迁移共同保留固定父版的运行方式及装载入口。 */
@@ -82,6 +80,12 @@ export function versionSource(root: string, id: string, commit?: string): MapVal
       if (old) { legacy = JSON.parse(old).sources?.[id]; break }
     }
   }
+  return harnessSource(change.agent_id, `${base}/candidate`, harness, read, text, legacy)
+}
+
+/** 业务仓主线和研究快照共用原生 Harness 装载声明。 */
+export function harnessSource(agentId: string, base: string, harness: MapValue | undefined,
+  read: (path: string, optional?: boolean) => string | undefined, text?: string, legacy?: MapValue): MapValue {
   const assets = harness?.loadable_assets
   if (!assets && !legacy) throw new Error('版本缺少 candidate/harness.yaml 装载声明')
   const runtimeProfile = assets?.profile ?? legacy?.profile ?? 'web'
@@ -102,16 +106,17 @@ export function versionSource(root: string, id: string, commit?: string): MapVal
   const conventionalProfile = `dsh/managed/${runtimeProfile}-profile.package.json`
   let profile: string | undefined
   if (assets && Object.hasOwn(assets, 'profile_manifest')) profile = relative(assets.profile_manifest)
-  else if (legacy?.profile_manifest !== undefined) profile = relative(legacy.profile_manifest.replace(`${base}/candidate/`, ''))
-  else if (assets && read(`${base}/candidate/${conventionalProfile}`, true) !== undefined) profile = conventionalProfile
+  else if (legacy?.profile_manifest !== undefined) profile = relative(legacy.profile_manifest.replace(`${base}/`, ''))
+  else if (assets && read(`${base}/${conventionalProfile}`, true) !== undefined) profile = conventionalProfile
+  const runtime = text ? parseHarnessRuntime(text) : undefined
   return {
-    agent_id: change.agent_id, candidate_root: `${base}/candidate/dsh`, profile: runtimeProfile,
-    ...(text && parseHarnessRuntime(text) ? { harness_runtime: parseHarnessRuntime(text) } : {}),
+    agent_id: agentId, candidate_root: `${base}/dsh`, profile: runtimeProfile,
+    ...(runtime ? { harness_runtime: runtime } : {}),
     patch: patch.slice('dsh/managed/'.length),
     preset: assets ? relative(assets.preset_file ?? `${presetId}/agent.cordis.yml`) : relative(legacy!.preset),
     guard: assets?.guard ? relative(assets.guard) : legacy?.guard ?? null,
     config_markers: ['/opt/dsh-presets'], required_env_names: [], optional_env_names: [...new Set(names)],
-    ...(profile ? { profile_manifest: `${base}/candidate/${relative(profile)}` } : {}),
+    ...(profile ? { profile_manifest: `${base}/${relative(profile)}` } : {}),
   }
 }
 

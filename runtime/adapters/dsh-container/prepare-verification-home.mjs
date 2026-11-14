@@ -1,69 +1,20 @@
 import { createHash } from 'node:crypto'
 import { chownSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, readSync, realpathSync, renameSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { createRequire } from 'node:module'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { runtimeInstallationClosure, projectRuntimePackages } from './runtime-packages.mjs'
+export { installationClosure, runtimeInstallationClosure } from './runtime-packages.mjs'
+import { fileURLToPath } from 'node:url'
 
 const home = '/var/lib/dsh'
 const controls = '/opt/dsh-verification-controls'
-const installAnchor = '/opt/dsh/apps/cli/package.json'
 const fallbackDir = join(home, 'profiles', 'node_modules')
 const installRoot = '/opt/dsh/'
+const runtimeRoot = '/opt/dsh-standalone/'
 
-function insideInstall(path, trustedRoot = installRoot) {
-  return path.startsWith(trustedRoot) && path !== trustedRoot
+function insideInstall(path, trustedRoot = [installRoot, runtimeRoot]) {
+  return [trustedRoot].flat().some(root => path.startsWith(root) && path !== root)
 }
 
-function manifestAt(anchor) {
-  const state = statSync(anchor)
-  if (!state.isFile() || state.size === 0 || state.size > 64 * 1024) {
-    throw new Error(`DSH installation manifest is not bounded: ${anchor}`)
-  }
-  const manifest = JSON.parse(readFileSync(anchor, 'utf8'))
-  if (!manifest || typeof manifest.name !== 'string' || !manifest.name) {
-    throw new Error(`DSH installation manifest has no package name: ${anchor}`)
-  }
-  return manifest
-}
-
-export function installationClosure(anchor) {
-  const links = new Map()
-  const first = manifestAt(anchor)
-  const appDir = join(anchor, '..')
-  if (!insideInstall(realpathSync.native(appDir))) {
-    throw new Error('DSH CLI installation anchor escaped image tree')
-  }
-  links.set(first.name, appDir)
-  const queue = [{ anchor, manifest: first }]
-  for (let head = 0; head < queue.length; head += 1) {
-    if (queue.length > 1024) throw new Error('DSH installation closure exceeds 1024 packages')
-    const current = queue[head]
-    for (const dep of [
-      ...Object.keys(current.manifest.dependencies ?? {}),
-      ...Object.keys(current.manifest.peerDependencies ?? {}),
-    ]) {
-      if (links.has(dep)) continue
-      if (!/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/.test(dep)) {
-        throw new Error(`DSH installation dependency name is invalid: ${dep}`)
-      }
-      let found
-      for (const path of createRequire(current.anchor).resolve.paths(dep) ?? []) {
-        const candidate = join(path, dep)
-        if (existsSync(join(candidate, 'package.json'))) {
-          found = candidate
-          break
-        }
-      }
-      if (!found) continue // 与锁定官方 healer 的 declared-but-uninstalled 处理一致。
-      if (!insideInstall(realpathSync.native(found))) {
-        throw new Error(`DSH dependency resolved outside immutable installation: ${dep}`)
-      }
-      links.set(dep, found)
-      queue.push({ anchor: join(found, 'package.json'), manifest: manifestAt(join(found, 'package.json')) })
-    }
-  }
-  return links
-}
 
 function fallbackEntries(dir) {
   const names = []
@@ -84,7 +35,7 @@ function fallbackEntries(dir) {
   return names
 }
 
-export function validateFallback(dir, expected, allowEmpty, trustedRoot = installRoot) {
+export function validateFallback(dir, expected, allowEmpty, trustedRoot = [installRoot, runtimeRoot]) {
   const actual = fallbackEntries(dir)
   if (allowEmpty && actual.length === 0) return false
   if (actual.length !== expected.size) {
@@ -213,25 +164,16 @@ export async function prepareControlledHome() {
   ensureTarget(join(home, 'AGENTS.md'), join(controls, 'locked-global.AGENTS.md'), true)
   ensureTarget(join(home, '.env'), join(controls, 'locked-bootstrap.env'))
 
-  const appBoot = createRequire(installAnchor).resolve('@deepseek-ai/dsh-app-boot')
-  const { healProfilesModuleFallback } = await import(pathToFileURL(appBoot).href)
   const profileManifest = join(home, 'profiles', 'web', 'package.json')
   ensureTarget(profileManifest, join(controls, 'web-profile.package.json'), false, false,
     '/opt/dsh-profile-seed/web-profile.package.json')
 
   // 仅 home-init 可写独立 fallback 卷；主 DSH 对这棵树只读挂载。
-  // 旧卷已有任何非精确安装 symlink 均拒绝，绝不先调用 healer 修补或执行。
-  const expected = installationClosure(installAnchor)
+  // 已有卷必须与当前标准镜像的依赖集合一致。
+  const expected = runtimeInstallationClosure()
   const existingFallback = validateFallback(fallbackDir, expected, true)
-  if (typeof healProfilesModuleFallback === 'function') {
-    await healProfilesModuleFallback({ installAnchor, home })
-  } else if (!existingFallback) {
-    // 新版 Runtime 取消原生 healer 后，仍由同一镜像安装闭包提供外置插件的依赖。
-    for (const [name, target] of expected) {
-      const link = join(fallbackDir, name)
-      mkdirSync(dirname(link), { recursive: true })
-      symlinkSync(target, link)
-    }
+  if (!existingFallback) {
+    projectRuntimePackages(fallbackDir, expected)
   }
   validateFallback(fallbackDir, expected, false)
 

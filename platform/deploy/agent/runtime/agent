@@ -166,7 +166,12 @@ if [ "$action" = restart ] && [ "${AGENT_PROFILE:-web}" = sdk ]; then
   echo 'SDK 任务不会自动重放；请显式运行 ./agent run --input-file <JSON文件>' >&2; exit 2
 fi
 command -v docker >/dev/null || { echo '请先在主机安装 Docker Engine 和 Compose 插件；本包不安装 Docker。' >&2; exit 2; }
-compose() { docker compose --project-directory "$ROOT" -f "$compose_file" "$@"; }
+compose() {
+  local env_files=()
+  [ ! -f "$ROOT/config/deployment.env" ] || env_files+=(--env-file "$ROOT/config/deployment.env")
+  [ ! -f "$ROOT/.env" ] || env_files+=(--env-file "$ROOT/.env")
+  docker compose --project-directory "$ROOT" "${env_files[@]}" -f "$compose_file" "$@"
+}
 ensure_image() {
   [ -f "$ROOT/config/deployment.env" ] || return 0
   docker compose version >/dev/null

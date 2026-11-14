@@ -11,6 +11,7 @@ import { configPath, configuredServers, readEnvironment, readStandaloneConfig, r
 import { harnessMcpConnections, migrateStandaloneConnections } from './connections.ts'
 import { projectStandaloneBoundary } from '../../../deploy/agent/runtime/projections.mts'
 import { parseHarnessRuntime, projectHarnessPresets } from '../models/harness-runtime.ts'
+import { runtimeInstallationClosure, projectRuntimePackages } from '../../../../runtime/adapters/dsh-container/runtime-packages.mjs'
 import { redactRunText } from '../agents/run-files.ts'
 
 const patchSchema = DEFAULT_SCHEMA.extend(new (Type as any)('tag:yaml.org,2002:js', { kind: 'scalar', construct: (value: string) => ({ __dshExpression: value }), represent: (value: any) => value.__dshExpression, predicate: (value: any) => Boolean(value && typeof value === 'object' && typeof value.__dshExpression === 'string') }))
@@ -65,17 +66,6 @@ function prepareNativeAssets(root: string, home: string) {
     rmSync(prepared, { recursive: true, force: true })
   } else project(nativeDsh(root, 'presets'), presets)
 }
-function sharedRuntimePackages(home: string, runtime: string) {
-  const file = join(runtime, 'dependencies/package.json')
-  if (!existsSync(file)) return
-  const modules = join(home, 'profiles/node_modules')
-  for (const name of Object.keys(JSON.parse(readFileSync(file, 'utf8')).dependencies || {})) {
-    const target = join(modules, name)
-    mkdirSync(dirname(target), { recursive: true })
-    rmSync(target, { recursive: true, force: true })
-    symlinkSync(join(runtime, 'dependencies/node_modules', name), target, 'dir')
-  }
-}
 function prepareSdkExample(root: string, home: string) {
   const app = join(home, 'standalone/sdk-app')
   mkdirSync(app, { recursive: true })
@@ -84,30 +74,8 @@ function prepareSdkExample(root: string, home: string) {
   if (!existsSync(join(app, 'node_modules'))) symlinkSync(join(home, 'profiles/node_modules'), join(app, 'node_modules'), 'dir')
 }
 function write(path: string, content: string, mode = 0o600) { mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); writeFileSync(path, content, { mode }) }
-function nativeFallback(home: string, installAnchor: string, sharedPackages: string[] = []) {
-  const require = createRequire(installAnchor)
-  const pending = [installAnchor], seen = new Set<string>(), modules = join(home, 'profiles/node_modules')
-  for (const name of sharedPackages) {
-    const manifest = (require.resolve.paths(name) || []).map(directory => join(directory, name, 'package.json')).find(existsSync)
-    if (!manifest) throw new Error(`当前标准镜像缺少官方共享模块 ${name}`)
-    pending.push(manifest)
-  }
-  mkdirSync(modules, { recursive: true })
-  while (pending.length) {
-    const manifest = pending.shift()!, directory = dirname(manifest), pkg = JSON.parse(readFileSync(manifest, 'utf8'))
-    if (seen.has(pkg.name)) continue
-    seen.add(pkg.name)
-    const link = join(modules, pkg.name)
-    mkdirSync(dirname(link), { recursive: true })
-    if (!existsSync(link)) symlinkSync(directory, link, 'dir')
-    for (const name of [...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.peerDependencies || {})]) {
-      for (const candidate of createRequire(manifest).resolve.paths(name) || []) {
-        const file = join(candidate, name, 'package.json')
-        if (existsSync(file)) { pending.push(file); break }
-      }
-    }
-  }
-  return require
+function prepareRuntimePackages(home: string, anchor: string, runtime: string, sdk: boolean) {
+  projectRuntimePackages(join(home, 'profiles/node_modules'), runtimeInstallationClosure(anchor, runtime, sdk ? ['@deepseek-ai/dsh-sdk-client'] : []))
 }
 export function generateProfile(config: StandaloneConfig, home: string, root: string, updateModel = true) {
   const harnessFile = join(nativeRoot(root), 'harness.yaml')
@@ -163,8 +131,7 @@ export function initializeStandalone({ root = runtimeRoot(), home = process.env.
   mkdirSync(home, { recursive: true, mode: 0o700 })
   prepareNativeAssets(root, home)
   if (existsSync(join(home, 'standalone/initialized.json'))) {
-    nativeFallback(home, installAnchor, readStandaloneConfig(home).profile === 'sdk' ? ['@deepseek-ai/dsh-sdk-client'] : [])
-    sharedRuntimePackages(home, runtimeDirectory(root))
+    prepareRuntimePackages(home, installAnchor, runtimeDirectory(root), readStandaloneConfig(home).profile === 'sdk')
     const previous = JSON.parse(readFileSync(configPath(home), 'utf8'))
     const current = migrateStandaloneConnections(previous, nativeDsh(root, 'managed'))
     if (current !== previous) writeStandaloneConfig(validateStandaloneConfig(current), home)
@@ -180,8 +147,7 @@ export function initializeStandalone({ root = runtimeRoot(), home = process.env.
   for (const server of native.servers) {
     if (!seed.mcp.servers.some(current => current.id === server.id)) seed.mcp.servers.push(server)
   }
-  nativeFallback(home, installAnchor, seed.profile === 'sdk' ? ['@deepseek-ai/dsh-sdk-client'] : [])
-  sharedRuntimePackages(home, runtimeDirectory(root))
+  prepareRuntimePackages(home, installAnchor, runtimeDirectory(root), seed.profile === 'sdk')
   writeStandaloneConfig(seed, home)
   const secret = join(seedDirectory(root), 'environment.llm-api-key')
   if (!existsSync(join(home, 'standalone/environment.llm-api-key'))) write(join(home, 'standalone/environment.llm-api-key'), existsSync(secret) ? readFileSync(secret, 'utf8') : '{}\n')
