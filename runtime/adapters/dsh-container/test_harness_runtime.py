@@ -1,4 +1,4 @@
-"""迁移来源的真实 Node 投影、持久项目副本与 Compose 装载合同。"""
+"""业务来源的真实 Node 投影、持久项目副本与 Compose 装载合同。"""
 
 import importlib.util
 from importlib.machinery import SourceFileLoader
@@ -68,18 +68,26 @@ class HarnessRuntimeTest(unittest.TestCase):
         self.assertEqual((project / "source.ts").read_text(), "export const total = 2\n")
         self.assertEqual(seed.read_text(), "export const total = 1\n")
 
-    def test_project_dependency_mounts_follow_project_cwd_without_mutating_receipt(self):
+    def test_standard_runtime_rejects_host_dependencies_and_keeps_project_mounts(self):
         original = {"source": "/prepared/modules", "target": "/work/harness/workspace/project/node_modules", "read_only": True}
-        self.contract["asset_dependencies"] = {"mounts": [original]}
+        for dependency in ({"mounts": [original]}, {"environment": {"NODE_PATH": "/prepared/modules"}}):
+            with self.subTest(dependency=dependency):
+                self.contract["asset_dependencies"] = dependency
+                with mock.patch.object(dev, "fail", side_effect=RuntimeError) as rejected:
+                    with self.assertRaises(RuntimeError):
+                        dev.asset_dependency_mounts(self.contract)
+                self.assertIn("业务依赖必须由标准 Runtime 镜像提供", rejected.call_args.args[0])
+                self.assertEqual(self.contract["asset_dependencies"], dependency)
+        self.contract["asset_dependencies"] = {"mounts": [], "environment": {}}
         mounts = dev.asset_dependency_mounts(self.contract)
-        self.assertEqual(mounts, [original, {**original, "target": "/work/project/node_modules"}])
-        self.assertEqual(self.contract["asset_dependencies"]["mounts"], [original])
+        self.assertEqual(mounts, [])
         rendered = dev.render_compose((ADAPTER / "verification.compose.yaml").read_text(), mode="verification", name="migrated-role", project=dev.project_name("migrated-role"), port=18501, harness_runtime=True, project_workspace=True, dependency_mounts=mounts)
         self.assertIn("working_dir: /work/project", rendered)
         self.assertIn("DSH_PERMISSION_MODE=workspace-write", rendered)
         self.assertIn("target: /opt/harness-candidate\n        read_only: true", rendered)
         self.assertIn("target: /work/project\n        read_only: false", rendered)
-        self.assertIn('target: "/work/project/node_modules"', rendered)
+        self.assertNotIn("/prepared/modules", rendered)
+        self.assertNotIn("/work/project/node_modules", rendered)
         legacy = dev.render_compose((ADAPTER / "verification.compose.yaml").read_text(), mode="verification", name="legacy-role", project=dev.project_name("legacy-role"), port=18502)
         self.assertIn("working_dir: /work/harness/workspace", legacy)
         self.assertIn("DSH_PERMISSION_MODE=read-only", legacy)
@@ -125,11 +133,23 @@ class HarnessRuntimeTest(unittest.TestCase):
         self.assertEqual((self.target / "project-workspace/source.ts").read_text(), "export const total = 1\n")
 
     def test_node_dependency_probe_runs_without_bundling_or_type_transform(self):
+        business = self.root / "business"
+        agent = business / "agents/sample"
+        agent.mkdir(parents=True)
+        (agent / "harness.yaml").write_text(json.dumps({
+            "agent": {"id": "sample"}, "loadable_assets": {
+                "workspace": "dsh/workspace", "preset_root": "dsh/presets",
+                "managed_root": "dsh/managed", "preset_id": "main",
+                "profile_patch": "dsh/managed/main.patch.yml",
+            },
+        }))
+        environment = {**os.environ, "HARNESS_BUSINESS_AGENTS_ROOT": str(business)}
         result = subprocess.run([dev.NODE_EXECUTABLE, str(ADAPTER / "harness-runtime.mts"),
-                                 "--dependencies", str(self.root), "EXP-sample-001-r0123456789ab"],
-                                capture_output=True, text=True)
-        self.assertEqual(result.returncode, 1, result.stderr)
-        self.assertEqual(json.loads(result.stdout)["status"], "pending")
+                                 "--dependencies", str(self.root), "business:sample"],
+                                capture_output=True, text=True, env=environment)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["status"], "ready")
+        self.assertEqual(json.loads(result.stdout)["mounts"], [])
         self.assertNotIn("ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX", result.stderr)
 
     def test_private_runtime_files_mount_readonly_without_copying_home_or_exposing_content(self):
