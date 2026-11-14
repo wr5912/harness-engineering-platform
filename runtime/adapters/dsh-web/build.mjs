@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import { spawnSync } from 'node:child_process'
-import { dirname, resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
+import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const arguments_ = process.argv.slice(2)
@@ -14,7 +15,7 @@ try { require.resolve('esbuild'); require.resolve('typescript') } catch {
   if (install.status !== 0) throw new Error('Web 路径适配器依赖安装失败')
 }
 const { build } = await import('esbuild')
-await build({
+const result = await build({
   absWorkingDir: root,
   entryPoints: Object.fromEntries(['index', 'platform-webserver', 'container-webserver', 'container-web-app', 'client-urls-worker']
     .map(name => [name, `src/${name}.ts`])),
@@ -26,5 +27,9 @@ await build({
   platform: 'node',
   target: 'node24',
   legalComments: 'none',
+  metafile: true,
   banner: { js: "import { createRequire as __webCreateRequire } from 'node:module'; import { fileURLToPath as __webFilePath } from 'node:url'; import { dirname as __webDirname } from 'node:path'; const require = __webCreateRequire(import.meta.url); const __filename = __webFilePath(import.meta.url); const __dirname = __webDirname(__filename);" },
 })
+// 旧进程可能仍引用先前的 chunk；保留文件，只发布本次实际生成的输出清单。
+const files = Object.keys(result.metafile.outputs).map(path => relative(outputDirectory, resolve(root, path))).sort()
+writeFileSync(resolve(outputDirectory, 'build.outputs.json'), JSON.stringify({ schemaVersion: 1, files }, null, 2) + '\n')

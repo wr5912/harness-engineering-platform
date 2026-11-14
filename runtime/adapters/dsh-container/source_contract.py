@@ -78,9 +78,20 @@ def image_build_input_digests(*, lock_path: Path = LOCK, adapter: Path = ADAPTER
     program = adapter.parent.parent.parent
     for name in ("standalone-bootstrap.js", "standalone-plugin.js", "standalone-bridge.js", "standalone-connection.js", "standalone-knowledge.js", "model-binding-runtime.js"):
         paths[f"standalone/{name}"] = program / "platform/plugin/lib" / name
-    for path in sorted((program / "runtime/adapters/dsh-web/lib").glob("*")):
-        if path.is_file():
-            paths[f"web/{path.name}"] = path
+    web = program / "runtime/adapters/dsh-web/lib"
+    manifest_path = web / "build.outputs.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        outputs = manifest["files"]
+        if (manifest.get("schemaVersion") != 1 or not isinstance(outputs, list) or not outputs
+                or not all(isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9_-]+\.mjs", name) for name in outputs)
+                or len(outputs) != len(set(outputs))):
+            raise ValueError("期望 schemaVersion=1 和不重复的 .mjs 文件名列表")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise ValueError(f"Web 构建输出清单无效：{manifest_path}；{error}；请重新构建平台插件") from error
+    paths["web/build.outputs.json"] = manifest_path
+    for name in outputs:
+        paths[f"web/{name}"] = web / name
     digests = {}
     for name, path in paths.items():
         if not path.is_file() or path.is_symlink():
