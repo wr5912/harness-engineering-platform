@@ -149,9 +149,10 @@ export function createPlatformEvents(assetRoot: string, options: Options = {}) {
     if (disposed) return
     for (const [directory, watcher] of watchers) if (!existsSync(directory)) { watcher.close(); watchers.delete(directory) }
     observe(join(root, 'agents'), ['catalog', 'agents'], true)
-    observe(join(root, 'evolution'), ['catalog', 'agents'], false)
-    observe(join(root, 'evolution/experiments'), ['catalog', 'agents', 'instances'], true)
-    observe(join(root, 'evolution/datasets'), ['agents'], true)
+    // 评测运行数据只来自当前演进目录；业务 Harness 资产在 business-agents 仓库。
+    observe(join(root, 'evolution/runs'), ['catalog', 'agents'], true)
+    observe(join(root, 'evolution/evidence'), ['agents'], true)
+    observe(join(root, 'evolution/decisions'), ['agents'], true)
     observe(join(root, 'releases'), ['catalog', 'agents'], true)
     // 登记与授权是接入列表的事实源；只发失效通知，不发送配置或凭据内容。
     const configRoot = dirname(workspaceConfigPath(root, 'external-instances.json'))

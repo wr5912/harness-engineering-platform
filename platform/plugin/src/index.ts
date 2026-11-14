@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync, type Dirent } from 'node:fs'
 import { join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
@@ -7,12 +7,11 @@ import type { ConnectionRpcHandler, ConnectionRpcResult } from '@deepseek-ai/dsh
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type * as NativeWebApp from '@deepseek-ai/dsh-web-app'
 import { applyAuthentication, currentAccount } from './auth.ts'
-import { inventory as agentExperimentInventory } from '../../../plugins/asset-query-cli/query.mjs'
 import { CHANNEL } from './protocol.ts'
 import type { Inventory, RunAsset } from './protocol.ts'
 import { DOMAIN_PREFIXES } from './protocol.ts'
 import { recentRuns } from './dashboard.ts'
-import { managementSessionRoots, workspaceIdentity } from './workspace.ts'
+import { businessAgentsRoot, managementSessionRoots, workspaceIdentity } from './workspace.ts'
 import { createAgentsHandler } from './agents/index.ts'
 import { createRunDownloadHandler } from './agents/run-files.ts'
 import { createInstancesHandler } from './instances/index.ts'
@@ -51,29 +50,37 @@ const RUN_ID = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 
 export function inventory(assetRoot: string): Inventory {
   const root = resolve(assetRoot)
-  const assets = agentExperimentInventory(root)
+  const agentsRoot = join(businessAgentsRoot(root), 'agents')
+  let agentEntries: Dirent<string>[] = []
+  try { agentEntries = readdirSync(agentsRoot, { withFileTypes: true, encoding: 'utf8' }) }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+  const agents = agentEntries
+    .filter(entry => entry.isDirectory() && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.name))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(entry => ({ id: entry.name, path: `business-agents/agents/${entry.name}` }))
   const runs: RunAsset[] = []
-  for (const id of assets.experiments) {
-    const base = `evolution/experiments/${id}/runs`
-    let entries
+  const runRoot = join(root, 'evolution', 'runs')
+  let entries: Dirent<string>[] = []
+  try { entries = readdirSync(runRoot, { withFileTypes: true, encoding: 'utf8' }) }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+  for (const entry of entries.filter(entry => entry.isDirectory() && RUN_ID.test(entry.name)).sort((a, b) => a.name.localeCompare(b.name))) {
+    const path = join(runRoot, entry.name)
+    let source = 'business:unknown'
     try {
-      entries = readdirSync(join(root, base), { withFileTypes: true })
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
-      throw error
-    }
-    for (const entry of entries.filter(entry => entry.isDirectory() && RUN_ID.test(entry.name))
-      .sort((a, b) => a.name.localeCompare(b.name))) {
-      runs.push({ id: entry.name, experiment_id: id, path: `${base}/${entry.name}` })
-    }
+      const text = readFileSync(join(path, 'run.yaml'), 'utf8')
+      const match = /^source_id:\s*([^\n]+)$/m.exec(text)
+      if (match?.[1]?.startsWith('business:')) source = match[1].trim()
+    } catch { /* 未完整落盘的 Run 仍只保留稳定目录标识，详情读取再报告未知。 */ }
+    runs.push({ id: entry.name, experiment_id: source, path: `evolution/runs/${entry.name}` })
   }
   return {
     schema_version: '1.0',
     root,
     workspace: { ...workspaceIdentity(root), managementRoots: managementSessionRoots(root) },
     observed_at: new Date().toISOString(),
-    agents: assets.agents.map(id => ({ id, path: `agents/${id}` })),
-    experiments: assets.experiments.map(id => ({ id, path: `evolution/experiments/${id}` })),
+    agents,
+    // 旧 Experiment 资产已停用；该字段保留协议形状但永远不扫描旧目录。
+    experiments: [],
     runs,
   }
 }
