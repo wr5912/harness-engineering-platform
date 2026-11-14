@@ -1,4 +1,3 @@
-import { VERSION_ID } from '../version-id.ts'
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
@@ -81,7 +80,7 @@ function ownsProcess(job: RunControl, root: string): boolean {
   } catch { return false }
 }
 
-/** 运行控制复用唯一 Run ID；旧任务只在当前数据根内兼容读取。 */
+  /** 运行控制复用唯一 Run ID；当前 Run 只存放于 evolution/runs。 */
 export function createEvaluationJobs(assetRoot: string, options: Options) {
   const root = resolve(assetRoot), identity = workspaceIdentity(root), realRoot = realpathSync(root)
   const directory = workspaceLocalPath(root, 'evaluation-jobs')
@@ -122,10 +121,6 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       throw new EvaluationJobError('not_found', '评测运行不属于当前工作区')
     return job
   }
-  function experiments() {
-    const path = join(root, 'evolution/experiments')
-    return existsSync(path) ? readdirSync(path, { withFileTypes: true }).filter(item => item.isDirectory() && !item.isSymbolicLink()).map(item => item.name) : []
-  }
   function inspectRun(path: string, id: string): Run | undefined {
     const manifestPath = join(path, 'run.yaml'), inputPath = join(path, 'inputs.lock.json')
     if (!existsSync(manifestPath)) return undefined
@@ -137,49 +132,20 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       inputs = frozenInputsAvailable ? JSON.parse(readFileSync(inputPath, 'utf8')) as MapValue : {}
     }
     catch { throw new EvaluationJobError('run_read_failed', 'Run 清单或冻结输入无法解析，原文件已保留') }
-    // 旧 Run 可以缺少冻结输入中的 run_id，但已有身份声明不能与目录不一致。
+    // Run 可以缺少冻结输入中的 run_id，但已有身份声明不能与目录不一致。
     if (!manifest || (manifest.run_id != null && manifest.run_id !== id) || (inputs.run_id != null && inputs.run_id !== id)
       || !['planned', 'running', 'completed', 'failed', 'cancelled'].includes(manifest.status)) throw new EvaluationJobError('run_read_failed', 'Run 身份或状态与目录不一致')
     return { path, id, manifest, inputs, frozen_inputs_available: frozenInputsAvailable }
   }
   function runDirectory(job: RunControl): Run | undefined {
     const id = job.schema_version === '2.0' ? job.run_id : job.run_id ?? job.result?.run_id
-    const selected = job.source.startsWith('experiment:') && VERSION_ID.test(job.source.slice(11)) ? [job.source.slice(11)] : experiments()
-    if (id && RUN.test(id)) for (const experiment of selected) {
-      const path = join(root, 'evolution/experiments', experiment, 'runs', id)
-      if (existsSync(path)) { const run = inspectRun(path, id); if (run) { if (job.schema_version === '2.0' && (run.manifest.run_id !== id || run.inputs.run_id !== id)) throw new EvaluationJobError('run_read_failed', '新 Run 缺少一致的清单与输入身份'); return run } }
-    }
-    if (job.schema_version === '2.0') return undefined
-    // 旧请求可能没有捕获 Run 输出；只查所属版本的原 execution 或已核验恢复关联。
-    let uncertainty = ''
-    for (const experiment of selected) {
-      const folder = join(root, 'evolution/experiments', experiment, 'runs')
-      if (!existsSync(folder)) continue
-      for (const name of readdirSync(folder)) {
-        if (!RUN.test(name)) continue
-        const path = join(folder, name), execution = join(path, 'execution.json')
-        if (lstatSync(path).isSymbolicLink()) { uncertainty = '旧 Run 目录无法核对'; continue }
-        if (existsSync(execution)) {
-          if (!ordinary(execution)) { uncertainty = '旧执行关联无法核对'; continue }
-          let record: MapValue
-          try { record = JSON.parse(readFileSync(execution, 'utf8')) } catch {
-            const run = inspectRun(path, name), recovered = run?.manifest
-            const recoveredId = /^\.local\/evaluation-jobs\/([0-9a-f-]+)\.json$/.exec(recovered?.recovery_source ?? '')?.[1]
-            if (recoveredId && UUID.test(recoveredId) && existsSync(pathFor(recoveredId)) && ordinary(pathFor(recoveredId))
-              && createHash('sha256').update(readFileSync(pathFor(recoveredId))).digest('hex') === recovered?.recovery_source_sha256) {
-              if (recoveredId === job.job_id) return run
-              continue
-            }
-            uncertainty = '旧执行关联无法解析，原文件已保留'; continue
-          }
-          if (record.job_id === job.job_id) return inspectRun(path, name)
-        } else if (!job.source.startsWith('experiment:') || experiment === job.source.slice(11)) {
-          uncertainty = '存在缺少执行关联的 Run 或初始化目录，未清理旧请求'
-        }
-      }
-    }
-    if (uncertainty) throw new EvaluationJobError('run_read_failed', uncertainty)
-    return undefined
+    if (!id || !RUN.test(id) || !job.source.startsWith('business:')) return undefined
+    const path = join(root, 'evolution/runs', id)
+    if (!existsSync(path)) return undefined
+    const run = inspectRun(path, id)
+    if (run && job.schema_version === '2.0' && (run.manifest.run_id !== id || run.inputs.run_id !== id))
+      throw new EvaluationJobError('run_read_failed', 'Run 缺少一致的清单与输入身份')
+    return run
   }
   function receipt(job: RunControl, run?: Run, full = true): MapValue {
     const result: MapValue = { run_id: run?.id ?? (job.schema_version === '2.0' ? job.run_id : null), run_created: Boolean(run), source: job.source, cases: job.cases ?? [],
@@ -227,9 +193,8 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     const before = existsSync(file) ? readFileSync(file, 'utf8') : undefined
     if (before !== undefined) { const stored = JSON.parse(before); if (!ordinary(file) || stored.schema_version !== '2.0' || stored.run_id !== id || stored.request_sha256 !== job.request_sha256 || stored.workspace_id !== identity.id || !workspaceOwnsCwd(root, stored.asset_root)) throw new EvaluationJobError('cleanup_failed', '运行状态归属已变化，未清理') }
     if (runDirectory(job)) return
-    const experiment = job.source.startsWith('experiment:') ? job.source.slice(11) : ''
-    if (VERSION_ID.test(experiment)) {
-      const path = join(root, 'evolution/experiments', experiment, 'runs', id)
+    if (job.source.startsWith('business:')) {
+      const path = join(root, 'evolution/runs', id)
       if (existsSync(path)) {
         if (lstatSync(path).isSymbolicLink() || !realpathSync(path).startsWith(realRoot + '/')) throw new EvaluationJobError('cleanup_failed', '初始化目录归属无法核对，现场已保留')
         const markerPath = join(path, '.initialization.json')
@@ -265,8 +230,8 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
   function recoverFailedCreation(job: RunControl): boolean {
     if (job.schema_version !== '2.0' || live.has(keyFor(job)) || starting.has(keyFor(job)) || !(job.pid ? processGone(job.pid, job.process_start) : job.process_finished === true)) return false
     let confirmed = job.process_finished === true && Number.isInteger(job.exit_code)
-    if (!confirmed && job.source.startsWith('experiment:') && VERSION_ID.test(job.source.slice(11))) {
-      const markerPath = join(root, 'evolution/experiments', job.source.slice(11), 'runs', job.run_id!, '.initialization.json')
+    if (!confirmed && job.source.startsWith('business:')) {
+      const markerPath = join(root, 'evolution/runs', job.run_id!, '.initialization.json')
       if (existsSync(markerPath) && ordinary(markerPath)) { const marker = JSON.parse(readFileSync(markerPath, 'utf8')); confirmed = marker.schema_version === '1.0' && marker.run_id === job.run_id && marker.request_sha256 === job.request_sha256 && processGone(marker.pid, marker.process_start) && groupGone(marker.pid) }
     }
     if (!confirmed) return false
@@ -291,10 +256,8 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
   }
   function committedById(id: string): Run | undefined {
     if (!RUN.test(id)) return undefined
-    for (const experiment of experiments()) {
-      const path = join(root, 'evolution/experiments', experiment, 'runs', id)
-      if (existsSync(path)) { const run = inspectRun(path, id); if (run) return run }
-    }
+    const path = join(root, 'evolution/runs', id)
+    if (existsSync(path)) return inspectRun(path, id)
   }
   function control(id: string): RunControl | undefined {
     if (existsSync(pathFor(id)) || live.has(id)) return read(id)
@@ -311,7 +274,8 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     if (job) return snapshot(job)
     const run = committedById(id)
     if (run) {
-      const source = run.inputs.source_id ?? run.manifest.source_id ?? `experiment:${run.manifest.experiment_id}`
+      const source = run.inputs.source_id ?? run.manifest.source_id
+      if (typeof source !== 'string' || !source.startsWith('business:')) throw new EvaluationJobError('run_read_failed', 'Run 缺少当前 business 来源')
       let execution: MapValue = {}
       try { execution = JSON.parse(readFileSync(join(run.path, 'execution.json'), 'utf8')) } catch {
         if (!FINAL.has(run.manifest.status)) throw new EvaluationJobError('run_read_failed', '运行中的执行记录无法读取，进程状态未知')
@@ -331,10 +295,6 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
       try {
         const job = read(name.slice(0, -5))
         const value = snapshot(job, false)
-        // 已删除版本的终态旧启动回执保留原文件，不再作为当前 Run 的读取故障。
-        if (job.schema_version === undefined && job.source.startsWith('experiment:') && VERSION_ID.test(job.source.slice(11))
-          && !existsSync(join(root, 'evolution/experiments', job.source.slice(11))) && FINAL.has(job.status)
-          && processGone(job.pid, job.process_start) && !live.has(keyFor(job)) && !starting.has(keyFor(job))) continue
         if (value.run_created && value.run_id) runs.set(value.run_id, value)
         else { if (!FINAL.has(value.status)) pending.push(value); if (value.status !== 'preparing' && value.status !== 'cancelling' && value.status !== 'running') errors.push({ path: `evaluation-jobs/${name}`, message: '旧启动状态待核对，未重放或清理。', code: 'observation_unknown' }) }
       }
@@ -348,11 +308,10 @@ export function createEvaluationJobs(assetRoot: string, options: Options) {
     const deleted: string[] = [], failed: { run_id: string; code: string; message: string }[] = []
     for (const id of ids as string[]) {
       try {
-        const matches = experiments().map(experiment => join(root, 'evolution/experiments', experiment, 'runs', id)).filter(path => existsSync(path))
-        if (!matches.length) throw new EvaluationJobError('not_found', '评测记录已不存在，请刷新列表核对')
-        if (matches.length !== 1) throw new EvaluationJobError('conflict', '存在重复的评测编号，无法确定删除目标')
-        if (realpathSync(matches[0]) !== join(realRoot, matches[0].slice(root.length + 1))) throw new EvaluationJobError('run_read_failed', '评测目录包含符号链接，无法核对删除目标')
-        const run = inspectRun(matches[0], id)
+        const path = join(root, 'evolution/runs', id)
+        if (!existsSync(path)) throw new EvaluationJobError('not_found', '评测记录已不存在，请刷新列表核对')
+        if (realpathSync(path) !== join(realRoot, path.slice(root.length + 1))) throw new EvaluationJobError('run_read_failed', '评测目录包含符号链接，无法核对删除目标')
+        const run = inspectRun(path, id)
         if (!run || !FINAL.has(run.manifest.status)) throw new EvaluationJobError('run_active', '评测尚未结束或状态未知，请先取消并刷新状态')
         const job = control(id)
         let execution: MapValue = {}

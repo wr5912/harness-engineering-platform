@@ -30,7 +30,7 @@ for import_root in (ADAPTER, EVALUATION_SCRIPTS):
 
 from evaluation_contract import cases_digest, execution_from, load_evaluation
 from scenario_analysis import analyze, summarize_review, summarize_source_diagnosis, validate_analysis
-from source_contract import EXPERIMENT as EXPERIMENT_RE, resolve
+from source_contract import resolve
 
 
 _MUTATION_PATH = Path(__file__).with_name("mutation-receipt.py")
@@ -123,30 +123,13 @@ def freeze_review_contract(repo: Path, agent_id: str, run_dir: Path, policy_path
             "model_policy_snapshot": {"path": relative, "sha256": hashlib.sha256(content).hexdigest()}}
 
 
-def build_review_evidence(repo: Path, experiment_id: str, change: dict, candidate_sha256: str) -> dict:
-    """只读复用受控构建核验；无法证明来源时，所有资产继续原文审读。"""
-    empty = {"schema_version": 1, "generated": [], "sources": []}
-    if not change.get("asset_builds"):
-        return empty
-    try:
-        completed = subprocess.run(
-            [os.environ.get("HARNESS_NODE", "node"), "--experimental-transform-types", str(ADAPTER / "harness-runtime.mts"),
-             "--build-evidence", str(repo), experiment_id], text=True, capture_output=True, check=False, timeout=60,
-            env={**os.environ, "HARNESS_PROGRAM_ROOT": str(PROGRAM_ROOT), "HARNESS_ASSET_ROOT": str(repo)},
-        )
-        value = json.loads(completed.stdout)
-        if completed.returncode or not isinstance(value, dict) or value.get("schema_version") != 1 \
-                or not isinstance(value.get("generated"), list) or not isinstance(value.get("sources"), list):
-            return empty
-        if value["generated"] and value.get("candidate_sha256") != candidate_sha256:
-            return empty
-        return value
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        return empty
+def runs_root(repo: Path) -> Path:
+    """当前评测 Run 的唯一存储根。"""
+    return repo / "evolution" / "runs"
 
 
 def valid_baseline_ref(value: str) -> bool:
-    if value == "none:first-experiment":
+    if value == "none:first-business-run":
         return True
     if value.startswith("git:"):
         return bool(COMMIT_RE.fullmatch(value[4:]))
@@ -225,7 +208,7 @@ def verify_run_source(repo: Path, manifest: dict, inputs: dict) -> dict:
         return candidate_digest(Path(contract["candidate_root"]).parent)
     check("candidate", inputs.get("candidate_sha256"), source_candidate_digest)
     if inputs.get("mcp_fixture"):
-        fixture = repo / "evolution/experiments" / manifest["experiment_id"] / "runs" / manifest["run_id"] / "evidence/mcp-fixture.json"
+        fixture = runs_root(repo) / manifest["run_id"] / "evidence/mcp-fixture.json"
         check("mcp_fixture", inputs["mcp_fixture"].get("sha256"), lambda: hashlib.sha256(fixture.read_bytes()).hexdigest())
 
     def snapshot_digest(value: dict) -> str:
@@ -341,7 +324,7 @@ def write_report(
         "> 本文件由 `run_record.py finalize` 根据本 Run 的结构化记录自动生成，请勿手工编辑。",
         "",
         f"- Run：`{manifest['run_id']}`",
-        f"- Experiment：`{manifest['experiment_id']}`",
+        f"- 来源：`{manifest['source_id']}`",
         f"- Agent：`{manifest['agent_id']}`",
         f"- 状态：{STATUS_ZH.get(manifest['status'], manifest['status'])}",
         f"- 有效结论：{VERDICT_ZH.get(effective, effective)}",
@@ -538,16 +521,9 @@ def read_run_manifest(path: Path) -> dict[str, str]:
 def load_run_manifest(repo: Path, run_id: str) -> tuple[Path, dict[str, str]]:
     if not RUN_ID_RE.fullmatch(run_id):
         raise ValueError("run 必须是 run-<UUIDv4>")
-    matches = []
-    experiments = repo / "evolution/experiments"
-    if experiments.is_dir():
-        for experiment in experiments.iterdir():
-            run_dir = experiment / "runs" / run_id
-            if run_dir.is_dir() and not run_dir.is_symlink():
-                matches.append(run_dir)
-    if len(matches) != 1:
-        raise ValueError(f"unknown or ambiguous run: {run_id}")
-    run_dir = matches[0]
+    run_dir = runs_root(repo) / run_id
+    if not run_dir.is_dir() or run_dir.is_symlink():
+        raise ValueError(f"unknown run: {run_id}")
     return run_dir, read_run_manifest(run_dir / "run.yaml")
 
 
@@ -626,7 +602,7 @@ def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
     }
     if case_id and case_id not in frozen:
         raise ValueError(f"Run 未选择 Case：{case_id}")
-    evaluation_path = repo / manifest["evaluation_ref"]
+    evaluation_path = Path(inputs.get("evaluation_path", repo / manifest["evaluation_ref"]))
     try:
         current = load_evaluation(evaluation_path)["cases"]
     except (OSError, ValueError) as error:
@@ -739,7 +715,7 @@ def run_view(repo: Path, run_id: str, case_id: str | None = None) -> dict:
                                         "file_count": value.get("file_count")}
                                   for key, value in inputs.get("harness_trees", {}).items()},
             "inputs_lock_path": (run_dir / "inputs.lock.json").relative_to(repo).as_posix()},
-        "candidate_path": inputs.get("candidate_path", f"evolution/experiments/{manifest['experiment_id']}/candidate"),
+        "candidate_path": inputs.get("candidate_path", f"business-agents/agents/{manifest['agent_id']}"),
         "image": image,
         "summary": summary,
         **({"source_diagnosis": analysis.get("source_diagnosis")} if "review_contract" in inputs else {}),
@@ -880,27 +856,25 @@ def run_index_facts(run_dir: Path, manifest: dict) -> dict:
 
 def agent_experiments(repo: Path, agent: str, errors: list[dict] | None = None) -> list[dict]:
     errors = errors if errors is not None else []
-    experiments = []
-    for root in sorted((repo / "evolution/experiments").glob("*")):
-        if not root.is_dir() or root.is_symlink():
+    grouped: dict[str, list[dict]] = {}
+    for path in sorted(runs_root(repo).glob("run-*/run.yaml")):
+        if path.is_symlink() or path.parent.is_symlink():
             continue
-        runs = []
-        for path in sorted((root / "runs").glob("run-*/run.yaml")):
-            if path.is_symlink() or path.parent.is_symlink():
+        try:
+            manifest = read_run_manifest(path)
+            if manifest.get("agent_id") != agent:
                 continue
-            try:
-                manifest = read_run_manifest(path)
-                if manifest.get("agent_id") != agent:
-                    continue
-                runs.append({**{key: manifest.get(key) for key in ("run_id", "status", "created_at", "finished_at", "source_id")},
-                             **run_index_facts(path.parent, manifest)})
-            except (OSError, ValueError, TypeError, KeyError) as exc:
-                errors.append({"agent_id": agent, "experiment_id": root.name, "run_id": path.parent.name,
-                               "path": path.relative_to(repo).as_posix(),
-                               "error": f"运行记录暂不可读（{type(exc).__name__}）"})
-        if runs:
-            experiments.append({"experiment_id": root.name, "runs": runs})
-    return experiments
+            source_id = manifest.get("source_id") or manifest.get("experiment_id")
+            if not isinstance(source_id, str) or not source_id.startswith("business:"):
+                raise ValueError("Run 缺少当前 business 来源")
+            grouped.setdefault(source_id, []).append({**{key: manifest.get(key) for key in ("run_id", "status", "created_at", "finished_at", "source_id")},
+                                                       **run_index_facts(path.parent, manifest)})
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            errors.append({"agent_id": agent, "source_id": None, "run_id": path.parent.name,
+                           "path": path.relative_to(repo).as_posix(),
+                           "error": f"运行记录暂不可读（{type(exc).__name__}）"})
+    return [{"source_id": source_id, "experiment_id": source_id, "runs": runs}
+            for source_id, runs in sorted(grouped.items())]
 
 
 def command_index(repo: Path, args: argparse.Namespace) -> None:
@@ -917,7 +891,7 @@ def command_overview(repo: Path) -> None:
     agents = []
     errors = []
     identities = set()
-    for path in (repo / "evolution/experiments").glob("*/runs/run-*/run.yaml"):
+    for path in runs_root(repo).glob("run-*/run.yaml"):
         try:
             agent = read_run_manifest(path).get("agent_id")
             if isinstance(agent, str) and re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", agent):
@@ -952,21 +926,15 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
         raise ValueError("run_id 必须是小写 run-UUIDv4")
     contract = resolve(args.source, repo=repo, source_ref=getattr(args, "source_ref", None),
                        **({"evaluation_source": args.evaluation_source} if getattr(args, "evaluation_source", None) else {}))
-    experiment_id = contract.get("experiment_id")
+    source_id = contract.get("source_id")
     agent_id = contract.get("agent_id")
-    business = contract["source_kind"] == "business"
-    experiment = repo / "evolution/experiments" / experiment_id
-    if business:
-        experiment.mkdir(parents=True, exist_ok=True)
-        change = {}
-    else:
-        match = EXPERIMENT_RE.fullmatch(experiment_id or "")
-        if not match or match.group(1) != agent_id or not experiment.is_dir() or experiment.is_symlink():
-            raise ValueError("source must resolve to a consistent Experiment and Agent")
-        change = read_change_yaml(Path(contract.get("change_path", experiment / "change.yaml")))
-    baseline_ref = args.baseline_ref or change.get("baseline_ref", "none:first-experiment")
+    if contract.get("source_kind") != "business" or not isinstance(source_id, str) or not source_id.startswith("business:"):
+        raise ValueError("当前评测只接受固定 business:<agent-id>@<commit> 来源")
+    if not isinstance(agent_id, str) or not agent_id:
+        raise ValueError("business 来源缺少 Agent 身份")
+    baseline_ref = args.baseline_ref or "none:first-business-run"
     if not valid_baseline_ref(baseline_ref):
-        raise ValueError("baseline_ref must be git:<commit>, release:<id> or none:first-experiment")
+        raise ValueError("baseline_ref must be git:<commit>, release:<id> or none:first-business-run")
     evaluation_relative = Path("agents") / agent_id / "evaluation.md"
     evaluation_path = Path(contract.get("evaluation_path", Path(contract.get("reference_root", repo)) / "evaluation.md"))
     evaluation = load_evaluation(evaluation_path)
@@ -982,15 +950,13 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
     comparison_ref = getattr(args, "compare_to", None)
     if comparison_ref:
         comparison_run_view(repo, comparison_ref, agent_id)
-    run_dir = experiment / "runs" / run_id
-    # Run 查询在数据根内按编号唯一定位；指定编号也不能在另一 Experiment 重用。
-    experiments = repo / "evolution/experiments"
-    descriptor = os.open(experiments, os.O_RDONLY | os.O_DIRECTORY)
+    run_dir = runs_root(repo) / run_id
+    runs = runs_root(repo)
+    runs.mkdir(parents=True, exist_ok=True)
+    # Run 查询在数据根内按编号唯一定位。
+    descriptor = os.open(runs, os.O_RDONLY | os.O_DIRECTORY)
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX)
-        for existing in experiments.iterdir():
-            if os.path.lexists(existing / "runs" / run_id):
-                raise FileExistsError(f"Run ID 已占用：{run_id}")
         run_dir.mkdir(parents=True, exist_ok=False)
     finally:
         os.close(descriptor)
@@ -1018,9 +984,9 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
             "candidate_sha256": source_digest,
             "created_at": utc_now(),
             "harness_trees": {
-                "workspace": external_tree_digest(Path(contract["workspace"])) if business else tree_digest(repo, Path(contract["workspace"])),
-                "presets": external_tree_digest(Path(contract["presets"])) if business else tree_digest(repo, Path(contract["presets"])),
-                "managed": external_tree_digest(Path(contract["managed"])) if business else tree_digest(repo, Path(contract["managed"])),
+                "workspace": external_tree_digest(Path(contract["workspace"])),
+                "presets": external_tree_digest(Path(contract["presets"])),
+                "managed": external_tree_digest(Path(contract["managed"])),
             },
             "reference_tree": external_tree_digest(Path(contract["reference_root"])) if contract.get("reference_root") else None,
             "evaluation_sha256": cases_digest(cases),
@@ -1039,6 +1005,7 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
                              "candidate_sha256": source_digest},
             "business_origin": ({**git_version(Path(contract["business_root"])), "root": str(Path(contract["business_root"]))}
                                  if contract.get("business_root") else None),
+            "evaluation_path": str(evaluation_path),
         }
         if inputs["review_mode"] == "ai":
             inputs["review_contract"] = freeze_review_contract(repo, agent_id, run_dir, getattr(args, "model_policy", None))
@@ -1065,12 +1032,9 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
         if contract.get("source_ref"):
             inputs.update({"source_ref": contract["source_ref"], "source_snapshot_root": Path(contract["source_snapshot_root"]).relative_to(repo).as_posix(),
                            "candidate_path": candidate.relative_to(repo).as_posix()})
-        if business:
-            inputs["business_origin"] = {"repository": contract["business_repository"], "tag": contract.get("source_tag"),
-                                         "commit": contract.get("source_ref") or git_version(Path(contract["business_repository"]))["commit"],
-                                         "dirty": False if contract.get("source_tag") else git_version(Path(contract["business_repository"]))["dirty"]}
-        else:
-            inputs["harness_review"] = build_review_evidence(Path(contract.get("source_snapshot_root", repo)), experiment_id, change, source_digest)
+        inputs["business_origin"] = {"repository": contract["business_repository"], "tag": contract.get("source_tag"),
+                                     "commit": contract.get("source_ref") or git_version(Path(contract["business_repository"]))["commit"],
+                                     "dirty": False if contract.get("source_tag") else git_version(Path(contract["business_repository"]))["dirty"]}
         if candidate_digest(candidate) != source_digest:
             raise ValueError("Candidate changed while locking review inputs")
         fixture_path = getattr(args, "mcp_fixture", None)
@@ -1119,7 +1083,7 @@ def command_init(repo: Path, args: argparse.Namespace) -> None:
         manifest = {
             "schema_version": "2.0",
             "run_id": run_id,
-            "experiment_id": experiment_id,
+            "experiment_id": contract["source_id"],
             "agent_id": agent_id,
             "kind": args.kind,
             "status": "planned",
@@ -1335,13 +1299,13 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command", required=True)
     init_parser = commands.add_parser("init", help="创建 Run 并记录输入身份")
     init_parser.add_argument("--run-id", help="预分配的 run-UUIDv4；省略时生成新的 Run ID")
-    init_parser.add_argument("--source", required=True, help="当前支持 experiment:<id>")
+    init_parser.add_argument("--source", required=True, help="固定 business:<agent-id>@<commit> 来源")
     init_parser.add_argument("--source-ref", help="固定来源 git:<40位提交>")
     init_parser.add_argument("--evaluation-source", choices=("source", "current"), help="明确选择来源用例或当前用例，所选合同封存到 Run")
     init_parser.add_argument("--mcp-fixture", help="本次 Runtime 的明确 Mock 连接映射 JSON，按原字节封存")
     init_parser.add_argument("--case", action="append", default=[], help="必须显式选择的 Case；可重复")
     init_parser.add_argument("--kind", default="research", choices=RUN_KINDS)
-    init_parser.add_argument("--baseline-ref", help="默认读取 Experiment change.yaml")
+    init_parser.add_argument("--baseline-ref", help="业务 Run 基线引用")
     init_parser.add_argument("--model", help="可选的预期模型标识，不改变 Runtime 设置")
     init_parser.add_argument("--model-policy", help="本次明确评测模型策略；省略时读取已配置业务默认模型，AI 复核时冻结独立评审配置")
     init_parser.add_argument("--case-concurrency", type=int, default=1)
@@ -1363,9 +1327,9 @@ def main() -> None:
     finalize_parser = commands.add_parser("finalize", help="生成摘要并封存 Run")
     finalize_parser.add_argument("--run", required=True)
     finalize_parser.add_argument("--status", required=True, choices=FINAL_STATUSES)
-    index_parser = commands.add_parser("index", help="按 Agent 列出 Experiment 和 Run")
+    index_parser = commands.add_parser("index", help="按 Agent 列出业务来源和 Run")
     index_parser.add_argument("--agent", required=True)
-    commands.add_parser("overview", help="列出全部 Agent 的 Experiment 和 Run")
+    commands.add_parser("overview", help="列出全部 Agent 的业务来源和 Run")
     show_parser = commands.add_parser("show", help="查看 Run 的冻结口径、结果和证据")
     show_parser.add_argument("--run", required=True)
     show_parser.add_argument("--case", help="只查看一个已选 Case")
