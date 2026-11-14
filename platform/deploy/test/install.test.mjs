@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -8,7 +8,8 @@ import test from 'node:test'
 import { installRuntime } from '../runtime.mts'
 import { install } from '../install.mts'
 import { updateBundle } from '../bundle-update.mts'
-import { copyTree } from '../fsutil.mts'
+import { copyTree, run } from '../fsutil.mts'
+import { snapshotRepository } from '../repository.mts'
 import { collectEntries } from '../manifest.mts'
 import { findVerifiedImage, inspectImageArchive, loadVerifiedImage, verifyImageInfo } from '../image.mts'
 
@@ -104,6 +105,70 @@ test('全量更新保留现场身份、配置和会话，删除旧业务资产�
   assert.equal(readFileSync(join(dataRoot, '.local/platform-home/sessions/saved'), 'utf8'), 'target-session')
   assert.equal(readFileSync(join(result.backups.dataRoot, 'agents/removed-asset'), 'utf8'), 'obsolete')
   assert.equal(readFileSync(join(result.backups.prefix, 'old-program'), 'utf8'), 'old')
+})
+
+test('无系统 Git 的五仓更新使用随包 Git，保留 HOME 会话并采用新 Harness', async () => {
+  const path = bundle('five-repo-no-system-git'), workspace = join(root, 'five-repo-target')
+  const prefix = join(workspace, 'harness-engineering-platform'), dataRoot = join(workspace, 'manager-workspace/harness-engineering-platform-data')
+  const home = join(workspace, 'platform-manager-dsh-home'), origin = 'https://example.invalid/fixture.git'
+  const gitPath = run('which', ['git']).trim()
+  const git = (directory, ...args) => run(gitPath, ['-C', directory, ...args]).trim()
+  const repository = (directory, files) => {
+    mkdirSync(directory, { recursive: true }); git(directory, 'init', '-b', 'main')
+    git(directory, 'config', 'user.name', 'fixture'); git(directory, 'config', 'user.email', 'fixture@example.invalid')
+    git(directory, 'remote', 'add', 'origin', origin)
+    for (const [file, content] of Object.entries(files)) write(join(directory, file), content)
+    git(directory, 'add', '.'); git(directory, 'commit', '-m', 'snapshot')
+  }
+  write(join(path, 'offline/git/git'), `#!/bin/sh\nexec '${gitPath}' "$@"\n`, true)
+  write(join(path, 'data/workspace.json'), JSON.stringify({ id: 'packaged-workspace', extensions: [] }))
+  repository(join(path, 'program'), { '.gitignore': 'runtime/\nbin/\n.local/\n' })
+  repository(join(path, 'data'), {})
+  const program = snapshotRepository(join(path, 'program'), join(root, 'snapshot-program'), join(path, 'repositories/program.bundle'))
+  const data = snapshotRepository(join(path, 'data'), join(root, 'snapshot-data'), join(path, 'repositories/data.bundle'))
+  rmSync(join(path, 'program/.git'), { recursive: true }); rmSync(join(path, 'data/.git'), { recursive: true })
+  const repositories = []
+  for (const [name, relative, files] of [
+    ['control', '.', { '.gitignore': 'harness-engineering-platform/\nmanager-workspace/\nplatform-manager-dsh-home/\n' }],
+    ['manager-home', 'platform-manager-dsh-home', { 'AGENTS.md': 'new-harness', '.gitignore': 'sessions/\n.credentials.yaml\nnode_modules/\n' }],
+    ['business', 'manager-workspace/business-agents', { 'agents/example/harness.yaml': 'new-business-harness' }],
+  ]) {
+    const source = join(root, 'five-repo-source-' + name), target = join(path, 'workspace', relative)
+    repository(source, files)
+    const snapshot = snapshotRepository(source, target, join(path, 'repositories/' + name + '.bundle'))
+    rmSync(join(target, '.git'), { recursive: true })
+    repositories.push({ name, path: relative, source, ...snapshot })
+  }
+  repository(home, { 'AGENTS.md': 'old-harness', '.gitignore': 'sessions/\n.credentials.yaml\nnode_modules/\n' })
+  write(join(home, 'sessions/saved.json'), '{"saved":true}')
+  write(join(home, '.credentials.yaml'), 'fixture-secret')
+  write(join(home, 'node_modules/cache'), 'discard')
+  write(join(prefix, '.local/installation.json'), '{}')
+  write(join(dataRoot, 'workspace.json'), JSON.stringify({ id: 'target-workspace', extensions: [] }))
+  manifest(path)
+  const m = JSON.parse(readFileSync(join(path, 'manifest.json'), 'utf8'))
+  m.package.commit = program.commit; m.source.programOrigin = origin; m.source.dataOrigin = origin
+  m.data = { commit: data.commit }; m.workspace = { sourceRoot: '/original-workspace', repositories }
+  write(join(path, 'manifest.json'), JSON.stringify(m))
+  // 只保留安装器需要的基础命令；PATH 中确实没有系统 Git。
+  const baseBin = join(root, 'five-repo-base-bin'), previousPath = process.env.PATH
+  mkdirSync(baseBin)
+  for (const command of ['dirname', 'sh']) symlinkSync(run('which', [command]).trim(), join(baseBin, command))
+  process.env.PATH = baseBin
+  try {
+    assert.equal(spawnSync('git', ['--version']).error?.code, 'ENOENT')
+    const result = await updateBundle({ ...options(path, prefix), dataRoot, allowFixtureData: true })
+    assert.equal(result.status, 'updated'); assert.equal(result.prepare, 'ok')
+    assert.equal(readFileSync(join(home, 'AGENTS.md'), 'utf8'), 'new-harness')
+    assert.equal(readFileSync(join(home, '.credentials.yaml'), 'utf8'), 'fixture-secret')
+    assert.equal(readFileSync(join(home, 'sessions/saved.json'), 'utf8'), '{"saved":true}')
+    assert.equal(existsSync(join(home, 'node_modules')), false)
+    for (const relative of ['.', 'harness-engineering-platform', 'manager-workspace/harness-engineering-platform-data', 'platform-manager-dsh-home', 'manager-workspace/business-agents']) {
+      assert.equal(git(join(workspace, relative), 'branch', '--show-current'), 'main')
+    }
+    assert.equal(JSON.parse(readFileSync(join(dataRoot, 'workspace.json'), 'utf8')).id, 'target-workspace')
+    assert.equal(process.env.PATH, baseBin)
+  } finally { process.env.PATH = previousPath }
 })
 
 test('安装环境不依赖解包目录，特殊路径按原值进入 shell，Git 失败时明确拒绝', () => {

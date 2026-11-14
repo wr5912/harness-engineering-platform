@@ -151,7 +151,6 @@ export function install(options: InstallOptions): InstallReport {
         copyTree(join(source, relative), join(target, relative))
       }
       copyDataState(options.preserveFrom.dataRoot, dataRoot, !workspace)
-      if (workspace && options.preserveFrom.managerHome) copyManagerState(options.preserveFrom.managerHome, workspace.managerHome)
       report.rewritten.push(...rewriteKnownPaths(dataRoot, [
         { from: options.preserveFrom.prefix, to: prefix },
         { from: options.preserveFrom.dataRoot, to: dataRoot },
@@ -197,6 +196,8 @@ export function install(options: InstallOptions): InstallReport {
     const previousPath = process.env.PATH
     process.env.PATH = env.PATH
     try {
+      // HOME 状态枚举和五仓恢复都使用已安装、已核验的随包 Git。
+      if (workspace && options.preserveFrom?.managerHome) copyManagerState(options.preserveFrom.managerHome, workspace.managerHome)
       if (manifest.source.programOrigin) restoreRepository(prefix, join(bundleRoot, 'repositories/program.bundle'), manifest.package.commit, manifest.source.programOrigin)
       if (manifest.data?.commit && manifest.source.dataOrigin) restoreRepository(dataRoot, join(bundleRoot, 'repositories/data.bundle'), manifest.data.commit, manifest.source.dataOrigin)
       if (workspace) for (const repository of manifest.workspace!.repositories) {
