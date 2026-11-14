@@ -34,6 +34,7 @@ export function initializeBusinessGateway(assetRoot: string, managementUrl: stri
   const explicitOrigin = gateway.publicOriginMode === 'explicit'
   if (!explicitOrigin) gateway.publicOrigin = `http://${host ?? entry.hostname}:${gateway.port}`
   gateway.publicOriginMode = explicitOrigin ? 'explicit' : 'auto'
+  gateway.managementUrlMode = entry.protocol === 'https:' ? 'explicit' : 'auto'
   gateway.sharedSecretFile ??= '.local/credentials/business-shared.key'
   gateway.instances ??= []
   gateway.managementUrl = managementUrl

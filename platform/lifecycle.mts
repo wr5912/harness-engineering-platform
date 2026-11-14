@@ -116,9 +116,10 @@ export function launchAddress(dataRoot: string, host?: string, port?: string, pu
   let configured: URL | undefined
   const access = join(dataRoot, 'config/business-access.json')
   if (existsSync(access) && json(access).gateway?.managementUrl !== undefined) configured = new URL(platformEntryUrl(dataRoot))
+  const autoConfigured = existsSync(access) && json(access).gateway?.managementUrlMode === 'auto' || existsSync(access) && json(access).gateway?.publicOriginMode === 'auto'
   const previous = previousState(dataRoot)
   const local = (value: string) => Object.values(networkInterfaces()).flat().some(item => item?.address === value)
-  const separate = configured && (configured.protocol === 'https:' || !local(configured.hostname)
+  const separate = configured && (autoConfigured || configured.protocol === 'https:' || !local(configured.hostname)
     || previous?.publicUrl === configured.href && previous.publicUrl !== previous.url)
   if (!host && separate && previous && local(previous.host) && !previous.host.startsWith('127.')) host = previous.host
   if (!host && (!configured || separate)) {
