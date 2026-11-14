@@ -1,7 +1,7 @@
 import { execFile, spawnSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { existsSync, readFileSync, mkdirSync, mkdtempSync, renameSync, rmSync, lstatSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { DEFAULT_SCHEMA, Type, load } from 'js-yaml'
 import { businessAgentsRoot } from '../workspace.ts'
 import { candidateDigest, candidateFiles, dataPath, atomicWrite, sha256, assertAssetPath } from '../tasks/files.ts'
@@ -22,6 +22,18 @@ export function businessIdentity(selector: string) {
   const id = separator < 0 ? value : value.slice(0, separator)
   if (!AGENT_ID.test(id)) throw new Error('业务智能体 ID 无效')
   return { id, tag: separator < 0 ? undefined : decodeURIComponent(value.slice(separator + 1)) }
+}
+
+/** 固定版本缓存的目录名就是其提交；恢复完整来源身份后再核对依赖。 */
+export function businessSourceSelector(root: string, selector: string, candidatePath?: string) {
+  const { id, tag } = businessIdentity(selector)
+  if (tag !== undefined || !candidatePath) return selector
+  const cacheRoot = resolve(dataPath(root, '.local/business-sources'))
+  const cached = relative(cacheRoot, resolve(candidatePath)).replaceAll('\\', '/').split('/')
+  if (/^[a-f0-9]{40}$/.test(cached[0] ?? '') && cached[2] === 'agents' && cached[3] === id && cached.length === 4) {
+    return `business:${id}@${cached[0]}`
+  }
+  return selector
 }
 
 export function businessVersions(root: string, id: string) {
