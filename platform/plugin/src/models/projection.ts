@@ -8,6 +8,7 @@ import { businessCatalogRoutes } from './catalog.ts'
 import { assertCandidatePath, resolveHarnessRuntime, type HarnessRuntime } from './harness-runtime.ts'
 import { resolvePreparedAssetDependencies, type PreparedAssetDependencies } from '../agents/asset-dependencies.ts'
 import { parseLocalCapabilities } from '../business-control/local-capabilities.ts'
+import { businessAgentsRoot } from '../workspace.ts'
 export { resolveHarnessRuntime } from './harness-runtime.ts'
 
 type Route = { provider: string; model: string }
@@ -168,10 +169,12 @@ export async function modelProviderReadiness(providers: readonly string[], servi
   return Object.fromEntries(entries)
 }
 
-function checkedManifest(assetRoot: string, agentId: string) {
+function checkedManifest(assetRoot: string, agentId: string, candidatePath?: string) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(agentId)) throw new Error('智能体 ID 无效')
   const root = resolve(assetRoot)
-  const agentDir = join(root, 'agents', agentId)
+  const businessRoot = resolve(businessAgentsRoot(root))
+  const selectedRoot = candidatePath && resolve(candidatePath).startsWith(`${businessRoot}/`) ? businessRoot : root
+  const agentDir = join(selectedRoot, 'agents', agentId)
   const file = join(agentDir, 'manifest.yaml')
   if (lstatSync(agentDir).isSymbolicLink() || !lstatSync(agentDir).isDirectory()
     || lstatSync(file).isSymbolicLink() || !lstatSync(file).isFile()) throw new Error('智能体模型配置来源不是普通文件')
@@ -183,7 +186,7 @@ function checkedManifest(assetRoot: string, agentId: string) {
 
 /** 平台原生设置是模型目录与连接配置的唯一来源；实例 Patch 只是一份启动投影。 */
 export async function projectModelPolicy(assetRoot: string, agentId: string, services: Services, requestedSelection?: Selection | null, candidatePath?: string): Promise<{ policy: ModelPolicy; environment: Record<string, string> }> {
-  const { sha256 } = checkedManifest(assetRoot, agentId)
+  const { sha256 } = checkedManifest(assetRoot, agentId, candidatePath)
   const runtime = resolveHarnessRuntime(assetRoot, agentId, candidatePath)
   const matrix = 'dsh/managed/role-tool-matrix.yaml'
   let localRoutes: Route[] = []
