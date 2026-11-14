@@ -4,9 +4,9 @@
 set -eu
 
 tuna_main=http://mirrors.tuna.tsinghua.edu.cn/debian
-aliyun_main=https://mirrors.aliyun.com/debian
+aliyun_main=http://mirrors.aliyun.com/debian
 official_main=http://deb.debian.org/debian
-aliyun_security=https://mirrors.aliyun.com/debian-security
+aliyun_security=http://mirrors.aliyun.com/debian-security
 official_security=http://deb.debian.org/debian-security
 
 task_main_mirror="${1:-$aliyun_main}"
