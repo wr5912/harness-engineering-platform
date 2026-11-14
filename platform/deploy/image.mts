@@ -141,7 +141,7 @@ export function expectedArch(arch: Arch): string {
 
 export function verifyImageInfo(info: ImageInfo, expected: { id?: string; arch?: Arch; fingerprint?: string }): string[] {
   const problems: string[] = []
-  if (!/^sha256:[0-9a-f]{64}$/.test(info.id)) problems.push('镜像缺少有效的不可变 ID')
+  if (!/^sha256:[0-9a-f]{64}$/.test(info.id)) problems.push(`镜像不可变 ID 无效：期望 sha256: 加 64 位小写十六进制，实际 ${info.id || '缺失'}`)
   if (expected.id && info.id !== expected.id) problems.push(`镜像 ID 不符：期望 ${expected.id}，实际 ${info.id}`)
   if (expected.arch && info.os !== 'linux') problems.push(`镜像系统不符：期望 linux，实际 ${info.os ?? '未知'}`)
   if (expected.arch && info.arch !== expectedArch(expected.arch)) problems.push(`镜像架构不符：期望 ${expected.arch}，实际 ${info.arch ?? '未知'}`)

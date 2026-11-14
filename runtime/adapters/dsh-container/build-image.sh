@@ -216,7 +216,7 @@ evidence = {
     "pnpm_runtime_version": sys.argv[14],
     "build_network_mode": sys.argv[15],
     "apt_mirror_main": sys.argv[16],
-    "apt_mirror_security": "http://deb.debian.org/debian-security",
+    "apt_mirror_security": "http://mirrors.aliyun.com/debian-security" if sys.argv[16] == "http://mirrors.aliyun.com/debian" else "http://deb.debian.org/debian-security",
     "npm_registry": sys.argv[17],
     "image_build_fingerprint": sys.argv[18],
     "image_label_key": sys.argv[19],

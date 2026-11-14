@@ -1089,10 +1089,14 @@ def assert_asset_dependencies(contract: dict, image_id: str | None = None) -> No
     checked = run(command, check=False)
     try:
         dependencies = json.loads(checked.stdout)
-    except (ValueError, TypeError):
-        fail("业务依赖无法核对，请在智能体资产中重新准备依赖")
+        if not isinstance(dependencies, dict):
+            raise ValueError(f"期望依赖结果为 JSON 对象，实际 {type(dependencies).__name__}")
+    except (ValueError, TypeError) as error:
+        detail = redact_secrets((checked.stderr or "").strip()) or str(error)
+        fail(f"业务来源 {experiment_id} 的标准 Runtime 依赖核对未返回有效 JSON（退出码 {checked.returncode}）：{detail}")
     if checked.returncode or dependencies.get("status") != "ready":
-        fail("业务依赖尚未准备：" + "；".join(dependencies.get("reasons", [])))
+        detail = "；".join(dependencies.get("reasons") or []) or redact_secrets((checked.stderr or "").strip()) or f"依赖结果 status 期望 ready，实际 {dependencies.get('status', '缺失')}"
+        fail(f"业务来源 {experiment_id} 的标准 Runtime 依赖核对失败（退出码 {checked.returncode}）：{detail}")
     projected = contract.get("model_policy", {}).get("asset_dependencies")
     if projected is not None and projected != dependencies or projected is None and dependencies.get("mounts") and contract.get("model_policy", {}).get("source") == "platform":
         fail("业务依赖准备回执已变化，请重新预览实例或评测")
@@ -1749,14 +1753,16 @@ def validate_image_identity(contract: dict, current: tuple[Path, dict] | None = 
     expected_fingerprint = image.get("build_fingerprint")
     expected_platform = image.get("platform")
     if not tag or not expected_fingerprint:
-        fail("来源合同缺少镜像构建指纹；请重新解析当前来源")
+        missing = [key for key, value in (("local_image_tag", tag), ("build_fingerprint", expected_fingerprint)) if not value]
+        fail("来源合同缺少镜像身份字段 image." + "、image.".join(missing) + "；请重新解析当前来源")
     inspected = run(["docker", "image", "inspect", tag, "--format", "{{json .}}"], check=False)
     if inspected.returncode != 0:
-        fail(f"本地镜像不存在：{tag}；请先执行 dsh-dev image build --source {contract['source_id']}")
+        detail = redact_secrets((inspected.stderr or "").strip()) or "Docker 未返回具体原因"
+        fail(f"无法查询标准 Runtime 镜像 {tag}（docker image inspect 退出码 {inspected.returncode}）：{detail}；请检查 Docker 服务、访问权限及镜像是否已导入")
     try:
         metadata = json.loads((inspected.stdout or "").strip())
-    except json.JSONDecodeError:
-        fail(f"无法解析镜像元数据：{tag}")
+    except json.JSONDecodeError as error:
+        fail(f"无法解析标准 Runtime 镜像 {tag} 的元数据：{error}")
     if not isinstance(metadata, dict):
         fail(f"镜像元数据不是对象：{tag}")
     image_id = metadata.get("Id")
@@ -1767,7 +1773,7 @@ def validate_image_identity(contract: dict, current: tuple[Path, dict] | None = 
     actual_fingerprint = labels.get(IMAGE_LABEL_KEY)
     platform = f"{metadata.get('Os')}/{metadata.get('Architecture')}"
     if not IMAGE_ID_RE.fullmatch(str(image_id or "")):
-        fail(f"镜像 {tag} 没有有效的 immutable image ID")
+        fail(f"镜像 {tag} 的 immutable image ID 无效：期望 sha256: 加 64 位小写十六进制，实际 {image_id!r}；请重新构建标准镜像")
     if actual_fingerprint != expected_fingerprint:
         fail(
             f"镜像 {tag} 的构建指纹不匹配（期望 {expected_fingerprint}，实际 {actual_fingerprint or '缺失'}）；"
@@ -3128,7 +3134,8 @@ def check_managed_plugin_dependencies(contract: dict, external_modules: str | No
                 ])
                 runtime_dependencies = set(json.loads(result.stdout))
             if name not in runtime_dependencies:
-                fail(f"插件 {manifest.parent.name} 缺少运行依赖 {name}；请核对标准 Runtime 的依赖锁并重建共享镜像")
+                required = (package.get("dependencies") or {}).get(name) or (package.get("optionalDependencies") or {}).get(name)
+                fail(f"插件 {manifest} 声明运行依赖 {name}（要求 {required}），实际标准 Runtime 镜像 {contract['image']['local_image_tag']} 的安装闭包未包含该包；请更新 Runtime 依赖锁并重建共享标准镜像")
 
 
 def migrate_existing_instance(args: argparse.Namespace, contract: dict,

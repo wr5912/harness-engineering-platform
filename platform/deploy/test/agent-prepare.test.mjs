@@ -37,7 +37,20 @@ test('资源架构不符、离线组件缺失会在导出前呈现明确缺口',
   const manifest = JSON.parse(readFileSync(join(f.resources, 'resources.json'), 'utf8'))
   manifest.arch = 'arm64'
   write(join(f.resources, 'resources.json'), JSON.stringify(manifest))
-  assert.match(inspectAgentResources(f.input).issues[0].message, /清单无效/)
+  assert.match(inspectAgentResources(f.input).issues[0].message, /resources.json 的 arch 期望 amd64，实际 arm64/)
+})
+
+test('资源身份不符明确指出字段及预期和实际值', t => {
+  const f = fixture(t), path = join(f.resources, 'resources.json')
+  const original = JSON.parse(readFileSync(path, 'utf8'))
+  for (const key of ['tag', 'fingerprint']) {
+    const changed = structuredClone(original)
+    changed.image[key] = key === 'tag' ? 'custom/runtime:latest' : 'sha256:' + '0'.repeat(64)
+    write(path, JSON.stringify(changed))
+    const message = inspectAgentResources(f.input).issues[0].message
+    assert.ok(message.includes(`image.${key} 与标准 Runtime 不一致`), message)
+    assert.ok(message.includes(`期望 ${original.image[key]}，实际 ${changed.image[key]}`), message)
+  }
 })
 
 test('准备中止保持既有运行资源，临时结果不替换当前缓存', async t => {

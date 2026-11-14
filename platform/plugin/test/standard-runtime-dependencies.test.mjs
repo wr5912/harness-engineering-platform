@@ -40,6 +40,8 @@ for (const manifest of [{ dependencies: { 'pinyin-pro': '^99.0.0' } }, { optiona
     f.put(join(f.data, '.local/asset-dependencies/business:demo/current.json'), JSON.stringify({ digest: 'a'.repeat(64), status: 'ready' }))
     const managed = resolvePreparedAssetDependencies(f.data, 'business:demo')
     assert.equal(managed.status, 'pending'); assert.match(managed.reasons.join(';'), /标准 Runtime 镜像.*重建共享标准镜像/)
+    const [name, version] = Object.entries(manifest.dependencies ?? manifest.optionalDependencies)[0]
+    assert.ok(managed.reasons.join(';').includes(`${name}（声明 ${version}，标准镜像 `))
     assert.deepEqual(managed.mounts, [])
     assert.equal(runtimeDependencies({ programRoot }, f.snapshot)[0].ready, false)
     const result = await createAssetDependenciesHandler(f.data, { command: () => assert.fail('不得补装依赖') })({ experiment_id: 'business:demo' })
@@ -58,4 +60,14 @@ test('Python 镜像锁在实例和导出中一致，兼容哈希锁且拒绝未�
   f.put(path, 'packaging==999.0\n'); snapshot.dependencies[0].requirements = ['packaging==999.0']
   assert.equal(resolvePreparedAssetDependencies(f.data, 'business:demo').status, 'pending')
   assert.equal(runtimeDependencies({ programRoot }, snapshot)[0].ready, false)
+})
+
+test('来源或声明读取失败保留具体原因，不替换为笼统的依赖错误', t => {
+  const f = fixture(t)
+  f.put(join(f.candidate, 'dsh/managed/voice/package.json'), '{invalid-json')
+  const result = resolvePreparedAssetDependencies(f.data, 'business:demo', {}, f.candidate)
+  assert.equal(result.status, 'pending')
+  assert.match(result.reasons.join(';'), /business:demo/)
+  assert.match(result.reasons.join(';'), /managed\/voice\/package.json/)
+  assert.match(result.reasons.join(';'), /JSON/)
 })

@@ -72,6 +72,26 @@ test('打开入口使用当前配置的直接地址，无需认证文件或访�
   assert.equal(existsSync(f.log), false)
 })
 
+test('校验失败指明具体字段、服务、期望值与实际值', t => {
+  const f = fixture(t)
+  const fingerprintFailure = f.run(['start'], { LAUNCHER_IMAGE_META: `${imageId}|linux|${arch}|changed` })
+  assert.equal(fingerprintFailure.status, 2)
+  assert.match(fingerprintFailure.stderr, /fingerprint 不符/)
+  assert.ok(fingerprintFailure.stderr.includes(`期望 ${fingerprint}，实际 changed`))
+  writeFileSync(join(f.root, 'runtime/compose.yaml'), JSON.stringify({ services: { init: { image: imageId }, dsh: { image: 'alpine:latest' } } }))
+  const imageFailure = f.run(['start'])
+  assert.equal(imageFailure.status, 2)
+  assert.ok(imageFailure.stderr.includes(`services.dsh.image 期望 ${imageId}，实际 alpine:latest`))
+  writeFileSync(join(f.root, 'runtime/compose.yaml'), JSON.stringify({ services: { init: { image: imageId }, dsh: { image: imageId, build: '.' } } }))
+  assert.match(f.run(['start']).stderr, /services\.dsh\.build 禁止设置/)
+  writeFileSync(join(f.root, 'runtime/compose.yaml'), JSON.stringify({ services: { init: { image: imageId }, dsh: { image: imageId } } }))
+  writeFileSync(join(f.root, 'manifest.json'), JSON.stringify({ kind: 'standalone-agent', image: { id: 'wrong', tag: 'fixture/runtime', fingerprint }, package: { arch } }))
+  assert.ok(f.run(['start']).stderr.includes(`manifest.json 的 image.id 不符：期望 ${imageId}，实际 wrong`))
+  writeFileSync(join(f.root, 'runtime/bundle.env'), 'IMAGE_ID=bad\n')
+  assert.match(f.run(['start']).stderr, /IMAGE_ID 期望 sha256:.*实际 bad/)
+  assert.doesNotMatch(readFileSync(f.log, 'utf8'), /(?: up | run --rm -T init| load )/)
+})
+
 test('启动、重启和配置的 MCP 参数通过 stdin 进入当前配置，Docker 参数不携带凭据', t => {
   const f = fixture(t)
   for (const action of ['start', 'restart', 'configure']) {

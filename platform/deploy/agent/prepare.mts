@@ -15,11 +15,13 @@ export function inspectAgentResources(input: AgentPackageInput): { directory: st
   try {
     if (!existsSync(join(directory, 'resources.json'))) throw new Error('目标架构运行资源尚未准备')
     manifest = JSON.parse(readFileSync(join(directory, 'resources.json'), 'utf8'))
-    if (![1, 2].includes(manifest?.schemaVersion ?? 0) || manifest?.arch !== input.arch || !manifest.image?.archive) throw new Error('目标架构资源清单无效')
-    if (!/^sha256:[0-9a-f]{64}$/.test(manifest.image.id ?? '') || !/^sha256:[0-9a-f]{64}$/.test(manifest.image.fingerprint ?? '')) throw new Error('运行资源缺少完整的标准 Runtime 镜像 ID 或构建指纹，请重新准备')
+    if (![1, 2].includes(manifest?.schemaVersion ?? 0)) throw new Error(`资源清单无效：${directory}/resources.json 的 schemaVersion 期望 1 或 2，实际 ${manifest?.schemaVersion ?? '缺失'}`)
+    if (manifest?.arch !== input.arch) throw new Error(`资源清单无效：${directory}/resources.json 的 arch 期望 ${input.arch}，实际 ${manifest?.arch ?? '缺失'}；请准备匹配架构的资源`)
+    if (!manifest.image?.archive) throw new Error(`资源清单无效：${directory}/resources.json 缺少 image.archive；请重新准备资源`)
+    for (const key of ['id', 'fingerprint'] as const) if (!/^sha256:[0-9a-f]{64}$/.test(manifest.image[key] ?? '')) throw new Error(`资源清单 image.${key} 无效：期望 sha256: 加 64 位小写十六进制，实际 ${manifest.image[key] ?? '缺失'}；请重新准备标准 Runtime 镜像`)
     const expected = expectedImage(input.programRoot, input.arch)
-    if (manifest.image.tag !== expected.tag || manifest.image.fingerprint !== expected.fingerprint) throw new Error('目标架构资源与标准 Runtime 不一致，请重新准备')
-    if (!existsSync(join(directory, manifest.image.archive))) throw new Error('目标架构资源缺少标准镜像归档')
+    for (const key of ['tag', 'fingerprint'] as const) if (manifest.image[key] !== expected[key]) throw new Error(`资源清单 image.${key} 与标准 Runtime 不一致：期望 ${expected[key]}，实际 ${manifest.image[key] ?? '缺失'}；请重新准备资源`)
+    if (!existsSync(join(directory, manifest.image.archive))) throw new Error(`目标架构资源缺少标准镜像归档：${join(directory, manifest.image.archive)}`)
   } catch (error) { issues.push({ code: 'resources_missing', message: error instanceof Error ? error.message : '运行资源检查失败' }) }
   return { directory, manifest, issues }
 }

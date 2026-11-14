@@ -37,6 +37,10 @@ export const assetCommand: AssetCommand = (command, args, options) => new Promis
   // 不返回安装器的原始输出，包索引凭据和来源 URL 不进入普通回执。
   child.on('close', (code, signal) => { clearTimeout(timer); code === 0 && !stopped ? done(output.trim()) : fail(new DependencyError('dependency_pending', `${command} 依赖准备未完成（${stopped ?? (signal ? `进程被 ${signal} 终止` : `退出码 ${code}`)}），请核对目标环境、包版本和网络后重试`)) })
 })
+function readNodeManifest(path: string) {
+  try { return JSON.parse(readFileSync(path, 'utf8')) }
+  catch (error) { throw new Error(`无法读取依赖声明 ${path}：${error instanceof Error ? error.message : String(error)}`) }
+}
 function declarations(candidate: string): Declaration[] {
   const files = candidateFiles(candidate, omitted).filter(path => /^dsh\/(?:managed|workspace)\//.test(path))
   const folders = new Map<string, string[]>()
@@ -47,7 +51,7 @@ function declarations(candidate: string): Declaration[] {
   for (const [directory, names] of folders) {
     const node = names.find(path => path.endsWith('/package.json'))
     if (node) {
-      const manifest = JSON.parse(readFileSync(dataPath(candidate, node), 'utf8'))
+      const manifest = readNodeManifest(dataPath(candidate, node))
       if (Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies }).length) {
         const lock = `${directory}/package-lock.json`
         result.push({ kind: 'node', path: node, directory, files: [node, ...(existsSync(dataPath(candidate, lock)) ? [lock] : [])].map(path => ({ path, sha256: hash(readFileSync(dataPath(candidate, path))) })) })
@@ -73,13 +77,13 @@ export function resolvePreparedAssetDependencies(assetRoot: string, experimentId
     if (!items.length) return { status: 'ready', reasons: [], mounts: [], environment: {} }
     const standard = standardDependencies(programRoot())
     const missing = items.flatMap(item => (item.kind === 'node'
-      ? standard.node(JSON.parse(readFileSync(dataPath(source.candidate, item.path), 'utf8')))
+      ? standard.node(readNodeManifest(dataPath(source.candidate, item.path)))
       : standard.python(pythonRequirements(source.candidate, item).trim().split('\n').filter(Boolean)))
       .map(name => `${item.path}: ${name}`))
     return { status: missing.length ? 'pending' : 'ready',
       reasons: missing.length ? [`标准 Runtime 镜像尚未包含兼容依赖：${missing.join('、')}；请更新平台 Runtime 依赖锁并重建共享标准镜像`] : [],
       mounts: [], environment: {}, receipt: { declarations_sha256: declarationHash(items) } }
-  } catch (error) { return { status: 'pending', reasons: [error instanceof DependencyError ? error.message : '无法核对业务来源与标准 Runtime 依赖锁'], mounts: [], environment: {} } }
+  } catch (error) { return { status: 'pending', reasons: [`无法核对业务来源 ${experimentId} 与标准 Runtime 依赖锁：${error instanceof Error ? error.message : String(error)}`], mounts: [], environment: {} } }
 }
 
 function pythonRequirements(candidate: string, item: Declaration) {

@@ -865,6 +865,10 @@ class EvaluationModeContractTest(unittest.TestCase):
             with contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
                 dev.check_managed_plugin_dependencies(contract)
             self.assertIn("标准 Runtime", error.getvalue())
+            self.assertIn(str(plugin / "package.json"), error.getvalue())
+            self.assertIn("pinyin-pro", error.getvalue())
+            self.assertIn("^3.29.4", error.getvalue())
+            self.assertIn(contract["image"]["local_image_tag"], error.getvalue())
 
     def test_only_eval_mode_is_supported(self):
         self.assertEqual(dev.normalize_mode("eval"), "verification")
@@ -1239,6 +1243,19 @@ class InstanceStateTest(unittest.TestCase):
 
 
 class StandardRuntimeDependencyTest(unittest.TestCase):
+    def test_failed_dependency_probe_preserves_reason_and_source(self):
+        contract = {"source_id": "business:demo", "source_kind": "business", "candidate_root": "/repo/agents/demo/dsh",
+                    "harness_runtime": True, "image": {"local_image_tag": IMAGE_TAG}}
+        for stdout, stderr, expected in (("", "permission denied reading /repo/agents/demo/package.json", "permission denied"),
+                                          ("[]", "", "JSON 对象"),
+                                          ('{"status":"unavailable"}', "", "实际 unavailable")):
+            with self.subTest(stdout=stdout), mock.patch.object(dev, "run", return_value=subprocess.CompletedProcess([], 7, stdout, stderr)), \
+                    contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+                dev.assert_asset_dependencies(contract)
+            self.assertIn("business:demo", error.getvalue())
+            self.assertIn("退出码 7", error.getvalue())
+            self.assertIn(expected, error.getvalue())
+
     def test_current_catalog_clears_old_dependency_mounts(self):
         contract = {"source_id": "business:demo", "source_kind": "business", "candidate_root": "/repo/agents/demo/dsh",
                     "image": {"local_image_tag": IMAGE_TAG}, "asset_dependencies": {"mounts": [{"source": "/old", "target": "/opt/node_modules"}]}}
@@ -1261,6 +1278,15 @@ class StandardRuntimeDependencyTest(unittest.TestCase):
 
 
 class ImageIdentityAndPsStateTest(unittest.TestCase):
+    def test_failed_docker_probe_does_not_claim_image_is_missing(self):
+        contract = {"source_id": "business:demo", "image": {"local_image_tag": IMAGE_TAG, "build_fingerprint": "sha256:" + "2" * 64}}
+        with mock.patch.object(dev, "run", return_value=subprocess.CompletedProcess([], 1, "", "permission denied connecting to Docker socket")), \
+                contextlib.redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit):
+            dev.validate_image_identity(contract)
+        self.assertIn("permission denied connecting to Docker socket", error.getvalue())
+        self.assertIn(IMAGE_TAG, error.getvalue())
+        self.assertNotIn("本地镜像不存在", error.getvalue())
+
     def test_batch_observation_groups_containers_and_volumes_with_generation_query(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

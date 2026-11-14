@@ -12,7 +12,9 @@ export function standardDependencies(programRoot: string) {
     .filter(line => line.trim() && !line.trim().startsWith('#')).map(normalize))
   return {
     node(manifest: Record<string, any>, names = Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies })) {
-      return names.filter(name => !catalog[name] || !satisfies(catalog[name], manifest.dependencies?.[name] ?? manifest.optionalDependencies?.[name] ?? manifest.peerDependencies?.[name] ?? '', { includePrerelease: true }))
+      const required = (name: string) => manifest.dependencies?.[name] ?? manifest.optionalDependencies?.[name] ?? manifest.peerDependencies?.[name] ?? ''
+      return names.filter(name => !catalog[name] || !satisfies(catalog[name], required(name), { includePrerelease: true }))
+        .map(name => `${name}（声明 ${required(name) || '缺失'}，标准镜像 ${catalog[name] ?? '未包含'}）`)
     },
     python(requirements: string[]) { return requirements.filter(line => !python.has(normalize(line))) },
   }
