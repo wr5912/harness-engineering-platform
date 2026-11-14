@@ -1,6 +1,7 @@
 import { accessSync, constants, existsSync, lstatSync, readFileSync, readlinkSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
+import { execFile, spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
+import { promisify } from 'node:util'
 import { inspectDataRoot } from './data.mts'
 import { managedState, ownsPort } from '../lifecycle.mts'
 import { managerWorkspaceRoot, workspaceIdentity } from '../plugin/src/workspace.ts'
@@ -20,6 +21,28 @@ export interface VerifyOptions {
   prefix: string
   dataRoot: string
   url?: string
+}
+
+/** 安装器尚未进入目标运行环境，在线核验必须通过目标的正式入口。 */
+export async function verifyInstalledDeployment(options: VerifyOptions): Promise<{ checks: DeploymentCheck[]; onlineVerified: boolean; ok: boolean }> {
+  const launcher = join(resolve(options.prefix), 'platform/dsh-deploy')
+  try {
+    const { stdout } = await promisify(execFile)(launcher, ['verify', '--prefix', resolve(options.prefix),
+      '--data-root', resolve(options.dataRoot), ...(options.url ? ['--url', options.url] : []), '--json'], {
+      env: { ...process.env, HARNESS_ASSET_ROOT: resolve(options.dataRoot) }, timeout: 120_000, maxBuffer: 4 * 1024 * 1024,
+    })
+    return JSON.parse(stdout)
+  } catch (error) {
+    const result = error as Error & { stdout?: string; stderr?: string }
+    // verify 的非零退出码也可能带有完整的逐项核验结果。
+    if (result.stdout) {
+      try {
+        const report = JSON.parse(result.stdout)
+        if (report.ok === false && Array.isArray(report.checks)) return report
+      } catch {}
+    }
+    throw new Error(`部署核验入口 ${launcher} 执行失败：${result.stderr?.trim() || result.message}`)
+  }
 }
 
 export async function verifyDeployment(options: VerifyOptions): Promise<{ checks: DeploymentCheck[]; onlineVerified: boolean; ok: boolean }> {
@@ -124,7 +147,7 @@ export async function verifyDeployment(options: VerifyOptions): Promise<{ checks
       const failed = entries.filter(entry => !entry.ready)
       checks.push({ id: 'online-business-instances', status: failed.length ? 'mismatch' : 'ok',
         detail: failed.length ? failed.map(entry => `${entry.name}：${entry.detail}`).join('；') : `已核对 ${entries.length} 个运行中业务实例的网页入口与接入版本` })
-    } catch { checks.push({ id: 'online-business-instances', status: 'mismatch', detail: '运行中业务实例入口检查未完成；请核对平台归属、Docker 状态和实例登记' }) }
+    } catch (error) { checks.push({ id: 'online-business-instances', status: 'mismatch', detail: `运行中业务实例入口检查失败：${error instanceof Error ? error.message : error}` }) }
   }
   return { checks, onlineVerified: Boolean(options.url && ['online-workspace', 'online-business-gateway', 'online-business-instances'].every(id => checks.find(check => check.id === id)?.status === 'ok')), ok: checks.every(check => check.status === 'ok') }
 }

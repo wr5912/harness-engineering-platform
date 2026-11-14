@@ -6,7 +6,7 @@ import { managedState, ownsPort } from '../lifecycle.mts'
 import { inspectBundle, install, type InstallOptions, type InstallReport } from './install.mts'
 import { activationSnapshot } from './remote-update.mts'
 import { readUpdateActivity } from './update.mts'
-import { verifyDeployment } from './verify.mts'
+import { verifyInstalledDeployment } from './verify.mts'
 import { prepareDeploymentFirewall } from './firewall.mts'
 import { workspaceTargets } from './workspace.mts'
 import { platformAddressArgs } from '../plugin/src/business-control/runtime-address.ts'
@@ -78,7 +78,7 @@ export async function updateBundle(options: InstallOptions): Promise<InstallRepo
       await readUpdateActivity({ programRoot: prefix, dataRoot }, current, workspace.id)
       const after = await activationSnapshot({ prefix, dataRoot })
       if (before?.sessions.some(id => !after.sessions.includes(id))) throw new Error('更新后管理会话清单不完整')
-      const verified = await verifyDeployment({ prefix, dataRoot, url: after.state.url })
+      const verified = await verifyInstalledDeployment({ prefix, dataRoot, url: after.state.url })
       if (!verified.ok) throw new Error(`更新后部署核对失败：${JSON.stringify(verified.checks.filter(item => item.status !== 'ok'))}`)
     }
     return { ...installed, status: 'updated', backups: report.backups }

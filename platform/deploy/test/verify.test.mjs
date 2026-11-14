@@ -1,10 +1,37 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { verifyDeployment } from '../verify.mts'
+import { verifyDeployment, verifyInstalledDeployment } from '../verify.mts'
+
+test('安装后的在线核验使用目标入口装载随包环境，忽略安装器的宿主 Python', async t => {
+  const prefix = mkdtempSync(join(tmpdir(), 'hep-installed-verify-'))
+  t.after(() => rmSync(prefix, { recursive: true, force: true }))
+  mkdirSync(join(prefix, 'platform'))
+  const launcher = join(prefix, 'platform/dsh-deploy')
+  writeFileSync(launcher, `#!/bin/sh
+export HARNESS_PYTHON=target-bundled-python
+exec '${process.execPath}' -e 'if(process.env.HARNESS_PYTHON!=="target-bundled-python")process.exit(9); console.log(JSON.stringify({ok:true,onlineVerified:true,checks:[],args:process.argv.slice(1),dataRoot:process.env.HARNESS_ASSET_ROOT}))' -- "$@"
+`, { mode: 0o755 })
+  const before = process.env.HARNESS_PYTHON
+  process.env.HARNESS_PYTHON = '/missing-host-python'
+  try {
+    const result = await verifyInstalledDeployment({ prefix, dataRoot: prefix + '-data', url: 'http://127.0.0.1:18121/hep/' })
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.args, ['verify', '--prefix', prefix, '--data-root', prefix + '-data', '--url', 'http://127.0.0.1:18121/hep/', '--json'])
+    assert.equal(result.dataRoot, prefix + '-data')
+    assert.equal(process.env.HARNESS_PYTHON, '/missing-host-python')
+    writeFileSync(launcher, '#!/bin/sh\necho \'{"ok":false,"onlineVerified":false,"checks":[{"id":"online-business-instances","status":"mismatch","detail":"实例 soc：HTTP 503"}]}\'\nexit 1\n', { mode: 0o755 })
+    assert.equal((await verifyInstalledDeployment({ prefix, dataRoot: prefix + '-data' })).checks[0].detail, '实例 soc：HTTP 503')
+    writeFileSync(launcher, '#!/bin/sh\necho "ModuleNotFoundError: yaml" >&2\nexit 1\n', { mode: 0o755 })
+    await assert.rejects(verifyInstalledDeployment({ prefix, dataRoot: prefix + '-data' }), /dsh-deploy.*ModuleNotFoundError: yaml/)
+  } finally {
+    if (before === undefined) delete process.env.HARNESS_PYTHON
+    else process.env.HARNESS_PYTHON = before
+  }
+})
 
 test('无关 HTTP 200 不通过在线工作区核验，也不向它发送登录凭据', async () => {
   const root = mkdtempSync(join(tmpdir(), 'hep-verify-'))
