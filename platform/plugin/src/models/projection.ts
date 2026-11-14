@@ -173,14 +173,23 @@ function checkedManifest(assetRoot: string, agentId: string, candidatePath?: str
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(agentId)) throw new Error('智能体 ID 无效')
   const root = resolve(assetRoot)
   const businessRoot = resolve(businessAgentsRoot(root))
-  const selectedRoot = candidatePath && resolve(candidatePath).startsWith(`${businessRoot}/`) ? businessRoot : root
+  // 未配置业务仓时 businessAgentsRoot 会退回 assetRoot；临时测试 Candidate
+  // 不能因此被误判为业务来源。生产业务来源必须来自独立真实业务仓并含 harness.yaml。
+  const candidate = candidatePath ? resolve(candidatePath) : undefined
+  const isBusiness = Boolean(candidate && businessRoot !== root
+    && existsSync(join(businessRoot, 'manifest.yaml'))
+    && candidate.startsWith(`${businessRoot}/`) && existsSync(join(candidate, 'harness.yaml')))
+  const selectedRoot = isBusiness ? businessRoot : root
   const agentDir = join(selectedRoot, 'agents', agentId)
-  const file = join(agentDir, 'manifest.yaml')
+  // business-agents 的唯一 Agent 身份声明是各 Agent 目录下的 harness.yaml；
+  // data 根的 manifest.yaml 只用于非业务测试/历史来源，不能拿来冒充业务 Harness。
+  const file = join(agentDir, isBusiness ? 'harness.yaml' : 'manifest.yaml')
   if (lstatSync(agentDir).isSymbolicLink() || !lstatSync(agentDir).isDirectory()
     || lstatSync(file).isSymbolicLink() || !lstatSync(file).isFile()) throw new Error('智能体模型配置来源不是普通文件')
   const text = readFileSync(file, 'utf8')
   const manifest = record(loadYaml(text))
-  if (manifest.agent_id !== undefined && manifest.agent_id !== agentId) throw new Error('智能体模型配置的对象身份不一致')
+  const declaredId = isBusiness ? record(manifest.agent).id : manifest.agent_id
+  if (declaredId !== undefined && declaredId !== agentId) throw new Error('智能体模型配置的对象身份不一致')
   return { manifest, sha256: createHash('sha256').update(text).digest('hex') }
 }
 
@@ -197,13 +206,6 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
     localRoutes = parseLocalCapabilities(readFileSync(file, 'utf8')).localModelRoutes
   }
   let dependencies: PreparedAssetDependencies | undefined
-  if (candidatePath) {
-    const id = basename(candidatePath) === 'candidate' ? basename(dirname(candidatePath)) : `business:${agentId}`
-    if (runtime || existsSync(join(assetRoot, '.local/asset-dependencies', id, 'current.json'))) {
-      dependencies = resolvePreparedAssetDependencies(assetRoot, id, {}, candidatePath)
-      if (dependencies.status !== 'ready') throw new Error(`业务依赖尚未准备：${dependencies.reasons.join('；')}`)
-    }
-  }
   const business = readBusinessDefault(assetRoot)
   if (!runtime?.model_bindings && business.migrationRequired) throw new Error('请先在设置 → 模型中确认业务智能体统一默认模型；旧配置不会自动生效')
   if (!runtime?.model_bindings && !business.default) throw new Error('请先在设置 → 模型中选择业务智能体统一默认模型')
@@ -231,6 +233,19 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
     const local = localRoutes.some(item => sameRoute(item, binding))
     if (binding.reasoningEffort && !(local ? binding.reasoningEffort === 'off' : selectedModel?.reasoning?.efforts.some(item => item.id === binding.reasoningEffort))) {
       throw new Error(`此实例默认模型或角色绑定 ${binding.provider}/${binding.model} 的推理档位已不可用，请刷新模型设置`)
+    }
+  }
+  // 先完成来源/模型合同校验，再检查依赖准备状态；否则一个非法模型选择
+  // 会被无关的依赖缺失遮蔽，调用方无法得到可操作的根因。
+  if (candidatePath) {
+    const id = basename(candidatePath) === 'candidate' ? basename(dirname(candidatePath)) : `business:${agentId}`
+    const candidateAbsolute = resolve(candidatePath)
+    const businessRoot = resolve(businessAgentsRoot(assetRoot))
+    const businessCandidate = businessRoot !== resolve(assetRoot)
+      && (candidateAbsolute.startsWith(`${businessRoot}/`) || candidateAbsolute.includes('/.local/business-sources/'))
+    if (businessCandidate || existsSync(join(assetRoot, '.local/asset-dependencies', id, 'current.json'))) {
+      dependencies = resolvePreparedAssetDependencies(assetRoot, id, {}, candidatePath)
+      if (dependencies.status !== 'ready') throw new Error(`业务依赖尚未准备：${dependencies.reasons.join('；')}`)
     }
   }
   const resolvedBindings = runtime?.model_bindings ? {
