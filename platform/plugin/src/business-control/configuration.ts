@@ -31,7 +31,9 @@ export function initializeBusinessGateway(assetRoot: string, managementUrl: stri
   if (typeof gateway !== 'object' || Array.isArray(gateway)) throw new Error('业务网关配置必须是对象')
   gateway.host ??= host ?? entry.hostname.replace(/^\[|\]$/g, '')
   gateway.port = port ?? gateway.port ?? 53105
-  gateway.publicOrigin ??= `http://${entry.hostname}:${gateway.port}`
+  const explicitOrigin = gateway.publicOriginMode === 'explicit'
+  if (!explicitOrigin) gateway.publicOrigin = `http://${host ?? entry.hostname}:${gateway.port}`
+  gateway.publicOriginMode = explicitOrigin ? 'explicit' : 'auto'
   gateway.sharedSecretFile ??= '.local/credentials/business-shared.key'
   gateway.instances ??= []
   gateway.managementUrl = managementUrl

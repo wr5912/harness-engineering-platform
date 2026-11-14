@@ -17,6 +17,28 @@ const autostartService = 'harness-engineering-platform.service'
 const autostartMarker = '# Managed by harness-engineering-platform dsh-platform autostart.'
 type State = { pid: number; birth: string; programRoot: string; dataRoot: string; url: string; publicUrl?: string; host: string; port: number; log: string; phase: string; detached: boolean; nodeHeapMb?: number }
 const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'))
+function rewritePlatformOwnedUrls(path: string, previousEntry: string | undefined, currentEntry: string) {
+  if (!existsSync(path) || !previousEntry) return
+  const oldUrl = new URL(previousEntry), nextUrl = new URL(currentEntry)
+  const value = json(path)
+  const visit = (item: any): any => {
+    if (typeof item === 'string') {
+      try {
+        const url = new URL(item)
+        if (url.hostname === oldUrl.hostname && (url.port === oldUrl.port || ['18120', '18121'].includes(url.port)) && url.pathname.startsWith('/hep')) {
+          url.protocol = nextUrl.protocol; url.hostname = nextUrl.hostname; url.port = nextUrl.port
+          return url.href
+        }
+      } catch {}
+      return item
+    }
+    if (Array.isArray(item)) return item.map(visit)
+    if (item && typeof item === 'object') return Object.fromEntries(Object.entries(item).map(([key, child]) => [key, visit(child)]))
+    return item
+  }
+  const saved = `${JSON.stringify(visit(value), null, 2)}\n`, before = readFileSync(path, 'utf8')
+  if (saved !== before) writeFileSync(path, saved, { mode: 0o600 })
+}
 export function platformNodeOptions(options = '', heapMb = 8192): string {
   const heap = `--max-old-space-size=${heapMb}`
   return options.trimEnd().endsWith(heap) ? options : `${options} ${heap}`.trim()
@@ -113,7 +135,8 @@ export function launchAddress(dataRoot: string, host?: string, port?: string, pu
   if (typeof base !== 'string' || !/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(base)) throw new Error('config/sites.json 的平台基址无效')
   const url = `http://${host}:${number}${base}`
   if (publicUrl && new URL(publicUrl).hash) throw new Error('--public-url 不能包含片段')
-  const entry = validatePlatformEntryUrl(dataRoot, publicUrl ?? (separate ? configured!.href : url))
+  // 配置中的非本机地址属于旧的自动生成结果；只有显式 --public-url 才保留 NAT/反向代理入口。
+  const entry = validatePlatformEntryUrl(dataRoot, publicUrl ?? (configured && configured.protocol === 'https:' ? configured.href : separate && configured && local(configured.hostname) ? configured.href : url))
   if (new URL(entry).pathname !== base) throw new Error('平台管理入口与站点基址不一致')
   return { host, port: number, url, publicUrl: entry }
 }
@@ -465,6 +488,8 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     // 数据尚未初始化时由浏览器引导建立配置，不能预先制造不完整数据根。
     if (existsSync(join(dataRoot, 'workspace.json'))) {
       initializeBusinessGateway(dataRoot, address!.publicUrl, address!.host)
+      rewritePlatformOwnedUrls(accessPath, before ? JSON.parse(before).gateway?.managementUrl : undefined, address!.publicUrl)
+      rewritePlatformOwnedUrls(join(dataRoot, 'mcp/manager.json'), before ? JSON.parse(before).gateway?.managementUrl : undefined, address!.publicUrl)
       saved = readFileSync(accessPath, 'utf8')
     }
     const log = join(service, 'platform.log')
