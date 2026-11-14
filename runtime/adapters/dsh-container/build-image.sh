@@ -10,17 +10,15 @@ task_arch=""
 task_base_image_archive=""
 task_evidence_file=""
 task_build_network="default"
-# 构建期 APT 默认使用 TUNA 主源和 Debian 官方 security；npm/pnpm 走 registry.npmmirror.com。
-# 只有 TUNA 不可达时，才由调用方显式改回 Debian 官方主源。
-task_apt_mirror="http://mirrors.tuna.tsinghua.edu.cn/debian"
+# 构建期 APT 默认使用阿里云 main/security；TUNA 和 Debian 官方源显式回退；npm/pnpm 走 registry.npmmirror.com。
+task_apt_mirror="https://mirrors.aliyun.com/debian"
 task_npm_registry="https://registry.npmmirror.com"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help)
-      printf 'Usage: %s [--source business:agent-id] [--arch amd64|arm64] [--base-image-archive FILE] [--evidence-output FILE] [--build-network host] [--apt-mirror http://mirrors.tuna.tsinghua.edu.cn/debian|http://deb.debian.org/debian]\n' "$0"
-      printf 'Build locked official DSH source. APT defaults to TUNA main with Debian official security;\n'
-      printf 'the official Debian APT source is an explicit fallback when the mirror is unreachable.\n'
+      printf 'Usage: %s [--source business:agent-id] [--arch amd64|arm64] [--base-image-archive FILE] [--evidence-output FILE] [--build-network host] [--apt-mirror https://mirrors.aliyun.com/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|http://deb.debian.org/debian]\n' "$0"
+      printf 'Build locked official DSH source. APT defaults to Aliyun main/security; TUNA and Debian official are explicit fallbacks.\n'
       printf 'Host network is opt-in for local build egress only.\n'
       exit 0
       ;;
@@ -59,9 +57,8 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --apt-mirror)
-      # TUNA 是默认主源；官方主源只作为 TUNA 不可达时的显式回退。
-      if [[ $# -lt 2 || ( "$2" != http://mirrors.tuna.tsinghua.edu.cn/debian && "$2" != http://deb.debian.org/debian ) || "$task_apt_mirror" != http://mirrors.tuna.tsinghua.edu.cn/debian ]]; then
-        printf 'Only the TUNA default or an explicit Debian official fallback is supported\n' >&2
+      if [[ $# -lt 2 || ( "$2" != https://mirrors.aliyun.com/debian && "$2" != http://mirrors.tuna.tsinghua.edu.cn/debian && "$2" != http://deb.debian.org/debian ) || "$task_apt_mirror" != https://mirrors.aliyun.com/debian ]]; then
+        printf 'Only the Aliyun default, TUNA fallback, or Debian official fallback is supported\n' >&2
         exit 2
       fi
       task_apt_mirror="$2"
