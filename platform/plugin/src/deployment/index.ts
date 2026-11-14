@@ -21,7 +21,7 @@ export interface DeploymentServices {
 /** 耗时扫描、复制与归档在独立进程执行；IPC传递凭据，状态回执只保留公开信息。 */
 export function createDeployments(assetRoot: string, services: DeploymentServices) {
   const root = workspaceLocalPath(assetRoot, 'artifacts', 'agent-deployments')
-  const active = new Map<string, AbortController>()
+  const active = new Map<string, { controller: AbortController; job: Job; completion?: Promise<void> }>()
   const pending = new Set<Promise<void>>()
   const accepting = new Map<string, { hash: string; promise: Promise<any> }>()
   const statePath = (id: string) => join(root, id, 'state.json')
@@ -38,6 +38,11 @@ export function createDeployments(assetRoot: string, services: DeploymentService
   }
   const save = async (job: Job) => { await mkdir(join(root, job.id), { recursive: true }); const tmp = `${statePath(job.id)}.${randomUUID()}.tmp`; await writeFile(tmp, JSON.stringify(job), { mode: 0o600 }); await rename(tmp, statePath(job.id)); services.notify?.() }
   async function load(id: string): Promise<Job> {
+    const running = active.get(id)
+    if (running) {
+      if (running.job.state !== 'running') await running.completion
+      return { ...running.job }
+    }
     let job: Job
     try { job = JSON.parse(await readFile(statePath(id), 'utf8')) }
     catch { throw new Error('导出任务不存在') }
@@ -78,7 +83,8 @@ export function createDeployments(assetRoot: string, services: DeploymentService
     const { seed } = await services.seed(selected, signal)
     const controller = new AbortController(), now = new Date().toISOString()
     const job: Job = { id, request_sha256: requestHash, agent_id: selected.agent_id, experiment_id: selected.experiment_id, arch: selected.arch, mode: selected.mode, state: 'running', created_at: now, updated_at: now }
-    active.set(id, controller)
+    const entry: { controller: AbortController; job: Job; completion?: Promise<void> } = { controller, job }
+    active.set(id, entry)
     try { await save(job) } catch (error) { active.delete(id); throw error }
     // 请求结束不取消已接受的导出；用户通过明确的取消操作终止。
     let progressWrite = Promise.resolve()
@@ -92,6 +98,7 @@ export function createDeployments(assetRoot: string, services: DeploymentService
     }).catch(async error => { await progressWrite; job.state = controller.signal.aborted ? 'cancelled' : 'failed'; job.error = safe(error instanceof Error ? error.message : error, seed) })
       .finally(async () => { job.updated_at = new Date().toISOString(); try { await save(job) } finally { active.delete(id) } })
       .finally(() => { pending.delete(task) }).catch(() => {})
+    entry.completion = task
     pending.add(task)
     return publicJob(job)
   }
@@ -99,7 +106,7 @@ export function createDeployments(assetRoot: string, services: DeploymentService
     try {
       if (action === 'status' || action === 'cancel') {
         const { job_id } = identity.parse(payload)
-        if (action === 'cancel') active.get(job_id)?.abort()
+        if (action === 'cancel') active.get(job_id)?.controller.abort()
         const job = await load(job_id)
         return { ok: true, value: publicJob(job) }
       }
@@ -135,5 +142,5 @@ export function createDeployments(assetRoot: string, services: DeploymentService
       return new Response(Readable.toWeb(createReadStream(job.archive)) as ReadableStream, { headers: { 'content-type': 'application/gzip', 'content-disposition': `attachment; filename="${basename(job.archive).replace(/[^a-zA-Z0-9._-]/g, '_')}"`, 'content-length': String(info.size), 'cache-control': 'no-store' } })
     } catch (error) { return Response.json({ error: error instanceof Error ? error.message : '安装包下载失败' }, { status: 409, headers: { 'cache-control': 'no-store' } }) }
   }
-  return { handler, download, async dispose() { for (const controller of active.values()) controller.abort(); await Promise.allSettled([...pending]); } }
+  return { handler, download, async dispose() { for (const { controller } of active.values()) controller.abort(); await Promise.allSettled([...pending]); } }
 }

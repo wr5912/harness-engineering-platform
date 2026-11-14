@@ -34,7 +34,9 @@ for (const id of ['business:alpha', 'business:alpha@v1', 'business:alpha@release
   assert.equal(accepted.value.experiment_id, id)
   let job
   for (let attempt = 0; attempt < 100; attempt++) {
-    const status = await manager.handler('status', { job_id: accepted.value.id }, signal())
+    const statuses = await Promise.all(Array.from({ length: 12 }, () => manager.handler('status', { job_id: accepted.value.id }, signal())))
+    for (const item of statuses) assert.ok(item.ok && ['running', 'completed'].includes(item.value.state), JSON.stringify(item))
+    const status = statuses.at(-1)
     assert.equal(status.ok, true)
     job = status.value
     if (job.state !== 'running') break
