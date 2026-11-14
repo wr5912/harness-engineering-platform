@@ -638,9 +638,10 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
   async function prepareSession(repositoryId: unknown) {
     if (repositoryId !== undefined && typeof repositoryId !== 'string') throw new Error('repository_id 必须是已登记仓库 ID')
     const repository = resolveRepository(root, repositoryId)
-    const id = (await services.controller.create({ cwd: repository.workspace, agentPreset: 'standard' })).sessionId
+    const workspaceRoot = resolveRepository(root).workspace
+    const id = (await services.controller.create({ cwd: workspaceRoot, agentPreset: 'standard' })).sessionId
     const { session } = await inspect(id)
-    if (session.header.cwd !== repository.workspace) throw new Error('原生会话工作目录与目标仓库不一致')
+    if (session.header.cwd !== workspaceRoot) throw new Error('原生会话工作目录与平台绑定工作区不一致')
     await record(id, { kind: 'workspace' })
     await record(id, { kind: 'repository', repository })
     return { session_id: id, repository }
@@ -661,7 +662,8 @@ export function createAssistant(root: string, platform: ConnectionRpcHandler, se
             if (state.repository && state.repository.id !== body.repository_id) throw new Error('已有会话不能切换目标仓库，请新建任务')
             if (!state.repository) {
               const repository = resolveRepository(root, body.repository_id)
-              if (repository.workspace !== session.header.cwd && !(repository.id === 'data' && workspaceOwnsCwd(root, session.header.cwd))) throw new Error('已有会话工作目录与目标仓库不一致')
+              if (session.header.cwd !== resolveRepository(root).workspace && repository.workspace !== session.header.cwd
+                && !(repository.id === 'data' && workspaceOwnsCwd(root, session.header.cwd))) throw new Error('已有会话工作目录与平台工作区不一致')
               await record(id, { kind: 'repository', repository })
             }
           }

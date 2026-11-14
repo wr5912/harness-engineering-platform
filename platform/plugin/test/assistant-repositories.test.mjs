@@ -110,10 +110,12 @@ test('目标仓库预备会话只创建不投递，续接固定来源且冷恢�
   assert.equal(sessions.get(defaultSession.value.session_id).header.cwd, f.manager)
   const dataSession = await call('prepare-session', { repository_id: 'data' })
   assert.equal(dataSession.ok, true)
-  assert.equal(sessions.get(dataSession.value.session_id).header.cwd, f.root)
+  assert.equal(sessions.get(dataSession.value.session_id).header.cwd, f.manager)
+  assert.equal(dataSession.value.repository.workspace, f.root, '业务目标保留真实仓库路径，不注册为原生工作区')
   const prepared = await call('prepare-session', { repository_id: 'business-agents' })
   assert.equal(prepared.ok, true, JSON.stringify(prepared)); const id = prepared.value.session_id
-  assert.equal(sessions.get(id).header.cwd, f.repository); assert.equal(prompts.length, 0)
+  assert.equal(sessions.get(id).header.cwd, f.manager); assert.equal(prompts.length, 0)
+  assert.equal(prepared.value.repository.workspace, f.repository)
   const status = await call('status', { session_id: id })
   assert.equal(status.ok, true, JSON.stringify(status)); assert.deepEqual(status.value.business_workspace.allowed_repository_ids, ['data', 'business-agents'])
   assert.deepEqual(status.value.business_workspace.excluded_repository_ids, ['harness-engineering-platform', 'platform-manager-dsh-home'])
@@ -138,30 +140,58 @@ test('目标仓库预备会话只创建不投递，续接固定来源且冷恢�
   assert.equal((await call('status', { session_id: 'legacy-session' })).value.repository.id, 'data')
 })
 
-test('原生工作区只接受已登记根，保留目标cwd并撤销其他登记，卸载恢复原生接口', async t => {
-  const f = fixture(t), rows = [], creates = []; let dispose
+test('原生工作区只绑定 manager，清除其他登记且仅保护绑定工作区的删除', async t => {
+  const f = fixture(t), creates = [], deleted = [], requests = []; let dispose
+  const legacyData = { id: 'ws-data', path: f.root, sessionIds: ['legacy-data-session'] }
+  const legacyBusiness = { id: 'ws-business', path: f.repository, sessionIds: ['legacy-business-session'] }
+  const unrelated = join(f.lab, 'unrelated-workspace'); mkdirSync(unrelated)
+  writeFileSync(join(unrelated, 'history.txt'), '保留其他目录和历史会话')
+  const legacyOther = { id: 'ws-other', path: unrelated, sessionIds: ['legacy-other-session'] }
+  const rows = [legacyData, legacyBusiness, legacyOther]
   const registry = {
-    async create(path) { let row = rows.find(item => item.path === path); if (!row) { row = { id: `ws-${rows.length}`, path, sessionIds: [] }; rows.push(row) }; return row },
-    list: () => rows, async delete(id) { rows.splice(rows.findIndex(item => item.id === id), 1); return true },
+    async create(path) { let row = rows.find(item => item.path === path); if (!row) { row = { id: 'ws-manager', path, sessionIds: [] }; rows.push(row) }; return row },
+    list: () => rows, async delete(id) { const index = rows.findIndex(item => item.id === id); if (index < 0) return false; deleted.push(id); rows.splice(index, 1); return true },
   }
   const native = async request => { creates.push(request); return { sessionId: 'native-session' } }
-  const services = { workspaceRegistry: registry, workspaceController: { delete() {} }, sessionController: { create: native } }
+  const nativeDelete = async function (request) {
+    assert.equal(this, services.workspaceController)
+    requests.push(request)
+    if (!await registry.delete(request.workspaceId)) throw new Error('workspace/not-found')
+    return { deleted: true }
+  }
+  const services = { workspaceRegistry: registry, workspaceController: { delete: nativeDelete }, sessionController: { create: native } }
   await bindConversationWorkspace({ get: name => services[name], effect: callback => { dispose = callback() } }, f.root)
-  const target = rows.find(item => item.path === f.repository)
-  assert.ok(target)
-  assert.equal(rows[0].path, f.manager)
+  assert.deepEqual(rows.map(item => item.path), [f.manager])
+  assert.deepEqual(deleted, ['ws-data', 'ws-business', 'ws-other'], '清理时不因原生数组原地删除而遗漏登记')
+  const manager = rows[0]
   await services.sessionController.create({ agentPreset: 'standard' })
-  assert.equal(creates.at(-1).workspaceId, rows[0].id)
-  await services.sessionController.create({ cwd: f.repository, agentPreset: 'standard' })
-  assert.equal(creates.at(-1).workspaceId, target.id)
+  assert.equal(creates.at(-1).workspaceId, manager.id)
+  await services.sessionController.create({ cwd: f.manager, agentPreset: 'standard' })
+  assert.equal(creates.at(-1).workspaceId, manager.id)
   assert.equal(creates.at(-1).cwd, undefined)
-  await assert.rejects(registry.create(tmpdir()), /不能添加其他工作区/)
-  await assert.rejects(services.sessionController.create({ cwd: tmpdir() }), /不能添加其他工作区/)
+  for (const path of [f.root, f.repository, unrelated, tmpdir()]) {
+    await assert.rejects(registry.create(path), /不能添加其他工作区/)
+    await assert.rejects(services.sessionController.create({ cwd: path }), /不能添加其他工作区/)
+  }
   for (const name of ['harness-engineering-platform', 'platform-manager-dsh-home']) {
     const path = join(f.lab, name); mkdirSync(path)
     await assert.rejects(registry.create(path), /不能添加其他工作区/)
   }
-  dispose(); assert.equal(services.sessionController.create, native)
+  await assert.rejects(services.workspaceController.delete({ workspaceId: manager.id }), /manager-workspace 不能移除/)
+  assert.deepEqual(requests, [], '保护绑定工作区时不触发原生删除')
+  rows.push(legacyOther)
+  const request = { workspaceId: legacyOther.id }
+  assert.deepEqual(await services.workspaceController.delete(request), { deleted: true })
+  assert.equal(requests.at(-1), request, '其他工作区删除沿用原生请求和回执')
+  await assert.rejects(services.workspaceController.delete({ workspaceId: 'missing' }), /workspace\/not-found/)
+  assert.deepEqual(rows.map(item => item.path), [f.manager])
+  assert.deepEqual(legacyData.sessionIds, ['legacy-data-session'])
+  assert.deepEqual(legacyBusiness.sessionIds, ['legacy-business-session'])
+  assert.deepEqual(legacyOther.sessionIds, ['legacy-other-session'])
+  assert.equal(readFileSync(join(unrelated, 'history.txt'), 'utf8'), '保留其他目录和历史会话')
+  dispose()
+  assert.equal(services.sessionController.create, native)
+  assert.equal(services.workspaceController.delete, nativeDelete)
   assert.equal(readFileSync(join(f.repository, 'AGENTS.md'), 'utf8'), '业务仓库项目规则。')
 })
 

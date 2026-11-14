@@ -39,7 +39,7 @@ interface AssistantSnapshot {
 }
 
 /** 浏览器只保留当前会话引用，任务与业务结果由原生 Session 和后端维护。 */
-export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'uiWorkspace' | 'workspaces'>, rpc: ClientConnectionRpc, getRoot: () => string | undefined, getLegacyRoots: () => string[] = () => []) {
+export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'uiWorkspace'>, rpc: ClientConnectionRpc, getRoot: () => string | undefined, getLegacyRoots: () => string[] = () => []) {
   let snapshot: AssistantSnapshot = { busy: false, error: '', repositories: [], repositoryId: 'data' }
   let storage: Storage | undefined
   let storageUnavailable = false
@@ -249,18 +249,14 @@ export function createAssistant(ctx: Pick<Context, 'sessions' | 'uiSession' | 'u
         const sessionIdToResume = submission?.sessionId ?? (typeof taskContext.session_id === 'string' ? taskContext.session_id : undefined)
         const root = getRoot()
         if (!root) throw new Error('项目工作区尚未就绪，请稍后重试。')
-        // 目标仓库由服务端登记解析；预备阶段只建空会话，投递前仍持久保存原提交身份。
+        // 服务端统一准备管理工作区的空会话，目标仓库只记录业务来源；投递前保存原提交身份。
         let preparedSessionId = sessionIdToResume as SessionId | undefined
-        if (!preparedSessionId && snapshot.repositoryId !== 'data') {
+        if (!preparedSessionId) {
           const prepared = await rpc.call(CHANNEL, 'assistant/prepare-session', { repository_id: snapshot.repositoryId })
           if (!prepared.ok) throw new Error(prepared.error.message)
           preparedSessionId = (prepared.value as { session_id: SessionId }).session_id
           if (!preparedSessionId) throw new Error('目标仓库未返回会话标识')
           await ctx.sessions.refresh()
-        }
-        if (!preparedSessionId) {
-          const workspace = await ctx.workspaces.create({ path: root })
-          preparedSessionId = await ctx.sessions.create({ workspaceId: workspace.workspaceId })
         }
         if (!submission) {
           submission = { root, sessionId: preparedSessionId, requestId: submissionRequestId(), ...(task !== undefined ? { task } : {}), context: structuredClone(taskContext) }

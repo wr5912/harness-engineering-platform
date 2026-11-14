@@ -456,7 +456,8 @@ export function apply(ctx: ClientContext) {
   const catalog = createCatalog(ctx.connection.rpc, updates)
   // 首次读取不依赖事件流首帧；连接池或通知通道异常时页面仍会发起资产查询。
   ctx.effect(() => { void catalog.refresh(); return () => catalog.dispose() })
-  const assistant = createAssistant(ctx, ctx.connection.rpc, () => catalog.getSnapshot().inventory?.root, () => catalog.getSnapshot().inventory?.workspace?.legacyRoots ?? [])
+  const assistant = createAssistant(ctx, ctx.connection.rpc, () => catalog.getSnapshot().inventory?.root,
+    () => catalog.getSnapshot().inventory?.workspace?.managementRoots ?? catalog.getSnapshot().inventory?.workspace?.legacyRoots ?? [])
   ctx.effect(() => () => assistant.dispose())
   ctx.effect(() => updates.subscribe(() => { if (updates.getSnapshot().domains.includes('assistant')) void assistant.refresh() }))
   ctx.on('connection/reset', () => { void catalog.refresh(); void assistant.reconnect() })

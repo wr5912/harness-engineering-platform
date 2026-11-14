@@ -16,16 +16,16 @@ function fixture(call, selection, rows = {}, config = {}) {
   const opened = []
   const references = []
   const nativeCreates = []
+  const workspaceCreates = []
+  const preparedSessions = []
+  const preparedRows = {}
   const selectionListeners = new Set()
   const assistant = createAssistant({
     uiSession: { adapter: { current: { getSnapshot: () => ({ key: selection }), subscribe: listener => { selectionListeners.add(listener); return () => selectionListeners.delete(listener) } } } },
-    workspaces: { create: async request => { assert.deepEqual(request, { path: '/repo' }); return { workspaceId: 'project' } } },
-    sessions: { list: { getSnapshot: () => ({ byId: rows }), subscribe: () => () => {} }, async refresh() { Object.assign(rows, config.refreshedRows) }, async create(request) {
+    workspaces: { create: async request => { workspaceCreates.push(request); throw new Error('助手不能在客户端注册原生工作区') } },
+    sessions: { list: { getSnapshot: () => ({ byId: rows }), subscribe: () => () => {} }, async refresh() { Object.assign(rows, preparedRows, config.refreshedRows) }, async create(request) {
       nativeCreates.push(request)
-      await config.beforeCreate?.(request)
-      const id = request.sessionId ?? config.sessionIds?.[nativeCreates.length - 1] ?? `session-${nativeCreates.length}`
-      rows[id] = { cwd: request.cwd ?? '/repo' }
-      return id
+      throw new Error('助手应由服务端准备原生 Session')
     }, retain(id, options) {
       if (!rows[id]) throw new Error(`sessions.retain: unknown session ${id}`)
       retained.push([id, options.source])
@@ -39,8 +39,19 @@ function fixture(call, selection, rows = {}, config = {}) {
       finally { reference.release() }
     } },
     uiWorkspace: { openSession: id => opened.push(id) },
-  }, { call: (channel, endpoint, body) => endpoint === 'assistant/configuration' ? Promise.resolve(config.configuration ?? { ok: true, value: { ready: true } }) : call(channel, endpoint, body) }, () => '/repo', () => config.legacyRoots ?? [])
-  return { assistant, retained, opened, references, nativeCreates, setSelection(id) { selection = id; selectionListeners.forEach(listener => listener()) } }
+  }, { async call(channel, endpoint, body) {
+    if (endpoint === 'assistant/configuration') return config.configuration ?? { ok: true, value: { ready: true } }
+    if (endpoint === 'assistant/prepare-session') {
+      preparedSessions.push(body)
+      if (config.prepareSession) return config.prepareSession(body)
+      await config.beforePrepare?.(body)
+      const id = config.sessionIds?.[preparedSessions.length - 1] ?? `session-${preparedSessions.length}`
+      preparedRows[id] = { cwd: config.managerRoot ?? '/repo' }
+      return { ok: true, value: { session_id: id } }
+    }
+    return call(channel, endpoint, body)
+  } }, () => '/repo', () => config.managementRoots ?? config.legacyRoots ?? [])
+  return { assistant, retained, opened, references, nativeCreates, workspaceCreates, preparedSessions, setSelection(id) { selection = id; selectionListeners.forEach(listener => listener()) } }
 }
 
 test('每个新任务使用独立 Session；融合确认可以续接原任务，切换后释放旧引用', async () => {
@@ -51,7 +62,9 @@ test('每个新任务使用独立 Session；融合确认可以续接原任务，
   })
   await f.assistant.create('检查版本', { page: 'agents', experiment_id: 'EXP-a' })
   await f.assistant.create('检查实例', { page: 'instances', instance_name: 'one' })
-  assert.deepEqual(f.nativeCreates[0], { workspaceId: 'project' })
+  assert.deepEqual(f.preparedSessions, [{ repository_id: 'data' }, { repository_id: 'data' }])
+  assert.deepEqual(f.workspaceCreates, [])
+  assert.deepEqual(f.nativeCreates, [])
   assert.equal(calls[0][2].session_id, 'session-1')
   assert.equal(f.assistant.getSnapshot().sessionId, 'session-2')
   assert.equal(f.references[1].released, 1)
@@ -59,7 +72,8 @@ test('每个新任务使用独立 Session；融合确认可以续接原任务，
   assert.equal(f.assistant.getSnapshot().sessionId, 'session-1')
   assert.deepEqual(f.opened, ['session-1', 'session-2', 'session-1'])
   assert.equal(calls.filter(([, endpoint]) => endpoint === 'assistant/session')[2][2].session_id, 'session-1')
-  assert.equal(f.nativeCreates.length, 2, '续接不另建会话')
+  assert.equal(f.preparedSessions.length, 2, '续接不另建会话')
+  assert.equal(f.nativeCreates.length, 0)
   assert.equal(calls.some(([channel]) => channel !== '/harness-platform'), false)
   f.assistant.dispose()
   assert.ok(f.references.every(item => item.released === 1))
@@ -180,13 +194,13 @@ test('列表通知未到时先完成原生登记与绑定，再向同一Session�
   const createStarted = new Promise(resolve => { startedCreate = resolve })
   const openStarted = new Promise(resolve => { startedOpen = resolve })
   const calls = []
-  // fixture 刻意不发 Session list 通知；create 返回前按原生合同登记身份。
+  // fixture 刻意不发 Session list 通知；服务端预备返回后由 refresh 按原生合同装载身份。
   const f = fixture(async (_channel, endpoint, body) => {
     calls.push([endpoint, body])
     return { ok: true, value: endpoint === 'assistant/session' ? { session_id: body.session_id } : { proposals: [] } }
   }, undefined, {}, {
     sessionIds: ['session-race'],
-    beforeCreate() { startedCreate(); return registration },
+    beforePrepare() { startedCreate(); return registration },
     ready() { startedOpen(); return opening },
   })
   const creating = f.assistant.create('你好', { page: 'home' })
@@ -202,7 +216,9 @@ test('列表通知未到时先完成原生登记与绑定，再向同一Session�
   assert.deepEqual(calls.filter(([endpoint]) => endpoint === 'assistant/session'), [
     ['assistant/session', { task: '你好', context: { page: 'home' }, session_id: 'session-race', request_id: calls.find(([endpoint]) => endpoint === 'assistant/session')[1].request_id }],
   ])
-  assert.deepEqual(f.nativeCreates, [{ workspaceId: 'project' }])
+  assert.deepEqual(f.preparedSessions, [{ repository_id: 'data' }])
+  assert.deepEqual(f.nativeCreates, [])
+  assert.deepEqual(f.workspaceCreates, [])
   assert.equal(f.assistant.getSnapshot().sessionId, 'session-race')
   assert.equal(f.assistant.getSnapshot().error, '')
   assert.equal(f.assistant.getSnapshot().busy, false)
@@ -300,7 +316,8 @@ test('可选业务配置缺失不阻断原生新建和既有会话', async () =>
   const f = fixture(async (_channel, endpoint, body) => ({ ok: true, value: endpoint === 'assistant/session' ? { session_id: body.session_id } : { proposals: [] } }), 'existing', { existing: { cwd: '/repo' } }, { configuration: { ok: true, value: { ready: false, message: '当前工作区未配置平台管理助手，请连接或克隆已有数据仓库。' } } })
   await f.assistant.select('existing', false)
   await f.assistant.create('新任务')
-  assert.equal(f.nativeCreates.length, 1)
+  assert.equal(f.preparedSessions.length, 1)
+  assert.equal(f.nativeCreates.length, 0)
   assert.equal(f.assistant.getSnapshot().sessionId, 'session-1')
   assert.equal(f.assistant.getSnapshot().error, '')
   f.assistant.dispose()
@@ -352,7 +369,8 @@ test('受理回执丢失后读取原提交，确认已受理不另建会话或�
     return { ok: true, value: { proposals: [], ...(body.request_id ? { submission: { request_id: body.request_id, state: accepted.has(body.request_id) ? 'accepted' : 'not_received' } } : {}) } }
   }))
   await f.assistant.create('迁移既有工程', { page: 'agents', workflow: 'migration' })
-  assert.equal(f.nativeCreates.length, 1)
+  assert.equal(f.preparedSessions.length, 1)
+  assert.equal(f.nativeCreates.length, 0)
   assert.equal(calls.filter(x => x.endpoint === 'assistant/session').length, 1)
   assert.equal(f.assistant.getSnapshot().sessionId, 'session-1')
   assert.equal(f.assistant.getSnapshot().pendingSubmission, undefined)
@@ -376,7 +394,8 @@ test('受理前断连和整页重挂沿用原会话及请求；恢复不抢占�
   const first = withSubmissionStorage(storage, () => fixture(call, undefined, rows))
   const context = { page: 'home' }
   await assert.rejects(first.assistant.create('核对版本', context), /网络断开/)
-  assert.equal(first.nativeCreates.length, 1)
+  assert.equal(first.preparedSessions.length, 1)
+  assert.equal(first.nativeCreates.length, 0)
   const original = submissions[0]
   assert.ok(first.assistant.getSnapshot().pendingSubmission)
   first.assistant.dispose()
@@ -386,6 +405,7 @@ test('受理前断连和整页重挂沿用原会话及请求；恢复不抢占�
   await assert.rejects(restored.assistant.create('另一个任务', context), /上一项任务/)
   online = true
   await restored.assistant.retrySubmission()
+  assert.equal(restored.preparedSessions.length, 0)
   assert.equal(restored.nativeCreates.length, 0)
   assert.equal(submissions.length, 2)
   assert.equal(submissions[1].session_id, original.session_id)
@@ -413,7 +433,8 @@ test('浏览器无法保存恢复身份时不投递，原生会话仍可定位',
   const storage = { getItem: () => null, setItem() { throw new Error('storage blocked') } }
   const f = withSubmissionStorage(storage, () => fixture(async (_channel, endpoint) => { calls.push(endpoint); return { ok: true, value: {} } }))
   await assert.rejects(f.assistant.create('核对任务'), /无法保存任务恢复信息/)
-  assert.equal(f.nativeCreates.length, 1)
+  assert.equal(f.preparedSessions.length, 1)
+  assert.equal(f.nativeCreates.length, 0)
   assert.equal(calls.includes('assistant/session'), false)
   f.assistant.dispose()
 })
@@ -438,7 +459,8 @@ test('明确新建才清理原提交恢复身份，保留原生会话；旧组�
   assert.equal(JSON.parse([...storage.values.values()][0]).requestId, pending[1].body.request_id)
   assert.ok(rows[pending[0].body.session_id])
   pending[1].resolve({ ok: true, value: { session_id: pending[1].body.session_id } }); await fresh
-  assert.equal(next.nativeCreates.length, 1)
+  assert.equal(next.preparedSessions.length, 1)
+  assert.equal(next.nativeCreates.length, 0)
   assert.equal(next.assistant.getSnapshot().sessionId, 'session-explicit-new')
   next.assistant.dispose()
 })
@@ -454,32 +476,84 @@ test('受理回执迟到时页面已切到其他对象，不自动打开原Sessi
   f.assistant.updateContext({ page: 'instances', instance_name: 'other' })
   release(); await task
   assert.deepEqual(f.opened, [])
-  assert.equal(f.nativeCreates.length, 1)
+  assert.equal(f.preparedSessions.length, 1)
+  assert.equal(f.nativeCreates.length, 0)
   assert.equal(f.assistant.getSnapshot().pendingSubmission, undefined)
   f.assistant.dispose()
 })
 
-test('目标仓库只影响新任务，预备会话后保留受理身份并恢复原固定目录', async () => {
-  const calls = [], target = { id: 'business-agents', workspace: '/business', commit: 'a'.repeat(40), available: true }
+test('业务目标保留仓库身份，新任务始终使用管理工作区且不注册子仓', async () => {
+  const managerRoot = '/manager-workspace'
+  const calls = [], target = { id: 'business-agents', workspace: `${managerRoot}/business-agents`, commit: 'a'.repeat(40), available: true }
   const rows = {}
   const f = fixture(async (_channel, endpoint, body) => {
     calls.push({ endpoint, body })
     if (endpoint === 'assistant/repositories') return { ok: true, value: { repositories: [{ id: 'data', workspace: '/repo', available: true }, target] } }
-    if (endpoint === 'assistant/prepare-session') { assert.equal(body.repository_id, target.id); rows.external = { cwd: '/business' }; return { ok: true, value: { session_id: 'external', repository: target } } }
     if (endpoint === 'assistant/session') return { ok: true, value: { session_id: body.session_id } }
     return { ok: true, value: { proposals: [], repository: target } }
-  }, undefined, rows)
+  }, undefined, rows, {
+    managementRoots: [managerRoot, '/repo', target.workspace],
+    prepareSession(body) {
+      assert.equal(body.repository_id, target.id)
+      rows.external = { cwd: managerRoot }
+      return { ok: true, value: { session_id: 'external', repository: target } }
+    },
+  })
   await f.assistant.refreshRepositories()
   f.assistant.selectRepository('business-agents')
   await f.assistant.create('读取项目规则')
-  assert.equal(f.nativeCreates.length, 0)
+  assert.deepEqual(f.preparedSessions, [{ repository_id: 'business-agents' }])
+  assert.deepEqual(f.workspaceCreates, [])
+  assert.deepEqual(f.nativeCreates, [])
+  assert.equal(rows.external.cwd, managerRoot)
   assert.equal(f.assistant.getSnapshot().sessionId, 'external')
   assert.equal(calls.filter(item => item.endpoint === 'assistant/session').length, 1)
   f.assistant.selectRepository('data')
-  assert.equal(f.assistant.getSnapshot().status.repository.workspace, '/business', '切换下个任务目录不能重绑已有会话')
+  assert.equal(f.assistant.getSnapshot().status.repository.workspace, target.workspace, '切换下个任务目标不能重绑已有会话')
   f.setSelection('external')
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(f.assistant.getSnapshot().platformContext, true)
   assert.throws(() => f.assistant.selectRepository('unregistered'), /不可用/)
+  f.assistant.dispose()
+})
+
+test('默认数据任务使用管理工作区，仓库列表不可用时仍能跟随原生会话', async () => {
+  const managerRoot = '/manager-workspace'
+  const calls = []
+  const f = fixture(async (_channel, endpoint, body) => {
+    calls.push({ endpoint, body })
+    if (endpoint === 'assistant/repositories') throw new Error('repositories offline')
+    return { ok: true, value: endpoint === 'assistant/session' ? { session_id: body.session_id } : { proposals: [] } }
+  }, undefined, {}, { managerRoot, managementRoots: [managerRoot, '/repo'] })
+  await f.assistant.create('检查业务登记')
+  assert.deepEqual(f.preparedSessions, [{ repository_id: 'data' }])
+  assert.deepEqual(f.workspaceCreates, [])
+  assert.deepEqual(f.nativeCreates, [])
+  f.setSelection('session-1')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.assistant.getSnapshot().platformContext, true, '仓库列表尚未加载仍认识服务端登记的管理根')
+  await f.assistant.refreshRepositories()
+  assert.match(f.assistant.getSnapshot().repositoriesError, /repositories offline/)
+  f.setSelection(undefined)
+  f.setSelection('session-1')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.assistant.getSnapshot().platformContext, true)
+  assert.equal(calls.filter(item => item.endpoint === 'assistant/session').length, 1, '恢复不会重复投递')
+  assert.equal(f.preparedSessions.length, 1, '恢复不会重复预备会话')
+  assert.equal(calls.some(item => item.endpoint === 'assistant/status'), true)
+  f.assistant.dispose()
+})
+
+test('服务端预备失败直接显示错误，不在浏览器创建工作区或会话', async () => {
+  const calls = []
+  const f = fixture(async (_channel, endpoint) => { calls.push(endpoint); return { ok: true, value: { proposals: [] } } }, undefined, {}, {
+    prepareSession: () => ({ ok: false, error: { message: '管理工作区不可用' } }),
+  })
+  await assert.rejects(f.assistant.create('检查业务登记'), /管理工作区不可用/)
+  assert.deepEqual(f.preparedSessions, [{ repository_id: 'data' }])
+  assert.deepEqual(f.workspaceCreates, [])
+  assert.deepEqual(f.nativeCreates, [])
+  assert.equal(calls.includes('assistant/session'), false)
+  assert.equal(f.assistant.getSnapshot().busy, false)
   f.assistant.dispose()
 })
