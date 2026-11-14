@@ -28,7 +28,7 @@ export function createDeploymentSeed(assetRoot: string, modelProjection: ModelPr
       Object.assign(environment, projected.environment)
     } catch {
       signal.throwIfAborted()
-      notices.push('当前模型连接未能完整导出，可在目标环境通过 agent configure 配置；本地业务 Provider 仍保留。')
+      notices.push('当前模型连接未能完整导出，可在目标环境通过 ./standalone_agent_launcher configure 配置；本地业务 Provider 仍保留。')
     }
     const mcp = harnessMcpConnections(join(candidate, 'managed'), source.patch)
     if (platformGroupUrl) mcp.servers = mcp.servers.map(server => bindPlatformGroupConnection(server, platformGroupUrl) ?? server)

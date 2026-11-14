@@ -110,7 +110,7 @@ function usage(): string {
   return `用法：
   dsh-deploy agent-runtime-update --prefix <安装目录> [--program-root <目录>]
   dsh-deploy agent-refresh-linked --prefix <旧版软链接实例目录> [--program-root <目录>] [--dependency-projection <旧依赖投影目录>]
-    从已链接的原生 Harness 刷新投影和挂载来源，保留配置、HOME、镜像和链接源；随后用 agent restart 生效。
+    从已链接的原生 Harness 刷新投影和挂载来源，保留配置、HOME、镜像和链接源；随后用 ./standalone_agent_launcher restart 生效。
 
   dsh-deploy agent-cleanup --prefix <独立智能体安装目录>
     移除该安装的容器、网络和安装介质，保留标准镜像、Harness、HOME 和会话。
@@ -161,7 +161,7 @@ function usage(): string {
     --out <目录>                agent-pack 输出目录
     --seed-file <*.llm-api-key> agent-pack 连接与凭据种子；不传时保留原生资产配置和工作区环境
     --expected-candidate-sha256 <摘要>  agent-pack 核对先前预览的实际资产
-    --prefix <目录>             agent-preview 刷新已有独立预览的运行器；保留资产、配置、会话和镜像，随后用 agent restart 生效
+    --prefix <目录>             agent-preview 刷新已有独立预览的运行器；保留资产、配置、会话和镜像，随后用 ./standalone_agent_launcher restart 生效
     --update-assets             与 --prefix 合用，改为更新同版本 Harness 资产及投影；现场冲突停止，保留备份、连接、HOME 和镜像
     --image-archive <tar>       agent-prepare 导入该架构标准镜像
 
@@ -341,7 +341,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
           const projected = await project({ agent_id: input.agentId, experiment_id: input.experimentId }, controller.signal)
           seed = projected.seed
           for (const notice of projected.notices) console.error(`agent-pack: ${notice}`)
-          console.error('agent-pack: 已收集当前业务 MCP 配置；自定义模型连接可通过 --seed-file 携带，或安装后使用 agent configure 重新配置。')
+          console.error('agent-pack: 已收集当前业务 MCP 配置；自定义模型连接可通过 --seed-file 携带，或安装后使用 ./standalone_agent_launcher configure 重新配置。')
         }
         const { packAgent } = await import('./agent/pack.mts')
         const result = await packAgent({ ...input, seed }, hooks)
