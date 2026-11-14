@@ -55,6 +55,21 @@ test('按真实 Git identity 解析目标，dirty 不伪装为提交来源，坏
   assert.throws(() => resolveRepository(f.root, 'business-agents'), /相对路径/)
 })
 
+test('HTTP GitLab 主源与 GitHub 镜像并存时，按登记地址解析而不依赖 origin 名称', t => {
+  const f = fixture(t)
+  f.git('remote', 'rename', 'origin', 'github')
+  f.entry.url = 'http://gitlab.example.invalid/ai-soc/business-agents.git'
+  f.git('remote', 'add', 'gitlab', f.entry.url); f.save()
+  assert.equal(resolveRepository(f.root, 'business-agents').url, f.entry.url)
+  assert.equal(listRepositories(f.root).repositories.find(item => item.id === 'business-agents').available, true)
+  f.git('remote', 'remove', 'gitlab')
+  assert.throws(() => resolveRepository(f.root, 'business-agents'), /远端与登记不一致/)
+  for (const url of ['http://user@gitlab.example.invalid/repo.git', 'http://gitlab.example.invalid/repo.git?token=private-value']) {
+    f.entry.url = url; f.save()
+    assert.throws(() => listRepositories(f.root), /不能携带凭据或查询参数/)
+  }
+})
+
 test('业务工作区只暴露 data 与 business-agents，程序仓和管理 HOME 保持运行时角色', t => {
   const f = fixture(t), scope = assistantWorkspaceScope(f.root)
   assert.deepEqual(scope.allowed_repository_ids, ['data', 'business-agents'])

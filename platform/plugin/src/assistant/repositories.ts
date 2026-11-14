@@ -44,7 +44,7 @@ function declarations(root: string): Declaration[] {
     if (item.url.includes('://')) {
       let url: URL
       try { url = new URL(item.url) } catch { throw new Error('仓库地址无效') }
-      if (!['https:', 'ssh:', 'file:'].includes(url.protocol) || url.password || url.search || url.hash || url.protocol === 'https:' && url.username) throw new Error('仓库地址不能携带凭据或查询参数')
+      if (!['http:', 'https:', 'ssh:', 'file:'].includes(url.protocol) || url.password || url.search || url.hash || ['http:', 'https:'].includes(url.protocol) && url.username) throw new Error('仓库地址不能携带凭据或查询参数')
     }
     if (item.agent_path !== undefined && (typeof item.agent_path !== 'string' || !item.agent_path || isAbsolute(item.agent_path) || item.agent_path.split(/[\\/]/).some((part: string) => !part || part === '.' || part === '..'))) throw new Error('agent_path 必须是仓库内相对路径')
     ids.add(item.id)
@@ -75,7 +75,8 @@ export function resolveRepository(root: string, requestedId?: string): Repositor
   try { workspace = realpathSync(path) } catch { throw new Error('目标仓库目录不存在') }
   if (inside(data, workspace) || inside(workspace, data)) throw new Error('目标仓库必须与数据仓库独立')
   if (realpathSync(git(workspace, ['rev-parse', '--show-toplevel'])) !== workspace) throw new Error('目标必须是 Git 工作树根目录')
-  if (git(workspace, ['remote', 'get-url', 'origin']) !== entry.url) throw new Error('目标仓库 origin 与登记不一致')
+  const remotes = git(workspace, ['remote']).split('\n').filter(Boolean)
+  if (!remotes.some(remote => git(workspace, ['remote', 'get-url', remote]) === entry.url)) throw new Error('目标仓库远端与登记不一致')
   const commit = git(workspace, ['rev-parse', 'HEAD'])
   if (commit !== entry.commit || git(workspace, ['rev-parse', '--verify', `${entry.ref}^{commit}`]) !== commit) throw new Error('目标仓库 HEAD、ref 与锁定提交不一致')
   if (entry.agent_path && !inside(workspace, realpathSync(join(workspace, entry.agent_path)))) throw new Error('agent_path 超出目标仓库')

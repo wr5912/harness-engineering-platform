@@ -99,9 +99,9 @@ function repositoryUrl(value?: string) {
   if (/^[a-z][a-z0-9-]*@[a-zA-Z0-9.-]+:[a-zA-Z0-9_./-]+$/.test(url)) return url
   try {
     const parsed = new URL(url)
-    if (['https:', 'ssh:'].includes(parsed.protocol) && !parsed.password && !parsed.search && !parsed.hash && (!parsed.username || parsed.protocol === 'ssh:' && parsed.username === 'git')) return url
+    if (['http:', 'https:', 'ssh:'].includes(parsed.protocol) && !parsed.password && !parsed.search && !parsed.hash && (!parsed.username || parsed.protocol === 'ssh:' && parsed.username === 'git')) return url
   } catch { /* 返回统一错误，不回显可能包含凭据的输入。 */ }
-  throw new Error('仓库地址须为 SSH、无凭据的 HTTPS 地址或本地 Git 绝对目录；请通过已有 Git 认证访问私有仓库')
+  throw new Error('仓库地址须为 SSH、无凭据的 HTTP(S) 地址或本地 Git 绝对目录；请通过已有 Git 认证访问私有仓库')
 }
 
 function missingIgnoreRules(root: string) {

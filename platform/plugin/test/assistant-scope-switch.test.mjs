@@ -18,7 +18,7 @@ import * as plugin from '../lib/index.js'
 
 const require = createRequire(import.meta.url)
 const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh-api-session-controller'))
-const [{ ToolRuntime }, { ToolExecutionPipeline, executeToolBatch }, { createScope }, { createUserMessage }, { SkillRegistry }, { FileSystemSkillProvider }, { SessionQueryEngine }] = await Promise.all([
+const [{ ToolRuntime }, { ToolExecutionPipeline, executeToolBatch }, { createScope }, { createUserMessage }, { SkillRegistry }, { FileSystemSkillProvider }, { SessionQueryEngine }, { WorkingDirectoryService }] = await Promise.all([
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-tools')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-tools/pipeline')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-scope')).href),
@@ -26,6 +26,7 @@ const [{ ToolRuntime }, { ToolExecutionPipeline, executeToolBatch }, { createSco
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-skill')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-skill-filesystem')).href),
   import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-session-query')).href),
+  import(pathToFileURL(sdkRequire.resolve('@deepseek-ai/dsh-working-directory')).href),
 ])
 
 // 精确历史读取复用原生 QueryEngine 和真实 SessionStore；此项不验证全文检索后端。
@@ -116,6 +117,7 @@ test('真实HTTP管理任务切换保留全部原生工具、Skill和权限决�
     inner.provide('agentDefaultModel', {})
     inner.provide('attachments', { fileHostPath: () => undefined, async *readFileStream() { throw new Error('此作用域测试未上传附件') } })
     new LocalFileSystem(inner, { cwd: assetRoot, diffBasisMaxBytes: 1024 * 1024 })
+    new WorkingDirectoryService(inner, { defaultDirectory: assetRoot })
     inner.provide('llm', { listConfigurableProviders: () => [] })
     inner.provide('agents', { get: id => agents.get(id) })
     inner.provide('goals', { get: () => undefined })

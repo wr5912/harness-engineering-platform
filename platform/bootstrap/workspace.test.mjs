@@ -104,6 +104,14 @@ test('克隆本地Git历史并保留来源，失败不留下半成品或覆盖�
   await assert.rejects(() => previewWorkspace({ action: 'clone', root: failed, repositoryUrl: 'https://user:private-value@example.invalid/repo' }), error => !error.message.includes('private-value'))
 })
 
+test('克隆预览支持 HTTP GitLab 地址并沿用已有 Git 认证', async t => {
+  const f = fixture(t)
+  const plan = await previewWorkspace({ action: 'clone', root: f.root, repositoryUrl: 'http://gitlab.example.invalid/ai-soc/data.git' })
+  assert.equal(plan.canApply, true)
+  assert.equal(existsSync(f.root), false)
+  await assert.rejects(() => previewWorkspace({ action: 'clone', root: f.root, repositoryUrl: 'http://user:private-value@gitlab.example.invalid/data.git' }), error => /仓库地址/.test(error.message) && !error.message.includes('private-value'))
+})
+
 test('初始化HTTP要求一次性入口和同源写，prepare失败可重试且成功交接实际根', async t => {
   const f = fixture(t), home = join(f.directory, 'home'), oldHome = process.env.HOME
   process.env.HOME = home
