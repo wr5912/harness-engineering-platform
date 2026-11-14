@@ -1061,6 +1061,9 @@ def start(home, host, port, dry_run, public_url=None, applied=False):
     if applied:
         # 故障恢复使用已应用的 Profile，不重新解析尚在编辑的扩展源码。
         check_artifacts(applied=True)
+        if repository_home(home):
+            check_repository_profile(profile)
+            check_profile_dependencies(profile)
         bundle = profile / "node_modules/@ai-agent-harness/harness-platform"
         if not bundle.is_symlink() or bundle.resolve() != PLUGIN:
             raise PlatformError("已应用 Profile 的平台链接不属于当前程序目录。")

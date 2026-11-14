@@ -294,10 +294,12 @@ if sys.argv[1:] == ["run", "build"]:
             (self.plugin / "lib" / name).write_text("export {}\n", encoding="utf-8")
         (self.web / "lib").mkdir(parents=True)
         (self.web / "lib/platform-webserver.mjs").write_text("export {}\n", encoding="utf-8")
-        result = self.run_cli("start", "--dry-run", "--port", str(self.free_port()))
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("缺少 Profile 依赖锁", result.stderr)
-        self.assertNotIn("Traceback", result.stderr)
+        for extra in ((), ("--applied",)):
+            with self.subTest(mode=extra or ("normal",)):
+                result = self.run_cli("start", *extra, "--dry-run", "--port", str(self.free_port()))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("缺少 Profile 依赖锁", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
 
     def test_prepare_restores_required_bundles_without_enabling_disabled_plugins(self):
         self.prepare()
