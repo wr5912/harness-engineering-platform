@@ -175,7 +175,7 @@ export function evaluationInstance(contract: RecordValue, manifest: RecordValue,
 export function verifyFiles(files: AssetFile[]): void {
   for (const file of files) {
     if (!file.path.startsWith('/') || createHash('sha256').update(readFileSync(file.path)).digest('hex') !== file.sha256) {
-      throw new Error('实际挂载内容与装载计划不一致')
+      throw new Error(`实际挂载内容与装载计划不一致：${file.path}`)
     }
   }
 }

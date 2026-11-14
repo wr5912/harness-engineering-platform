@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { chownSync, existsSync, lstatSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, chownSync, existsSync, lstatSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -27,6 +27,25 @@ const containerAssets = '/opt/harness-business-assets'
 const containerPlugin = '/opt/harness-platform'
 const containerSecret = '/opt/harness-business/shared-secret'
 const containerPatch = '/opt/harness-business/business.patch.yml'
+
+/** 实际启动时准备私有挂载；只处理 Runtime 直接读取的配置，不改动 Harness 或其他数据。 */
+export function prepareRuntimeConfiguration(assetRoot: string, sitesFile: string, uid: number, gid: number, business: boolean) {
+  const credentials = mcpCredentialPaths(assetRoot)
+  const directories = business ? [join(assetRoot, 'config'), credentials.directory].filter(existsSync) : []
+  const files = [sitesFile, ...(business ? [join(assetRoot, 'config/business-access.json'),
+    join(assetRoot, 'mcp/manager.json'), credentials.file].filter(existsSync) : [])]
+  for (const path of [...directories, ...new Set(files)]) {
+    try {
+      if (process.geteuid?.() === 0) chownSync(path, uid, gid)
+      // 目录保留原权限；容器用户成为属主后可遍历原有 0700 目录。
+      if (!directories.includes(path)) chmodSync(path, 0o600)
+    } catch (error) {
+      const reason = (error as NodeJS.ErrnoException).code ?? 'UNKNOWN'
+      throw new Error(`Runtime 配置权限准备失败：${path}；目标用户 ${uid}:${gid}；${reason}`)
+    }
+  }
+  return { uid, gid, directories, files: [...new Set(files)] }
+}
 
 /** 显式重载时只同步来源的连接列表，不覆盖其他原生运行设置。 */
 export function syncSourceMcp(settings: string, seed: string, apply = false, expectedDigest?: string) {
@@ -277,6 +296,11 @@ export function renderBusinessInstance(config: BusinessLaunchConfig, input: Busi
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
+    if (process.argv[2] === '--prepare-mounts') {
+      const input = JSON.parse(readFileSync(0, 'utf8'))
+      console.log(JSON.stringify(prepareRuntimeConfiguration(resolve(process.argv[3]!), input.sitesFile, input.uid, input.gid, input.business)))
+      process.exit(0)
+    }
     if (process.argv[2] === '--sync-source-mcp') {
       const input = JSON.parse(readFileSync(0, 'utf8'))
       console.log(JSON.stringify(syncSourceMcp(input.settings, input.seed, input.apply === true, input.expected_digest)))
@@ -357,7 +381,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       '实例名必须是小写 kebab-case',
       '业务网关配置持续被占用或保存锁未释放；请稍后重试并核对配置锁',
     ])
-    const reason = error instanceof Error && (known.has(error.message) || process.argv[2] === '--delete') ? error.message
+    const reason = error instanceof Error && (known.has(error.message) || ['--delete', '--prepare-mounts'].includes(process.argv[2]!)) ? error.message
       : ['--entry', '--check-entry'].includes(process.argv[2]!) ? '业务网页入口配置或实例登记读取失败，请核对当前数据工作区与网关登记'
         : '业务启动配置或来源文件解析失败'
     console.error(`BUSINESS_STARTUP_ERROR:${reason}`)

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { businessSourceDigest, readBusinessLaunchConfig, renderBusinessInstance, syncSourceMcp } from './business.ts'
+import { businessSourceDigest, prepareRuntimeConfiguration, readBusinessLaunchConfig, renderBusinessInstance, syncSourceMcp } from './business.ts'
 import { mcpCredentialPaths } from '../../../platform/plugin/src/mcp/credential-path.ts'
 import { bindPlatformEntry } from '../../../platform/plugin/src/business-control/runtime-address.ts'
 const require = createRequire(new URL('../../../platform/plugin/package.json', import.meta.url))
@@ -34,6 +34,26 @@ function fixture(t) {
       command: ['--patch', 'managed.patch.yml', '--no-open', '--host', '127.0.0.1', '--port', '53191'], environment: [], volumes: [] } } }) }
   return { root, config, file, input, managed }
 }
+
+test('启动准备覆盖私有配置目录及文件，不改写配置内容和其他数据', t => {
+  const f = fixture(t), root = f.config.assetRoot, sites = join(root, 'config/sites.json')
+  writeFileSync(sites, '{"中文":"保留"}', { mode: 0o600 })
+  writeFileSync(join(root, 'config/unrelated.json'), '{}', { mode: 0o640 })
+  chmodSync(join(root, 'config'), 0o700)
+  const credentials = mcpCredentialPaths(root)
+  chmodSync(credentials.directory, 0o700)
+  const before = readFileSync(credentials.file), uid = process.geteuid() || 1000, gid = process.geteuid() === 0 ? 1000 : process.getegid()
+  const result = prepareRuntimeConfiguration(root, sites, uid, gid, true)
+  for (const path of [...result.directories, ...result.files]) {
+    assert.equal(statSync(path).uid, uid)
+    assert.equal(statSync(path).gid, gid)
+    assert.equal(statSync(path).mode & 0o777, result.directories.includes(path) ? 0o700 : 0o600)
+  }
+  assert.equal(readFileSync(sites, 'utf8'), '{"中文":"保留"}')
+  assert.deepEqual(readFileSync(credentials.file), before)
+  assert.equal(statSync(join(root, 'config/unrelated.json')).mode & 0o777, 0o640)
+  assert.throws(() => prepareRuntimeConfiguration(root, join(root, 'missing.json'), uid, gid, false), /missing.json.*目标用户.*ENOENT/)
+})
 
 test('显式同步来源 MCP 只替换服务连接，预览不写入，过期设置拒绝覆盖', t => {
   const f = fixture(t), seed = join(f.managed, 'web-profile.seed.patch.yml'), settings = join(f.root, 'settings.yml')
@@ -207,7 +227,7 @@ test('网页入口保留登记错误并隐藏配置解析细节', t => {
   mkdirSync(directory, { recursive: true })
   const selected = { agentId: f.input.agentId, instanceId: f.input.name, sourceDigest: f.input.sourceDigest, accessMode: 'anonymous' }
   const basePath = `/agents/${selected.agentId}/instances/${selected.instanceId}/`
-  writeFileSync(join(directory, 'instance.json'), JSON.stringify({ asset_root: f.config.assetRoot, agent_id: selected.agentId,
+  writeFileSync(join(directory, 'instance.json'), JSON.stringify({ asset_root: f.config.assetRoot, agent_id: selected.agentId, source_id: `business:${selected.agentId}`,
     web_base_path: basePath, business_control: { runtime_generation: 'generation-test', source_digest: f.input.sourceDigest, origin: 'http://127.0.0.1:53191' } }))
   const run = () => spawnSync(process.execPath, [new URL('./business.ts', import.meta.url).pathname,
     '--entry', f.config.assetRoot, selected.agentId, selected.instanceId], {

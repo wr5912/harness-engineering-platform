@@ -8,7 +8,15 @@ export const inject = ['agentPresets']
 /** 由本次 DSH 进程核对挂载字节、Preset 登记和本地插件装载；不调用模型、工具或外部 MCP。 */
 export function apply(ctx: any) {
   const expected = JSON.parse(readFileSync('/opt/harness-asset-load/expected.json', 'utf8'))
-  verifyFiles(expected.files)
+  const verifyMountedFiles = () => {
+    try { verifyFiles(expected.files) }
+    catch (error) {
+      writeFileSync('/tmp/hep-asset-load.json', JSON.stringify({ ok: false, nonce: expected.nonce,
+        error: error instanceof Error ? error.message : String(error), pid: process.pid }), { mode: 0o600 })
+      throw error
+    }
+  }
+  verifyMountedFiles()
   let checking = false, completed = false
   const check = async () => {
     if (checking || completed) return
@@ -28,7 +36,7 @@ export function apply(ctx: any) {
       const inventory = (await ctx.agentPresets.compositionInventory()).find((item: any) => item.id === expected.preset_id)
       if (!inventory || inventory.rows.some((row: any) => row.enabled && /^(?:\/|file:|\.)/.test(row.moduleName)
         && row.fiberState !== 2)) return
-      verifyFiles(expected.files)
+      verifyMountedFiles()
       writeFileSync('/tmp/hep-asset-load.json', JSON.stringify({ ok: true, nonce: expected.nonce,
         source_id: expected.source_id, digest: expected.digest, files_digest: digest(expected.files),
         preset_id: expected.preset_id, loaded_at: new Date().toISOString(), pid: process.pid }), { mode: 0o600 })

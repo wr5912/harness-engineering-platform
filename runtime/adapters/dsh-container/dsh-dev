@@ -1710,6 +1710,14 @@ def registered_business_source_digest(instance_id: str) -> str | None:
     return None
 
 
+def prepare_runtime_configuration(contract: dict, current: tuple | None) -> None:
+    user = runtime_user(current[1].get("home_directory") if current else None)
+    business_command(["--prepare-mounts", str(REPO)], {
+        "sitesFile": str(sites_config(REPO)), "uid": int(user["DSH_RUNTIME_UID"]),
+        "gid": int(user["DSH_RUNTIME_GID"]), "business": bool(contract.get("business_control")),
+    })
+
+
 def business_helper(config_file: str, payload: dict) -> dict:
     return business_command([str(Path(config_file).resolve())], payload)
 
@@ -1903,6 +1911,8 @@ def verify_load_receipt(name: str, contract: dict, expected: dict) -> dict:
             receipt = json.loads(result.stdout) if result.returncode == 0 else {}
         except ValueError:
             receipt = {}
+        if receipt.get("ok") is False and receipt.get("nonce") == expected["nonce"]:
+            fail("目标实例本地资产装载失败：" + redact_secrets(str(receipt.get("error", "未提供失败原因"))))
         if receipt.get("ok") is True and all(receipt.get(key) == expected[key] for key in ("nonce", "source_id", "digest", "preset_id")):
             assert_reload_source(contract)
             # 运行中观察器核对字节；宿主再次核对来源及代次，避免把启动间的改写记成已加载。
@@ -2101,6 +2111,7 @@ def _command_up(args: argparse.Namespace, contract: dict,
         })
     if contract.get("model_policy"):
         assert_model_policy_current(contract["model_policy"], repo=REPO)
+    prepare_runtime_configuration(contract, current)
     if hasattr(args, "reload_manifest"):
         assert_reload_cas(args)
         contract["reload_source_digest"] = asset_command("source", asset_contract(args.reload_manifest), args.reload_manifest, directory=None)["digest"]
@@ -2188,9 +2199,9 @@ def _command_up(args: argparse.Namespace, contract: dict,
         try:
             report["asset_status"] = verify_load_receipt(args.name, contract, expectation)
         except SystemExit:
-            if hasattr(args, "reload_manifest"):
-                raise
-            report["asset_status"] = {"status": "unknown", "message": "实例已启动，但本次实际装载尚未核验"}
+            stop_instance(args.name, load_instance(args.name)[1])
+            print("本次实例已停止，HOME 与会话已保留；修复上述装载原因后同名重试。", file=sys.stderr)
+            raise
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     print(json.dumps({
         "hint": web_cold_start_hint(args.mode, args.analysis_workspace, bool(contract.get("business_control"))),
