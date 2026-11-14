@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { load as loadYaml } from 'js-yaml'
 import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller'
 import { readBusinessDefault } from './business-default.ts'
-import { businessCatalogRoutes } from './catalog.ts'
+import { businessCatalogRoutes, configuredModelCatalog } from './catalog.ts'
 import { assertCandidatePath, resolveHarnessRuntime, type HarnessRuntime } from './harness-runtime.ts'
 import { resolvePreparedAssetDependencies, type PreparedAssetDependencies } from '../agents/asset-dependencies.ts'
 import { parseLocalCapabilities } from '../business-control/local-capabilities.ts'
@@ -210,8 +210,8 @@ export async function projectModelPolicy(assetRoot: string, agentId: string, ser
   if (!runtime?.model_bindings && !business.default) throw new Error('请先在设置 → 模型中选择业务智能体统一默认模型')
   const selected = selection(requestedSelection === undefined ? runtime?.model_bindings?.main ?? business.default : requestedSelection)
   if (!selected) throw new Error('请为此实例选择默认模型')
-  const catalog = await services.sessionController.modelCatalog()
   const namespaces = services.settingsController.describe().namespaces
+  const catalog = configuredModelCatalog(await services.sessionController.modelCatalog(), namespaces)
   const deepseek = record(namespaces.find(item => item.ns === 'llm-deepseek')?.value)
   const pi = record(namespaces.find(item => item.ns === 'llm-pi-ai')?.value)
   const directory = services.llm.listConfigurableProviders()
