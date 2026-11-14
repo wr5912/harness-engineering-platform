@@ -9,7 +9,7 @@ task_frozen_root=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help)
-      printf 'Usage: %s [verification] [--source experiment:EXP-agent-NNN-r12hex] [--frozen FROZEN_SOURCES_DIR]\n' "$0"
+      printf 'Usage: %s [verification] [--source business:agent-id[@tag-or-commit]] [--frozen FROZEN_SOURCES_DIR]\n' "$0"
       printf 'Compare exact host/container mounts and DSH composed config; no business acceptance.\n'
       exit 0 ;;
     verification)

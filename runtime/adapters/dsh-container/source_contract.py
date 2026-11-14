@@ -236,7 +236,7 @@ def _experiment_contract(
         "experiment_id": item["agent_id"] if business_root else source_id,
         "agent_id": item["agent_id"],
         "candidate_root": str(root),
-        "experiment_root": str(repo / "evolution/experiments" / item["agent_id"]) if business_root else str(root.parents[1]),
+        "experiment_root": str(root.parent) if business_root else str(root.parents[1]),
         "workspace": str(root / "workspace"),
         "presets": str(root / "presets"),
         "managed": str(root / "managed"),
