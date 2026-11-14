@@ -216,13 +216,7 @@ export function install(options: InstallOptions): InstallReport {
       if (prepared.status !== 0) throw new Error(`离线 prepare 失败（退出码 ${prepared.status}）`)
       report.prepare = 'ok'
       if (manifest.image) {
-        const previousPython = process.env.HARNESS_PYTHON
-        process.env.HARNESS_PYTHON = env.HARNESS_PYTHON || env.HEP_PYTHON
-        try { assertImageSource(prefix, manifest.package.arch, manifest.image) }
-        finally {
-          if (previousPython === undefined) delete process.env.HARNESS_PYTHON
-          else process.env.HARNESS_PYTHON = previousPython
-        }
+        assertImageSource(prefix, manifest.package.arch, manifest.image, env)
       }
       if (dataCheck?.kind === 'workspace') {
         const locator = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'harness-engineering-platform', 'workspace.json')

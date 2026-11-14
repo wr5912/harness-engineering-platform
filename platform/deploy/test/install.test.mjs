@@ -318,7 +318,7 @@ test('Docker 归档识别标签、ID、多标签同镜像，并拒绝歧义和�
     assert.throws(() => loadVerifiedImage('archive.tar', { fingerprint: 'wrong' }), /指纹不符/)
     const path = bundle('image-bundle'), prefix = join(root, 'image-program')
     const contract = join(path, 'program/runtime/adapters/dsh-container/source_contract.py')
-    write(contract, 'import json\nprint(json.dumps({"tag":"hep:a","fingerprint":"expected"}))\n')
+    write(contract, 'import json, yaml\nfrom hep_install_probe import VALUE\nassert VALUE == 42\nprint(json.dumps({"tag":"hep:a","fingerprint":"expected"}))\n')
     write(join(path, 'image.tar'), 'external docker boundary fixture')
     manifest(path, { archive: 'image.tar' })
     assert.throws(() => install({ ...options(path, prefix), dryRun: true }), /镜像身份不完整/)
