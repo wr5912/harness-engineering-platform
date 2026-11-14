@@ -8,6 +8,11 @@ import { collectEntries, sha256File } from '../manifest.mts'
 import { agentCandidateDigest } from '../agent/snapshot.mts'
 import { refreshAgentAssets } from '../agent/runtime/assets.mts'
 import { stageManagedProjections } from '../agent/runtime/projections.mts'
+import { fixture as packageFixture, write } from './agent-fixture.mjs'
+import { packAgent } from '../agent/pack.mts'
+import { inspectAgentSnapshot } from '../agent/snapshot.mts'
+import { tarExtract } from '../fsutil.mts'
+import { harnessDigest } from '../agent/layout.mts'
 const programRoot = fileURLToPath(new URL('../../../', import.meta.url))
 
 function fixture(t) {
@@ -73,4 +78,29 @@ test('挂载方式变化时恢复资产、原投影和清单，不留下半次�
   assert.deepEqual(readFileSync(join(f.root, 'runtime/projections/managed/ui/index.js')), oldProjection)
   assert.match(readFileSync(join(f.root, 'assets/managed/ui/index.js'), 'utf8'), /value='old'/)
   assert.equal(readFileSync(join(f.root, 'SHA256SUMS'), 'utf8'), 'original checksums')
+})
+
+test('原生 Harness 整体更新保留现场配置与会话，并拒绝新增文件冲突和外部目录', async t => {
+  const f = packageFixture(t), packed = await packAgent(f.input), root = join(f.root, 'installed')
+  mkdirSync(root)
+  tarExtract(packed.archive, root)
+  write(join(root, 'state/home/session'), 'keep session')
+  write(join(root, 'state/home/standalone/config.json'), 'keep current connections')
+  const deployment = readFileSync(join(root, 'config/deployment.env'))
+  const update = () => refreshAgentAssets(root, f.program, inspectAgentSnapshot(f.input), 'amd64', packed.manifest.image.tag)
+  write(join(f.candidate, 'dsh/workspace/AGENTS.md'), '# updated\n')
+  write(join(root, 'harness/dsh/workspace/local.txt'), 'local addition')
+  assert.throws(update, /现场修改或冲突/)
+  rmSync(join(root, 'harness/dsh/workspace/local.txt'))
+  const result = update()
+  assert.equal(result.restartRequired, true)
+  assert.match(readFileSync(join(result.backup, 'harness/dsh/workspace/AGENTS.md'), 'utf8'), /当前已保存/)
+  assert.equal(readFileSync(join(root, 'harness/dsh/workspace/AGENTS.md'), 'utf8'), '# updated\n')
+  assert.equal(JSON.parse(readFileSync(join(root, 'manifest.json'))).source.harnessSha256, harnessDigest(join(root, 'harness')))
+  assert.deepEqual(readFileSync(join(root, 'config/deployment.env')), deployment)
+  assert.equal(readFileSync(join(root, 'state/home/session'), 'utf8'), 'keep session')
+  assert.equal(readFileSync(join(root, 'state/home/standalone/config.json'), 'utf8'), 'keep current connections')
+  assert.equal(update().changed, 0)
+  write(join(root, 'config/deployment.env'), deployment + '\nAGENT_HARNESS_ROOT="/external/harness"\n')
+  assert.throws(update, /外部 Harness/)
 })

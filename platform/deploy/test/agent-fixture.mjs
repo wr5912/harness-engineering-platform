@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, readFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -36,7 +36,7 @@ export function fixture(t, arch = 'amd64', id = 'EXP-alpha-001') {
   mkdirSync(join(program, 'platform/deploy'), { recursive: true })
   copyFileSync(new URL('../bootstrap-docker.sh', import.meta.url), join(program, 'platform/deploy/bootstrap-docker.sh'))
   mkdirSync(join(program, 'platform/deploy/agent/runtime'), { recursive: true })
-  for (const name of ['agent', 'install.sh', 'README.md']) copyFileSync(new URL(`../agent/runtime/${name}`, import.meta.url), join(program, 'platform/deploy/agent/runtime', name))
+  for (const name of ['agent', 'install.sh', 'README.md', 'config.README.md']) copyFileSync(new URL(`../agent/runtime/${name}`, import.meta.url), join(program, 'platform/deploy/agent/runtime', name))
   const image = join(root, 'image'), config = JSON.stringify({ architecture: arch, os: 'linux', config: { Labels: { 'org.ai-agent-harness.dsh.image-build-fingerprint': fingerprint } } })
   const imageId = hash(config)
   write(join(image, imageId + '.json'), config)
@@ -52,4 +52,12 @@ export function fixture(t, arch = 'amd64', id = 'EXP-alpha-001') {
   const resourceManifest = { schemaVersion: 1, arch, createdAt: '2026-10-29T00:00:00Z', image: { tag, id: `sha256:${imageId}`, arch, fingerprint, archive: 'images/dsh-runtime.tar' }, docker: { files: collectEntries(join(resources, 'docker')) }, dependencies: [] }
   write(join(resources, 'resources.json'), JSON.stringify(resourceManifest))
   return { root, candidate, program, data, resources, out, id, input: { programRoot: program, assetRoot: data, agentId: 'alpha', experimentId: id, arch, mode: 'online', resourcesDir: resources, out } }
+}
+
+export function catalog(f, dependencies = {}, python = '') {
+  write(join(f.program, 'runtime/adapters/dsh-container/standalone-deps/package.json'), JSON.stringify({ dependencies }))
+  write(join(f.program, 'runtime/adapters/dsh-container/standalone-deps/requirements.txt'), python)
+}
+export function exportRecord(f, result) {
+  return JSON.parse(readFileSync(join(f.data, '.local/artifacts/agent-deployments', result.manifest.package.name + '.export.json'), 'utf8'))
 }

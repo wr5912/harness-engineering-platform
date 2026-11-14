@@ -625,6 +625,8 @@
 
 ### PA-13 离线一键打包与安装部署
 
+- **精简独立包（2026-11-14 UTC）**：交付原生 `harness/`、`agent`、`config/`、通用镜像和 `manifest.json`，维护帮助进入工具，配置说明集中在配置目录。AMD64 Web 与 SDK 的真实模型、外部 Harness、会话保留及平台 MCP 链路的版本、结果与覆盖边界记录在[数据仓验收回执](https://github.com/wr5912/harness-engineering-platform-data/blob/main/deliverables/standalone-compact-20261114/acceptance.json)。
+
 - **独立包平台连接实测（2026-11-13）**：AMD64 原生 Harness 包完成新装、资产与运行器升级、重启及会话保留；包内无 LFX、组合执行器或冻结流程。Web/SDK Compose 显式设置可写 `HOME=/var/lib/dsh`，平台端 LFX 实际上传 201、执行 200。部署测试 184 项、插件测试 1861 项通过；插件全量中跳过的真实浏览器用例已单独通过。真实外部业务仅覆盖只读基线，不代表全部组合效果通过。
 
 - **远端数据更新管理 Skill（2026-11-05，关联 `PA-05/12`）**：数据工作区新增 `remote-data-deployment`，管理原则与工作区分流优先选择该技能，复用维护部署工具区分整库增量、最小安装及指定实例资产更新。真实本地 DSH 注册表可发现并读取，既有管理资产就绪，技能加载测试 4/4；元数据、引用及命令示例核对通过。未执行模型自动选技、当前会话重载或远端部署，不提升业务验收结论；范围和证据见[技能核验](../platform/plugin/test/evidence/remote-data-deployment-skill-20261105/README.md)。

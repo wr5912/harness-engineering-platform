@@ -169,11 +169,21 @@ class SourceContractTest(unittest.TestCase):
                          source_contract._read_source_lock(source_contract.LOCK)["local_image_tag"]
                          + "-" + result["image"]["platform"].split("/")[1] + "-" + fingerprint[7:19])
         with tempfile.TemporaryDirectory(prefix="dsh-image-inputs-") as location:
-            adapter = Path(location)
-            for name in source_contract.IMAGE_BUILD_FILES:
-                (adapter / name).write_bytes((source_contract.ADAPTER / name).read_bytes())
+            program = Path(location) / "program"
+            adapter = program / "runtime/adapters/dsh-container"
+            adapter.mkdir(parents=True)
+            for name, digest in source_contract.image_build_input_digests().items():
+                if name.startswith("standalone/"):
+                    target = program / "platform/plugin/lib" / name.removeprefix("standalone/")
+                    original = source_contract.ADAPTER.parents[2] / "platform/plugin/lib" / target.name
+                elif name.startswith("web/"):
+                    target = program / "runtime/adapters/dsh-web/lib" / name.removeprefix("web/")
+                    original = source_contract.ADAPTER.parent / "dsh-web/lib" / target.name
+                else:
+                    target, original = adapter / name, source_contract.ADAPTER / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(original.read_bytes())
             lock_path = adapter / "source.lock.json"
-            lock_path.write_bytes(source_contract.LOCK.read_bytes())
             first = source_contract.image_build_fingerprint(
                 source_contract._read_source_lock(lock_path), lock_path=lock_path, adapter=adapter
             )

@@ -48,27 +48,16 @@ test('准备中止保持既有运行资源，临时结果不替换当前缓存',
   assert.equal(readFileSync(join(f.resources, 'resources.json'), 'utf8'), previous)
 })
 
-test('发行版构建后缀使用上游版本下载，无法识别的版本在导出镜像前失败', async t => {
-  const f = fixture(t), bin = join(f.root, 'bin'), calls = join(f.root, 'downloads.txt')
-  const previousPath = process.env.PATH
+test('导入标准镜像不调用主机 Docker 或下载 Docker 安装器', async t => {
+  const f = fixture(t), bin = join(f.root, 'bin'), previousPath = process.env.PATH
   process.env.PATH = `${bin}:${previousPath}`
   t.after(() => { process.env.PATH = previousPath })
-  write(join(bin, 'docker'), '#!/bin/sh\ncase "$1" in version) echo 29.1.3;; compose) echo 2.40.3+ds1-0ubuntu1~22.04.1;; *) exit 90;; esac\n', 0o755)
-  write(join(bin, 'curl'), `#!/bin/sh
-while [ "$1" != "--output" ]; do shift; done
-target="$2"
-url="$3"
-printf '%s\\n' "$url" >> '${calls}'
-case "$url" in *.tgz) cp '${join(f.resources, 'docker/docker-fixture.tgz')}' "$target";; *) cp '${join(f.resources, 'docker/docker-compose')}' "$target";; esac
-`, 0o755)
-  const result = await prepareAgentResources({ ...f.input, resourcesDir: join(f.root, 'normalized'), imageArchive: join(f.resources, 'images/dsh-runtime.tar') })
-  assert.equal(result.manifest.docker.version, '29.1.3')
-  assert.equal(result.manifest.docker.composeVersion, '2.40.3')
-  assert.match(readFileSync(calls, 'utf8'), /releases\/download\/v2\.40\.3\/docker-compose-linux-x86_64/)
-  write(join(bin, 'docker'), '#!/bin/sh\necho 2.40.3-rc.1\n', 0o755)
-  const stages = []
-  await assert.rejects(prepareAgentResources({ ...f.input, resourcesDir: join(f.root, 'invalid') }, { onProgress: item => stages.push(item.stage) }), /无法解析/)
-  assert.deepEqual(stages, [])
+  for (const name of ['docker', 'curl']) write(join(bin, name), '#!/bin/sh\nexit 90\n', 0o755)
+  const target = join(f.root, 'image-only')
+  const result = await prepareAgentResources({ ...f.input, resourcesDir: target, imageArchive: join(f.resources, 'images/dsh-runtime.tar') })
+  assert.equal(result.manifest.schemaVersion, 2)
+  assert.equal(result.manifest.docker, undefined)
+  assert.equal(existsSync(join(target, 'docker')), false)
 })
 
 test('另一 Agent 同路径但不同锁文件的缓存不被预览当成当前版本依赖', t => {

@@ -60,23 +60,33 @@ ARG DSH_APT_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/debian
 COPY apt-mirror.sh /opt/dsh-adapter/apt-mirror.sh
 RUN sh /opt/dsh-adapter/apt-mirror.sh "$DSH_APT_MIRROR" \
     && apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::ForceIPv4=true \
-      install -y --no-install-recommends chromium python3 tzdata \
+      install -y --no-install-recommends chromium python3 python3-venv tzdata \
     && rm -rf /var/lib/apt/lists/* /opt/dsh-adapter \
     && cd /opt/dsh/apps/web \
     && node --input-type=module -e "await import('playwright'); await import('fflate')" \
     && chromium --version >/dev/null
 
-# 运行期适配层脚本不 COPY 进镜像：它们由 Compose 以只读 bind 挂载到 /opt/dsh-adapter。
-# 这样脚本改动只需重新启动实例，不必重建镜像，也不会出现"镜像内脚本过期"的中间状态。
+# 平台开发适配器仍可 bind 挂载；独立运行的通用适配器和依赖属于共享标准镜像。
+COPY --from=standalone_runtime / /opt/dsh-standalone/
+RUN cd /opt/dsh-standalone/dependencies \
+    && npm ci --omit=dev --registry=https://registry.npmmirror.com \
+    && python3 -m venv /opt/dsh-standalone/python-env \
+    && /opt/dsh-standalone/python-env/bin/pip install --no-cache-dir --require-hashes -r requirements.txt \
+    && ln -s dependencies/node_modules /opt/dsh-standalone/node_modules \
+    && mkdir -p /opt/harness-model-runtime \
+    && ln -s /opt/dsh-standalone/model-binding-runtime.js /opt/harness-model-runtime/model-binding-runtime.mjs
+ENV PYTHONPATH=/opt/dsh-standalone/python-env/lib/python3.11/site-packages
+# 平台实例通过只读卷装载 /opt/dsh-adapter；独立实例使用镜像内的通用适配器。
 RUN mkdir -p /opt/dsh-adapter \
       /var/lib/dsh/profiles/node_modules \
       /var/lib/dsh/profiles/web/node_modules \
       /var/lib/dsh/profiles/web/.dsh-module-fallback/node_modules \
       /var/lib/dsh/node_modules /work/harness/workspace \
     && chown -R node:node /var/lib/dsh /work/harness \
+    && ln -s /var/lib/dsh/profiles/node_modules /node_modules \
     && corepack enable
 
-ENV DSH_HOME=/var/lib/dsh
+ENV HOME=/var/lib/dsh DSH_HOME=/var/lib/dsh XDG_CACHE_HOME=/var/lib/dsh/.cache
 WORKDIR /work/harness/workspace
 USER node
 ENTRYPOINT ["node", "/opt/dsh/apps/cli/lib/bin.js"]

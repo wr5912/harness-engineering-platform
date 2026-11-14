@@ -36,6 +36,8 @@ export interface DependencyPackage {
   lockSha256?: string
   modulesPath?: string
   sourceFile?: string
+  requirements?: string[]
+  unresolved?: boolean
   reason?: string
   ready: boolean
   preparedTarget?: { image: string; imageId: string }
@@ -53,20 +55,21 @@ export interface AgentSourceSnapshot {
   git: { commit: string; dirty: boolean }
 }
 export interface AgentResourceManifest {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   arch: Arch
   createdAt: string
   image: ImageEntry
-  docker: { version?: string; composeVersion?: string; files: FileEntry[] }
+  docker?: { version?: string; composeVersion?: string; files: FileEntry[] }
   dependencies: Array<{ path: string; lockSha256?: string; files: FileEntry[]; preparedTarget?: DependencyPackage['preparedTarget'] }>
 }
 export interface AgentPackageManifest {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   kind: 'standalone-agent'
   package: { name: string; arch: Arch; mode: DeploymentMode; createdAt: string; sensitive: true }
   source: {
     agentId: string; experimentId: string; candidateSha256: string; commit: string; dirty: boolean; profile?: 'web' | 'sdk'
     paths: { workspace: string; presets: string; managed: string; profilePatch: string; preset: string }
+    harnessSha256?: string
     files: AgentSourceSnapshot['files']; omitted: string[]
   }
   image: ImageEntry

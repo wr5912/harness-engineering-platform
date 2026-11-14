@@ -48,10 +48,10 @@ GRADING_ROLES = ("scoring",)
 CONTAINER_WORKSPACE = "/work/harness/workspace"
 CONTAINER_REFERENCE = "/work/reference"
 CONTAINER_EVAL_INPUT = "/work/eval-input"
-IMAGE_FINGERPRINT_VERSION = "2"
+IMAGE_FINGERPRINT_VERSION = "3"
 IMAGE_LABEL_KEY = "org.ai-agent-harness.dsh.image-build-fingerprint"
 # source_contract.py 只在宿主读取来源，不进入镜像；路径/目录调整不能改变 Runtime 镜像身份。
-IMAGE_BUILD_FILES = ("Dockerfile", "apt-mirror.sh", "build-image.sh", "dsh-cli.sh")
+IMAGE_BUILD_FILES = ("Dockerfile", "apt-mirror.sh", "build-image.sh", "dsh-cli.sh", "stage-standalone.mts")
 IMAGE_ARCHITECTURES = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}
 
 
@@ -69,6 +69,19 @@ def image_build_input_digests(*, lock_path: Path = LOCK, adapter: Path = ADAPTER
     """返回会改变本地镜像内容或构建方式的输入摘要。"""
     paths = {lock_path.name: lock_path}
     paths.update({name: adapter / name for name in IMAGE_BUILD_FILES})
+    # 通用运行制品和依赖锁改变共享镜像身份；业务 Harness 不参与。
+    for directory in (adapter / "standalone-deps", adapter / "runtime-compat"):
+        for path in sorted(directory.rglob("*")):
+            if path.is_file() and "node_modules" not in path.parts:
+                paths[str(path.relative_to(adapter))] = path
+    for name in ("sdk-runner.mts", "sdk-preset.mts", "sdk-profile.patch.yml", "sdk-module-links.mts", "prepare-verification-home.mjs"):
+        paths[name] = adapter / name
+    program = adapter.parent.parent.parent
+    for name in ("standalone-bootstrap.js", "standalone-plugin.js", "standalone-bridge.js", "standalone-connection.js", "standalone-knowledge.js", "model-binding-runtime.js"):
+        paths[f"standalone/{name}"] = program / "platform/plugin/lib" / name
+    for path in sorted((program / "runtime/adapters/dsh-web/lib").glob("*")):
+        if path.is_file():
+            paths[f"web/{path.name}"] = path
     digests = {}
     for name, path in paths.items():
         if not path.is_file() or path.is_symlink():

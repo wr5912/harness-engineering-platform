@@ -1,0 +1,16 @@
+{
+  "name": "dsh-standard-runtime-dependencies",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2",
+    "@deepseek-ai/schemastery": "3.18.4",
+    "msedge-tts": "2.0.8",
+    "pinyin-pro": "3.29.4",
+    "sherpa-onnx": "1.13.8",
+    "sherpa-onnx-node": "1.13.8",
+    "typescript": "5.9.3",
+    "ws": "8.22.0",
+    "zod": "4.6.5"
+  }
+}

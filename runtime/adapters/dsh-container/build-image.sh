@@ -4,6 +4,7 @@ set -euo pipefail
 task_adapter_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 task_repo_dir="$(cd "$task_adapter_dir/../../.." && pwd -P)"
 task_source_dir=""
+task_standalone_dir=""
 task_source_id=""
 task_evidence_file=""
 task_build_network="default"
@@ -60,6 +61,7 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+(cd "$task_repo_dir/platform/plugin" && pnpm run build)
 task_source_id="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field experiment_id)"
 task_source_commit="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.commit)"
 task_source_tree="$(python3 "$task_adapter_dir/source_contract.py" --source "$task_source_id" --field image.tree)"
@@ -80,6 +82,7 @@ if [[ -z "$task_evidence_file" ]]; then
 fi
 
 task_cleanup() {
+  if [[ -n "$task_standalone_dir" ]]; then rm -rf -- "$task_standalone_dir"; fi
   if [[ -n "$task_source_dir" && -d "$task_source_dir" && "$task_source_dir" == /tmp/dsh-adapter-source.* ]]; then
     rm -rf -- "$task_source_dir"
   fi
@@ -90,6 +93,8 @@ command -v git >/dev/null
 command -v docker >/dev/null
 command -v python3 >/dev/null
 
+task_standalone_dir="$(mktemp -d /tmp/dsh-standard-runtime.XXXXXXXX)"
+node "$task_adapter_dir/stage-standalone.mts" "$task_standalone_dir"
 task_source_dir="$(mktemp -d /tmp/dsh-adapter-source.XXXXXXXX)"
 git -C "$task_source_dir" init -q
 git -C "$task_source_dir" remote add origin "$task_source_repository"
@@ -116,6 +121,7 @@ docker buildx build \
   --platform "$task_platform" \
   --network "$task_build_network" \
   --build-context "dsh_source=$task_source_dir" \
+  --build-context "standalone_runtime=$task_standalone_dir" \
   --build-arg "DSH_CLIENT_COMMIT_HASH=$task_source_commit" \
   --build-arg "DSH_LOCK_SHA256=$task_lock_sha" \
   --build-arg "DSH_CLI_VERSION=$task_cli_version" \

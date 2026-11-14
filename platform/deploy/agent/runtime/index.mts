@@ -2,6 +2,7 @@ import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFi
 import { dirname, join } from 'node:path'
 import { stageManagedProjections } from './projections.mts'
 import { collectEntries, sha256File, writeChecksums } from '../../manifest.mts'
+import { writeCompactRuntime } from './compact.mts'
 import { migrateStandaloneConnections } from '../../../plugin/src/standalone/connections.ts'
 
 export interface RuntimeBundleOptions { programRoot: string; imageTag: string; imageId?: string; imageFingerprint?: string; arch: 'amd64' | 'arm64'; agentId: string; experimentId: string; presetId: string; profilePatch: string; profile?: 'web' | 'sdk'; harnessRuntime?: any }
@@ -13,12 +14,18 @@ export async function refreshAgentPreview(root: string, programRoot: string, pre
     || manifest.source.experimentId !== preview.experimentId || manifest.source.candidateSha256 !== preview.candidateSha256
     || manifest.package.arch !== preview.arch) throw new Error('预览目录与所选智能体版本、资产摘要或架构不一致')
   if (manifest.source.profile === 'sdk') throw new Error('现有预览运行器刷新仅支持 Web 包；SDK 包请使用正式导出入口')
+  if (manifest.schemaVersion === 2) {
+    // 镜像承载运行器；预览刷新只更新入口，不改写现场配置或旧包目录。
+    cpSync(join(programRoot, 'platform/deploy/agent/runtime/agent'), join(root, 'agent'))
+    cpSync(join(programRoot, 'platform/deploy/agent/runtime/config.README.md'), join(root, 'config/README.md'))
+    return
+  }
   const seedFile = join(root, 'config-seed/standalone.json')
   const config = migrateStandaloneConnections(JSON.parse(readFileSync(seedFile, 'utf8')), join(root, 'assets/managed'))
   writeFileSync(seedFile, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 })
   for (const legacy of ['runtime/lfx', 'runtime/extensions', 'mcp/compositions']) rmSync(join(root, legacy), { recursive: true, force: true })
   delete manifest.extensions
-  await writeRuntimeBundle(root, { programRoot, imageTag: manifest.image.tag, imageId: manifest.image.id,
+  await writeLegacyRuntimeBundle(root, { programRoot, imageTag: manifest.image.tag, imageId: manifest.image.id,
     imageFingerprint: manifest.image.fingerprint, arch: manifest.package.arch, agentId: config.agentId,
     experimentId: config.experimentId, presetId: config.presetId, profilePatch: config.profilePatch, profile: config.profile })
   const refreshed = ['agent', 'install.sh', 'README.md', 'config-seed/standalone.json']
@@ -31,7 +38,7 @@ export async function refreshAgentPreview(root: string, programRoot: string, pre
 }
 
 /** 目标机只用 Bash 和 Docker；Node、DSH 与初始化均在同一标准镜像内执行。 */
-export async function writeRuntimeBundle(staging: string, options: RuntimeBundleOptions) {
+export async function writeLegacyRuntimeBundle(staging: string, options: RuntimeBundleOptions) {
   if (!options.programRoot) throw new Error('独立运行器需要明确的平台程序根')
   const programRoot = options.programRoot
   const root = join(staging, 'runtime')
@@ -83,3 +90,5 @@ export async function writeRuntimeBundle(staging: string, options: RuntimeBundle
   writeFileSync(join(root, 'compose.yaml'), JSON.stringify(compose, null, 2) + '\n')
   writeFileSync(join(root, 'bundle.env'), `AGENT_ID=${options.agentId}\nAGENT_ARCH=${options.arch}\nAGENT_PROFILE=${options.profile ?? 'web'}\nIMAGE_TAG=${options.imageTag}\nIMAGE_ID=${options.imageId || ''}\nIMAGE_FINGERPRINT=${options.imageFingerprint || ''}\n`)
 }
+
+export const writeRuntimeBundle = writeCompactRuntime

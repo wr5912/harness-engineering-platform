@@ -6,7 +6,7 @@ import { createAssetDependenciesHandler } from '../../plugin/src/agents/asset-de
 import { prepareAgentResources } from '../agent/prepare.mts'
 import { previewAgentPackage, packAgent } from '../agent/pack.mts'
 import { inspectAgentSnapshot } from '../agent/snapshot.mts'
-import { fixture, write } from './agent-fixture.mjs'
+import { fixture, write, catalog } from './agent-fixture.mjs'
 
 async function prepareBusinessDependency(f) {
   const image = JSON.parse(readFileSync(join(f.resources, 'resources.json'), 'utf8')).image
@@ -31,46 +31,37 @@ async function prepareBusinessDependency(f) {
   return { image, modules: prepared.value.mounts[0].source }
 }
 
-test('直接导出已准备依赖冻结字节及镜像身份，复制前变化不进入安装包', async t => {
+test('标准镜像覆盖声明后，旧准备目录变化不进入新包', async t => {
   const f = fixture(t), prepared = await prepareBusinessDependency(f)
+  catalog(f, { fixture: '1.0.0' })
   assert.equal(previewAgentPackage(f.input).resourceReady, true)
-  const snapshot = inspectAgentSnapshot(f.input), dependency = snapshot.dependencies[0]
-  assert.deepEqual(dependency.preparedTarget, { image: prepared.image.tag, imageId: prepared.image.id })
-  assert.ok(dependency.preparedFiles.some(file => file.path === 'fixture/index.js'))
-  const result = await packAgent(f.input)
-  assert.ok(result.manifest.files.some(file => file.path === 'assets/managed/import-plugin/node_modules/fixture/index.js'))
-  const before = readdirSync(f.out).filter(name => name.endsWith('.tar.gz')).length
-  await assert.rejects(packAgent(f.input, { onProgress(progress) {
-    if (progress.stage === 'snapshot') write(join(prepared.modules, 'fixture/index.js'), 'changed during export\n')
-  } }), /业务依赖在导出期间变化/)
-  assert.equal(readdirSync(f.out).filter(name => name.endsWith('.tar.gz')).length, before)
-  assert.equal(readdirSync(f.out).some(name => name.endsWith('.partial')), false)
+  const result = await packAgent(f.input, { onProgress(progress) {
+    if (progress.stage === 'snapshot') write(join(prepared.modules, 'fixture/index.js'), 'ignored host cache\n')
+  } })
+  assert.ok(result.archive)
+  assert.equal(result.manifest.schemaVersion, 2)
+  assert.deepEqual(result.manifest.files, [])
 })
 
-test('准备资源保留依赖目标镜像和锁摘要；原准备目录移除后仍可独立消费', async t => {
-  const f = fixture(t), prepared = await prepareBusinessDependency(f), target = join(f.root, 'prepared-import')
-  const input = { ...f.input, resourcesDir: target, imageArchive: join(f.resources, 'images/dsh-runtime.tar'), dockerAssetsDir: join(f.resources, 'docker') }
+test('资源准备仅保存共享镜像，不把业务准备目录变成部署依赖', async t => {
+  const f = fixture(t), prepared = await prepareBusinessDependency(f), target = join(f.root, 'image-cache')
+  catalog(f, { fixture: '1.0.0' })
+  const input = { ...f.input, resourcesDir: target, imageArchive: join(f.resources, 'images/dsh-runtime.tar') }
   const result = await prepareAgentResources(input)
-  assert.deepEqual(result.manifest.dependencies[0].preparedTarget, { image: prepared.image.tag, imageId: prepared.image.id })
-  assert.ok(result.manifest.dependencies[0].lockSha256)
-  write(join(target, 'resources.json'), JSON.stringify({ ...result.manifest, image: { ...result.manifest.image, id: 'sha256:' + 'c'.repeat(64) } }))
-  assert.equal((await prepareAgentResources(input)).manifest.image.id, prepared.image.id)
+  assert.deepEqual(result.manifest.dependencies, [])
+  assert.equal(existsSync(join(target, 'dependencies')), false)
   rmSync(join(f.data, '.local/asset-dependencies', f.id), { recursive: true })
   assert.equal(previewAgentPackage(input).resourceReady, true)
   assert.ok((await packAgent(input)).archive)
-  result.manifest.dependencies[0].preparedTarget.imageId = 'sha256:' + 'b'.repeat(64)
-  write(join(target, 'resources.json'), JSON.stringify(result.manifest))
-  assert.equal(previewAgentPackage(input).resourceReady, false)
-  await assert.rejects(packAgent(input), /缺少|另一标准镜像/)
-  assert.equal(existsSync(join(target, 'dependencies/managed/import-plugin/node_modules/fixture/index.js')), true)
 })
 
-test('依赖资源准备期间来源变化会保留未完成状态', async t => {
-  const f = fixture(t), prepared = await prepareBusinessDependency(f), target = join(f.root, 'interrupted-import')
-  await assert.rejects(prepareAgentResources({ ...f.input, resourcesDir: target,
-    imageArchive: join(f.resources, 'images/dsh-runtime.tar'), dockerAssetsDir: join(f.resources, 'docker') }, { onProgress(progress) {
-    if (progress.stage === 'dependencies') write(join(prepared.modules, 'fixture/index.js'), 'changed during prepare\n')
-  } }), /业务依赖在准备期间变化/)
-  assert.equal(existsSync(join(target, 'resources.json')), false)
-  assert.equal(readdirSync(f.root).some(name => name.startsWith('.prepare-')), false)
+test('宿主依赖不能补偿标准镜像缺失或不兼容的版本', async t => {
+  const f = fixture(t)
+  await prepareBusinessDependency(f)
+  for (const dependencies of [{}, { fixture: '2.0.0' }]) {
+    catalog(f, dependencies)
+    assert.equal(previewAgentPackage(f.input).resourceReady, false)
+    await assert.rejects(prepareAgentResources(f.input), /标准镜像/)
+    await assert.rejects(packAgent(f.input), /标准镜像/)
+  }
 })

@@ -59,7 +59,7 @@ function validateOptions(command: string, options: Options): void {
     'agent-cleanup': ['prefix'],
     'agent-preview': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'prefix'],
     'agent-pack': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'out', 'seed-file', 'expected-candidate-sha256'],
-    'agent-prepare': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'image-archive', 'docker-assets'],
+    'agent-prepare': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'image-archive'],
     pack: ['out', 'program-root', 'data-root', 'assets-dir', 'knowledge-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
     install: ['bundle-root', 'prefix', 'data-root', 'host', 'port', 'gateway-port', 'public-url'],
     verify: ['prefix', 'data-root', 'url'],
@@ -156,7 +156,6 @@ function usage(): string {
     --prefix <目录>             agent-preview 刷新已有独立预览的运行器；保留资产、配置、会话和镜像，随后用 agent restart 生效
     --update-assets             与 --prefix 合用，改为更新同版本 Harness 资产及投影；现场冲突停止，保留备份、连接、HOME 和镜像
     --image-archive <tar>       agent-prepare 导入该架构标准镜像
-    --docker-assets <目录>      agent-prepare 导入官方 docker-*.tgz 与 docker-compose
 
   dsh-deploy pack [选项]
     --out <目录>                 输出目录，默认 ./dist
@@ -294,7 +293,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       try {
         if (command === 'agent-prepare') {
           const { prepareAgentResources } = await import('./agent/prepare.mts')
-          const result = await prepareAgentResources({ ...input, imageArchive: text(options, 'image-archive'), dockerAssetsDir: text(options, 'docker-assets') }, hooks)
+          const result = await prepareAgentResources({ ...input, imageArchive: text(options, 'image-archive') }, hooks)
           console.log(JSON.stringify({ resourcesDir: result.resourcesDir, arch: result.manifest.arch, image: result.manifest.image }, null, 2))
           return 0
         }

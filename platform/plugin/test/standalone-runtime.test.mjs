@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync, realpathSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync, realpathSync, renameSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { dump, load, FAILSAFE_SCHEMA, Type } from 'js-yaml'
@@ -59,6 +59,31 @@ test('新 HOME 原生初始化一次，冻结业务配置保留，模型与 MCP 
   assert.equal(readStandaloneConfig(f.home).mcp.sharedToken, 'b'.repeat(64))
   assert.match(readFileSync(join(f.home, 'profiles/standalone/cordis.patch.yml'), 'utf8'), /原生UI保存/)
   assert.equal(existsSync(join(f.home, 'profiles/node_modules/@fixture/cli')), true)
+})
+
+test('原生目录布局在 HOME 生成投影，重启读取新资产且保留当前模型、连接和会话', t => {
+  const f = fixture(t)
+  mkdirSync(join(f.root, 'harness/dsh'), { recursive: true })
+  renameSync(join(f.root, 'assets/managed'), join(f.root, 'harness/dsh/managed'))
+  mkdirSync(join(f.root, 'harness/dsh/presets'), { recursive: true })
+  mkdirSync(join(f.root, 'config'), { recursive: true })
+  renameSync(join(f.root, 'config-seed'), join(f.root, 'config/seed'))
+  writeFileSync(join(f.root, 'harness/harness.yaml'), 'loadable_assets: {}\n')
+  const patch = join(f.root, 'harness/dsh/managed/agent.patch.yml')
+  const original = readFileSync(patch)
+  assert.equal(initializeStandalone(f).initialized, true)
+  assert.deepEqual(readFileSync(patch), original)
+  assert.equal(realpathSync(join(f.home, 'standalone/managed/agent.patch.yml')), patch)
+  const model = join(f.home, 'profiles/standalone/cordis.patch.yml')
+  writeFileSync(model, '- id: agent-default-model\n  config: {provider: api, model: current-model}\n')
+  const config = readStandaloneConfig(f.home)
+  writeFileSync(join(f.home, 'session'), 'keep session')
+  writeFileSync(patch, original + '\n- id: newly-added-business-tool\n  name: /opt/dsh-managed/new.mjs\n')
+  assert.equal(initializeStandalone(f).initialized, false)
+  assert.match(readFileSync(join(f.home, 'standalone/runtime.patch.yml'), 'utf8'), /newly-added-business-tool/)
+  assert.match(readFileSync(model, 'utf8'), /current-model/)
+  assert.deepEqual(readStandaloneConfig(f.home).mcp, config.mcp)
+  assert.equal(readFileSync(join(f.home, 'session'), 'utf8'), 'keep session')
 })
 
 test('独立 Web 访问声明随 Harness 读取，不支持的模式明确报错而非静默匿名运行', t => {
@@ -218,6 +243,10 @@ test('SDK 独立环境使用原生SDK组合和固定Preset，初始化及重配�
   const config = join(f.root, 'new-model.json')
   writeFileSync(config, JSON.stringify({ defaultModel: { provider: 'new-api', model: 'new-model' } }))
   await configureStandalone(config, f)
+  assert.equal(prepareStandaloneSdk(f).model, 'new-model')
+  writeFileSync(join(f.root, 'sdk/example.ts'), '// 更新后的原生 SDK 示例\n')
+  assert.equal(initializeStandalone(f).initialized, false)
+  assert.equal(readFileSync(join(f.home, 'standalone/sdk-app/example.ts'), 'utf8'), '// 更新后的原生 SDK 示例\n')
   assert.equal(prepareStandaloneSdk(f).model, 'new-model')
   assert.equal(existsSync(join(f.home, 'standalone/input.json')), false)
 })

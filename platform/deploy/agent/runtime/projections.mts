@@ -8,7 +8,7 @@ const sha = (value: string | Buffer) => createHash('sha256').update(value).diges
 /** 平台访问控制不随独立部署运行；业务 MCP 使用 Harness 声明的平台连接。 */
 export function projectStandaloneBoundary(source: string, programRoot: string): { content: string; changed: boolean } {
   if (!source.includes('businessRuntime')) return { content: source, changed: false }
-  const ts = createRequire(join(programRoot, 'platform/plugin/package.json'))('typescript') as any
+  const ts = createRequire(process.env.STANDALONE_RUNTIME ? join(process.env.STANDALONE_RUNTIME, 'package.json') : join(programRoot, 'platform/plugin/package.json'))('typescript') as any
   const file = ts.createSourceFile('managed.mjs', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
   const edits: Array<{ start: number; end: number; content: string }> = []
   let platformGuard = false

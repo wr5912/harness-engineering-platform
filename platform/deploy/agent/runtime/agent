@@ -3,7 +3,8 @@ set -euo pipefail
 usage() {
   cat <<'HELP'
 用法：./agent <命令> [参数]
-  start       启动智能体
+  install [--prefix <空目录>]  导入随包标准镜像，启动 Web 或准备 SDK
+  start       启动智能体（首次使用自动导入镜像）
   stop        停止智能体，保留 HOME 和会话
   cleanup     移除本实例的容器、网络和安装介质，保留镜像、Harness、HOME 和会话
   restart     重新装载 Harness、MCP 配置和端口，保留 HOME 和会话
@@ -12,7 +13,18 @@ usage() {
   open        打开局域网直接访问入口，无需登录或访问 Token
   configure [--config-file <JSON>]  交互配置或导入连接配置
   prepare-sdk | run --input-file <JSON> | example [输入]  SDK 操作
+  help        显示安装、配置和维护帮助
   -h, --help  显示帮助；也可在命令后使用
+
+运行主机需预装 Docker Engine 和 Compose 插件，无需另装 Node、Python 或 DSH。
+解压后：./agent install → ./agent configure → ./agent restart
+维护：./agent status；./agent logs -f；./agent stop；./agent cleanup
+升级前备份 config/ 和 state/；Harness 修改后重启，模型设置和会话仍保留。
+
+install、start、restart、configure、SDK 命令支持：
+  --harness-root <目录>  使用外部原生 Harness，保存为此安装的后续运行来源
+  --port <端口>         设置 Web 端口，默认 18500
+  --host <地址>         设置浏览器访问主机，默认检测本机地址
 
 start、restart、configure 支持：
   --mcp-server <连接ID>  选择 mcp.servers[].id，可重复执行以配置多个服务
@@ -21,19 +33,67 @@ start、restart、configure 支持：
   示例：./agent restart --mcp-server ai-soc-master --mcp-url http://host:8000/openapi.json --mcp-token '<Token>'
 
 配置文件（修改后执行 ./agent restart）：
-  state/deployment.env                 AGENT_PORT、AGENT_HOST 等部署设置
+  config/deployment.env                AGENT_PORT、AGENT_HOST、外部 Harness 等部署设置
   state/home/standalone/config.json     mcp.servers 中的地址和凭据
-Harness：编辑 assets/workspace、assets/presets、assets/managed 后重启，无需构建镜像。
-说明：详见 README.md；命令行 Token 可能被本机进程查看或终端历史记录。
+Harness：编辑 harness/ 下的原生资产后重启，无需构建镜像。
+配置字段与首次初始化说明见 config/README.md。
+manifest.json 保存包身份、镜像和 Harness 摘要；无需手工编辑。
+cleanup 保留配置和会话；导入镜像后可删除 images/ 节省空间，镜像仍可重启。
+远程模型与平台 MCP 仍需网络；本机不运行平台组合执行器。
 HELP
 }
 argument_error() { echo "$1" >&2; usage >&2; exit 2; }
 action=${1:-status}
-case "$action" in -h|--help) usage; exit 0 ;; esac
+case "$action" in help|-h|--help) usage; exit 0 ;; esac
 for argument in "${@:2}"; do case "$argument" in -h|--help) usage; exit 0 ;; esac; done
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+# 旧安装仍沿用原配置，新包所有可编辑配置集中在 config/。
+if [ -f "$ROOT/config/deployment.env" ]; then
+  . "$ROOT/config/deployment.env"
+  compose_file="$ROOT/config/compose.yaml"
+else
+  . "$ROOT/runtime/bundle.env"
+  compose_file="$ROOT/runtime/compose.yaml"
+fi
+if [ ! -f "$ROOT/config/deployment.env" ] && [ -f "$ROOT/state/deployment.env" ]; then . "$ROOT/state/deployment.env"; fi
+prefix='' harness_changed=false deployment_changed=false
+remaining=()
+shift || true
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --harness-root|--port|--host|--prefix)
+      [ "$#" -ge 2 ] && [ -n "$2" ] || argument_error "$1 缺少值"
+      case "$1" in
+        --harness-root) AGENT_HARNESS_ROOT=$(realpath -- "$2"); harness_changed=true; deployment_changed=true ;;
+        --port) AGENT_PORT=$2; deployment_changed=true ;;
+        --host) AGENT_HOST=$2; deployment_changed=true ;;
+        --prefix) [ "$action" = install ] || argument_error '--prefix 仅用于 install'; prefix=$2 ;;
+      esac
+      shift 2 ;;
+    *) remaining+=("$1"); shift ;;
+  esac
+done
+set -- "$action" "${remaining[@]}"
+if [ "$harness_changed" = true ]; then
+  [ -f "$AGENT_HARNESS_ROOT/harness.yaml" ] && [ -d "$AGENT_HARNESS_ROOT/dsh/workspace" ] && [ -d "$AGENT_HARNESS_ROOT/dsh/managed" ] && [ -d "$AGENT_HARNESS_ROOT/dsh/presets" ] || argument_error '外部 Harness 缺少 harness.yaml 或原生 dsh 目录'
+fi
+if [ -n "$prefix" ]; then
+  prefix=$(realpath -m -- "$prefix")
+  case "$prefix/" in "$ROOT/"*) argument_error '安装目标不能位于当前包目录内' ;; esac
+  if [ -e "$prefix" ]; then
+    [ -d "$prefix" ] && [ -z "$(ls -A -- "$prefix")" ] || argument_error '安装目标必须为空目录'
+  fi
+  mkdir -p -- "$prefix"
+  cp -a -- "$ROOT/." "$prefix/"
+  next=(install)
+  [ "$harness_changed" = false ] || next+=(--harness-root "$AGENT_HARNESS_ROOT")
+  [ -z "${AGENT_PORT:-}" ] || next+=(--port "$AGENT_PORT")
+  [ -z "${AGENT_HOST:-}" ] || next+=(--host "$AGENT_HOST")
+  exec "$prefix/agent" "${next[@]}"
+fi
 mcp_server='' mcp_url='' mcp_token='' token_supplied=false
 case "$action" in
-  start|restart|configure)
+  install|start|restart|configure)
     parameters=("${@:2}")
     if [ "$action" = configure ] && [ "${2:-}" = --config-file ]; then
       [ "$#" = 3 ] && [ -f "${3:-}" ] || argument_error '--config-file 需要一个存在的 JSON 文件'
@@ -60,23 +120,75 @@ case "$action" in
   logs) ;;
   *) argument_error '未知命令' ;;
 esac
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-. "$ROOT/runtime/bundle.env"
-if [ -f "$ROOT/state/deployment.env" ]; then . "$ROOT/state/deployment.env"; fi
 export AGENT_PORT=${AGENT_PORT:-18500}
 if [ -z "${AGENT_HOST:-}" ]; then
   AGENT_HOST=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++)if($i=="src"){print $(i+1);exit}}' || true)
   AGENT_HOST=${AGENT_HOST:-$(hostname -I 2>/dev/null | awk '{print $1}' || true)}
 fi
 export AGENT_HOST=${AGENT_HOST:-127.0.0.1}
-export AGENT_UID=${AGENT_UID:-1000}
-export AGENT_GID=${AGENT_GID:-1000}
-export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-hep-agent-${AGENT_ID}}
+export AGENT_UID=${AGENT_UID:-$(id -u)}
+export AGENT_GID=${AGENT_GID:-$(id -g)}
+export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-hep-agent-${AGENT_ID}-$(printf '%s' "$ROOT" | cksum | awk '{print $1}')}
+export AGENT_HARNESS_ROOT=${AGENT_HARNESS_ROOT:-$ROOT/harness}
+# Shell 配置持久化 CLI 显式覆盖；日常编辑 config/deployment.env 始终生效。
+shell_quote() { printf "'%s'" "${1//\'/\'\\\'\'}"; }
+if [ "$deployment_changed" = true ] && [ -f "$ROOT/config/deployment.env" ]; then
+  {
+    for key in AGENT_PORT AGENT_HOST AGENT_UID AGENT_GID AGENT_HARNESS_ROOT COMPOSE_PROJECT_NAME; do
+      printf '%s=' "$key"; shell_quote "${!key}"; printf '\n'
+    done
+  } > "$ROOT/config/.deployment.overrides"
+  keys="AGENT_PORT|AGENT_HOST|AGENT_UID|AGENT_GID|AGENT_HARNESS_ROOT|COMPOSE_PROJECT_NAME"
+  awk -v keys="$keys" '$0 !~ "^(" keys ")="' "$ROOT/config/deployment.env" > "$ROOT/config/.deployment.next"
+  cat "$ROOT/config/.deployment.overrides" >> "$ROOT/config/.deployment.next"
+  mv "$ROOT/config/.deployment.next" "$ROOT/config/deployment.env"
+  rm "$ROOT/config/.deployment.overrides"
+fi
+if [ "$deployment_changed" = true ] || [ ! -f "$ROOT/state/deployment.env" ]; then
+  mkdir -p "$ROOT/state"
+  {
+    for key in AGENT_PORT AGENT_HOST AGENT_UID AGENT_GID AGENT_HARNESS_ROOT COMPOSE_PROJECT_NAME; do
+      printf '%s=' "$key"; shell_quote "${!key}"; printf '\n'
+    done
+  } > "$ROOT/state/deployment.env"
+fi
+if [ "$action" = open ]; then
+  if [ "${AGENT_PROFILE:-web}" = sdk ]; then
+    echo "SDK：./agent prepare-sdk；./agent run --input-file <JSON>；./agent example '输入'。配置说明：$ROOT/config/README.md"
+  else
+    entry="http://${AGENT_HOST}:${AGENT_PORT}/assistant/"
+    echo "$entry"
+    if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null; then xdg-open "$entry" >/dev/null 2>&1 || true; fi
+  fi
+  exit 0
+fi
+if [ "$action" = restart ] && [ "${AGENT_PROFILE:-web}" = sdk ]; then
+  echo 'SDK 任务不会自动重放；请显式运行 ./agent run --input-file <JSON文件>' >&2; exit 2
+fi
+command -v docker >/dev/null || { echo '请先在主机安装 Docker Engine 和 Compose 插件；本包不安装 Docker。' >&2; exit 2; }
+compose() { docker compose --project-directory "$ROOT" -f "$compose_file" "$@"; }
+ensure_image() {
+  [ -f "$ROOT/config/deployment.env" ] || return 0
+  docker compose version >/dev/null
+  local actual
+  actual=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}' 2>/dev/null || true)
+  if [ "$actual" != "${IMAGE_ID:-$actual}" ] || [ -z "$actual" ]; then
+    [ -f "$ROOT/images/dsh-runtime.tar" ] || { echo '标准镜像尚未导入且安装介质不存在，请恢复 images/dsh-runtime.tar。' >&2; exit 2; }
+    docker load -i "$ROOT/images/dsh-runtime.tar"
+    actual=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')
+    [ -z "${IMAGE_ID:-}" ] || [ "$actual" = "$IMAGE_ID" ] || { echo '导入镜像与当前包不一致。' >&2; exit 2; }
+  fi
+}
+case "$action" in install|start|restart|configure|prepare-sdk|run|example) ensure_image ;; esac
+if [ "$action" = install ]; then
+  if [ "${AGENT_PROFILE:-web}" = sdk ]; then action=prepare-sdk; else action=start; fi
+  set -- "$action" "${@:2}"
+fi
 if [ "${AGENT_PROFILE:-web}" != sdk ]; then
   [[ "$AGENT_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$((10#$AGENT_PORT))" -ge 1 ] && [ "$((10#$AGENT_PORT))" -le 65535 ] || argument_error 'AGENT_PORT 须为 1–65535 的端口'
   [[ "$AGENT_HOST" =~ ^[a-zA-Z0-9.-]+$ ]] || argument_error 'AGENT_HOST 地址无效'
 fi
-compose() { docker compose --project-directory "$ROOT" -f "$ROOT/runtime/compose.yaml" "$@"; }
+
 configure_mcp() {
   [ -n "$mcp_server" ] || return 0
   compose run --rm -T init >/dev/null
@@ -147,17 +259,10 @@ case "${1:-status}" in
     echo '本实例的容器、网络和安装介质已清理；标准镜像、Harness、HOME 和会话已保留。'
     ;;
   restart)
-    if [ "${AGENT_PROFILE:-web}" = sdk ]; then echo 'SDK 任务不会自动重放；请显式运行 ./agent run --input-file <JSON文件>' >&2; exit 2
-    else configure_mcp; compose up -d --force-recreate --wait dsh; fi
+    configure_mcp; compose up -d --force-recreate --wait dsh
     ;;
   status) compose ps ;;
   logs) shift; compose logs --tail 150 "$@" dsh || { usage >&2; exit 2; } ;;
-  open)
-    [ "${AGENT_PROFILE:-web}" != sdk ] || { echo "SDK 接入说明：$ROOT/SDK使用说明.md"; exit 0; }
-    entry="http://${AGENT_HOST}:${AGENT_PORT}/assistant/"
-    echo "$entry"
-    if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null; then xdg-open "$entry" >/dev/null 2>&1 || true; fi
-    ;;
   configure)
     if [ -n "$mcp_server" ]; then
       configure_mcp

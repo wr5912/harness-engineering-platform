@@ -107,13 +107,13 @@ export function DeploymentDialog({ rpc, active, target, onClose }: Pick<Platform
           {issues.length > 0 && <ul className="agent-deployment-issues">{issues.map((issue: any, index: number) => <li key={index}>{issue.message ?? String(issue)}</li>)}</ul>}
           {!preview.resourceReady && !preview.canPrepareResources && <>
             <button type="button" onClick={() => setResourcesHelp(!resourcesHelp)}>查看运行资源准备步骤</button>
-            {resourcesHelp && <section aria-label="运行资源准备步骤"><p>在所选架构的在线准备机上，使用相同程序与数据版本运行：</p><pre className="harness-asset-content">{`./platform/dsh-deploy agent-prepare --agent-id ${target.agent_id} --source experiment:${target.experiment_id} --arch ${arch} --mode ${mode}`}</pre><p>将生成的 .local/deploy-assets/{arch}/ 复制到当前平台程序目录中的同名位置，再点击“检查安装包”。准备机需具备匹配的标准 DSH 镜像；缺少业务依赖时须先按该版本声明准备。</p><p className="agent-muted">也可通过 CLI 的 --image-archive 和 --docker-assets 导入对应架构镜像与 Docker 资源，不会混用本机架构。</p></section>}
+            {resourcesHelp && <section aria-label="运行资源准备步骤"><p>在所选架构的在线准备机上，使用相同程序与数据版本运行：</p><pre className="harness-asset-content">{`./platform/dsh-deploy agent-prepare --agent-id ${target.agent_id} --source experiment:${target.experiment_id} --arch ${arch} --mode ${mode}`}</pre><p>将生成的 .local/deploy-assets/{arch}/ 复制到当前平台程序目录中的同名位置，再点击“检查安装包”。准备机需具备匹配的标准 DSH 镜像；新增运行依赖须先纳入标准镜像的依赖清单。</p><p className="agent-muted">也可通过 CLI 的 --image-archive 导入对应架构的标准镜像。目标机需预装 Docker 和 Compose。</p></section>}
           </>}
           {preview.notices?.map((notice: string) => <p key={notice} className="agent-muted">{notice}</p>)}
           {mode === 'offline' && preview.knowledge?.references?.some((ref: any) => ref.kind === 'document') && <>
             <button type="button" onClick={() => setSourcesOpen(!sourcesOpen)}>{sourcesOpen ? '收起本地资料选择' : '使用已有本地资料补充离线参考'}</button>
             {sourcesOpen && <section aria-label="补充离线资料"><p className="agent-muted">可为参考链接选择当前版本中的文档；其余资料在生成时尝试下载。新资料请先通过知识整理或资产入口保存到当前版本，再重新检查。</p>
-              {[...new Set<string>(preview.knowledge.references.filter((ref: any) => ref.kind === 'document').map((ref: any) => ref.url))].map(url => <label key={url} className="agent-field"><span className="agent-deployment-url" title={url}>{url}</span><select value={knowledgeSources[url] ?? ''} onChange={event => setKnowledgeSources(previous => ({ ...previous, [url]: event.target.value }))}><option value="">自动取得参考资料</option>{preview.files.filter((file: any) => /\.(?:md|markdown|txt|html?|pdf|docx)$/i.test(file.path)).map((file: any) => <option key={file.path} value={file.path.replace(/^assets\//, 'dsh/')}>{file.path.replace(/^assets\//, '')}</option>)}</select></label>)}
+              {[...new Set<string>(preview.knowledge.references.filter((ref: any) => ref.kind === 'document').map((ref: any) => ref.url))].map(url => <label key={url} className="agent-field"><span className="agent-deployment-url" title={url}>{url}</span><select value={knowledgeSources[url] ?? ''} onChange={event => setKnowledgeSources(previous => ({ ...previous, [url]: event.target.value }))}><option value="">自动取得参考资料</option>{preview.files.filter((file: any) => /\.(?:md|markdown|txt|html?|pdf|docx)$/i.test(file.path)).map((file: any) => <option key={file.path} value={file.path.replace(/^harness\//, '')}>{file.path.replace(/^harness\//, '')}</option>)}</select></label>)}
             </section>}
           </>}
           {ready && <p role="status">可以生成安装包。包内包含连接凭据，请妥善保管。</p>}
@@ -121,7 +121,7 @@ export function DeploymentDialog({ rpc, active, target, onClose }: Pick<Platform
       </> : <section aria-label="导出任务状态"><h3>{stateLabels[job.state] ?? '导出状态待核对'}</h3>
         {['running', 'submitting'].includes(job.state) && <><LoadingIndicator label="生成安装包" /><p role="status">{typeof job.progress === 'string' ? job.progress : job.progress?.message ?? '正在收集资产、运行依赖和镜像。关闭窗口后任务继续执行。'}</p></>}
         {job.error && <p role="alert">{job.error}</p>}
-        {job.state === 'completed' && <><p>安装包大小：{bytes(job.size ?? 0)}。解包后运行 install.sh；缺少 Docker 时按目标环境自动离线安装。</p><p className="agent-muted">包内包含连接凭据，请妥善保管。业务效果仍需在目标环境核验。</p><a className="agent-primary agent-deployment-download" href={new URL(job.download ?? `api/harness-platform/agent-deployments/download?job_id=${job.id}`, window.location.href).href}>下载安装包</a></>}
+        {job.state === 'completed' && <><p>安装包大小：{bytes(job.size ?? 0)}。解包后运行 ./agent install。目标机需预装 Docker 和 Compose；使用 ./agent help 查看启停维护方法，config/README.md 查看配置说明。</p><p className="agent-muted">包内包含连接凭据，请妥善保管。业务效果仍需在目标环境核验。</p><a className="agent-primary agent-deployment-download" href={new URL(job.download ?? `api/harness-platform/agent-deployments/download?job_id=${job.id}`, window.location.href).href}>下载安装包</a></>}
       </section>}
       {error && <p role="alert">{error}</p>}
     </div>

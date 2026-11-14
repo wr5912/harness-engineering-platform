@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
-import { fixture, write, command } from './agent-fixture.mjs'
+import { fixture, write, command, catalog, exportRecord } from './agent-fixture.mjs'
 import { agentCandidateDigest, inspectAgentSnapshot } from '../agent/snapshot.mts'
 import { sha256File } from '../manifest.mts'
 import { packAgent, previewAgentPackage } from '../agent/pack.mts'
@@ -26,7 +26,7 @@ test('SDK 独立包保留官方运行入口、示例与文档，无业务 Web �
   const result = await packAgent(f.input), root = join(f.root, 'sdk-package')
   tarExtract(result.archive, root)
   assert.equal(result.manifest.source.profile, 'sdk')
-  const compose = JSON.parse(readFileSync(join(root, 'runtime/compose.yaml'), 'utf8'))
+  const compose = JSON.parse(readFileSync(join(root, 'config/compose.yaml'), 'utf8'))
   for (const service of Object.values(compose.services)) { assert.equal(service.environment.HOME, '/var/lib/dsh'); assert.equal(service.environment.DSH_HOME, '/var/lib/dsh') }
   assert.equal(compose.services.dsh.ports, undefined)
   assert.equal(compose.services.dsh.healthcheck, undefined)
@@ -34,15 +34,11 @@ test('SDK 独立包保留官方运行入口、示例与文档，无业务 Web �
   assert.ok(compose.services.dsh.volumes.some(volume => volume.target === '/opt/node_modules' && volume.read_only === true))
   assert.deepEqual(compose.services.dsh.command, ['sdk-run', '/var/lib/dsh/standalone/input.json'])
   assert.equal(existsSync(join(root, 'runtime/web')), false)
-  assert.ok(existsSync(join(root, 'runtime/sdk-runner.mts')))
-  assert.ok(existsSync(join(root, 'runtime/sdk-preset.mts')))
-  assert.ok(existsSync(join(root, 'runtime/sdk-module-links.mts')))
-  assert.ok(existsSync(join(root, 'runtime/prepare-verification-home.mjs')))
-  assert.match(readFileSync(join(root, 'sdk/example.ts'), 'utf8'), /from '@deepseek-ai\/dsh-sdk-client'/)
-  assert.match(readFileSync(join(root, 'SDK使用说明.md'), 'utf8'), /\[sdk\/README\.md\]\(sdk\/README\.md\)/)
-  assert.equal(JSON.parse(readFileSync(join(root, 'config-seed/standalone.json'), 'utf8')).profile, 'sdk')
+  assert.equal(existsSync(join(root, 'runtime')), false)
+  assert.match(readFileSync(join(root, 'harness/sdk/example.ts'), 'utf8'), /from '@deepseek-ai\/dsh-sdk-client'/)
+  assert.match(readFileSync(join(root, 'config/README.md'), 'utf8'), /SDK/)
+  assert.equal(JSON.parse(readFileSync(join(root, 'config/seed/standalone.json'), 'utf8')).profile, 'sdk')
   command('bash', ['-n', join(root, 'agent')])
-  command('bash', ['-n', join(root, 'install.sh')])
 })
 
 test('SDK 版本修改后的示例与指南原字节进入包及来源摘要，装配运行器不覆盖内容', async t => {
@@ -57,12 +53,12 @@ test('SDK 版本修改后的示例与指南原字节进入包及来源摘要，�
   await assert.rejects(packAgent({ ...f.input, expectedCandidateSha256: before.candidateSha256 }), /版本资产已变化/)
   const result = await packAgent(f.input), root = join(f.root, 'sdk-source-bytes')
   tarExtract(result.archive, root)
-  assert.equal(readFileSync(join(root, 'sdk/example.ts'), 'utf8'), example)
-  assert.equal(readFileSync(join(root, 'sdk/README.md'), 'utf8'), guide)
+  assert.equal(readFileSync(join(root, 'harness/sdk/example.ts'), 'utf8'), example)
+  assert.equal(readFileSync(join(root, 'harness/sdk/README.md'), 'utf8'), guide)
   assert.equal(result.manifest.source.candidateSha256, agentCandidateDigest(f.candidate))
   for (const path of ['sdk/example.ts', 'sdk/README.md']) {
-    assert.equal(result.manifest.source.files.find(file => file.sourcePath === path)?.sha256, sha256File(join(f.candidate, path)))
-    assert.equal(result.manifest.files.find(file => file.path === path)?.sha256, sha256File(join(root, path)))
+    assert.equal(exportRecord(f, result).sourceFiles.find(file => file.sourcePath === path)?.sha256, sha256File(join(f.candidate, path)))
+    assert.equal(sha256File(join(root, 'harness', path)), sha256File(join(f.candidate, path)))
   }
 })
 
@@ -80,23 +76,14 @@ test('SDK 包完整承接主子角色模型投影及 Candidate 外层业务项�
   assert.ok(snapshot.files.some(file => file.path === 'assets/candidate/roles/main.md'))
   const result = await packAgent(f.input), root = join(f.root, 'sdk-roles')
   tarExtract(result.archive, root)
-  const main = readFileSync(join(root, 'runtime/projections/presets/alpha-main/agent.cordis.yml'), 'utf8')
-  const reviewer = readFileSync(join(root, 'runtime/projections/presets/reviewer/agent.cordis.yml'), 'utf8')
-  assert.match(main, /main-model/)
-  assert.match(main, /\/opt\/harness-candidate\/roles\/main.md/)
-  assert.match(reviewer, /review-model/)
-  assert.equal(readFileSync(join(f.candidate, 'dsh/presets/alpha-main/agent.cordis.yml'), 'utf8'), sourcePreset)
-  const compose = JSON.parse(readFileSync(join(root, 'runtime/compose.yaml'), 'utf8'))
-  assert.ok(compose.services.dsh.volumes.some(volume => volume.target === '/opt/dsh-presets' && volume.source === './runtime/projections/presets'))
-  assert.ok(compose.services.dsh.volumes.some(volume => volume.target === '/opt/harness-candidate' && volume.source === './assets/candidate'))
-  for (const name of ['workspace', 'presets', 'managed']) {
-    assert.deepEqual(readdirSync(join(root, 'assets/candidate/dsh', name)), [], '只读父层内须预建空的子挂载点')
-  }
-  const candidateMounts = compose.services.dsh.volumes.filter(volume => volume.target.startsWith('/opt/harness-candidate'))
-  assert.equal(candidateMounts[0].target, '/opt/harness-candidate')
-  assert.ok(candidateMounts.every(volume => volume.read_only))
+  assert.equal(readFileSync(join(root, 'harness/dsh/presets/alpha-main/agent.cordis.yml'), 'utf8'), sourcePreset)
+  assert.equal(readFileSync(join(root, 'harness/roles/main.md'), 'utf8'), '# 主角色\n')
+  const compose = JSON.parse(readFileSync(join(root, 'config/compose.yaml'), 'utf8'))
+  assert.ok(compose.services.dsh.volumes.some(volume => volume.target === '/opt/dsh-presets' && volume.source === './state/home/standalone/presets'))
+  assert.ok(compose.services.dsh.volumes.some(volume => volume.target === '/opt/harness-candidate' && volume.source === '${AGENT_HARNESS_ROOT:-./harness}'))
+  assert.ok(compose.services.dsh.volumes.filter(volume => volume.target.startsWith('/opt/harness-candidate')).every(volume => volume.read_only))
   assert.equal(agentCandidateDigest(f.candidate), snapshot.candidateSha256)
-  assert.ok(compose.services.dsh.volumes.some(volume => volume.target === '/opt/harness-model-runtime/model-binding-runtime.mjs'))
+  assert.equal(existsSync(join(root, 'runtime')), false)
 })
 
 test('SDK 运行资产缺失、未知 Profile 与导出期间变化明确拒绝', async t => {
@@ -133,9 +120,9 @@ for (const location of ['roles/main.md', 'project/README.md', 'dsh/workspace/AGE
     assert.deepEqual(preview.knowledge.references.filter(ref => ref.required).map(ref => ref.url), [url])
     const result = await packAgent(input), root = join(f.root, 'offline-sdk')
     tarExtract(result.archive, root)
-    assert.equal(result.manifest.knowledge.sources.length, 1)
-    assert.equal(result.manifest.knowledge.references.some(ref => ref.url.endsWith('/unselected.md')), false)
-    const fetched = await createOfflineKnowledgeProvider(join(root, 'assets/workspace/knowledge/offline/index.json')).fetch({ url })
+    assert.equal(exportRecord(f, result).knowledge.sources.length, 1)
+    assert.equal(exportRecord(f, result).knowledge.references.some(ref => ref.url.endsWith('/unselected.md')), false)
+    const fetched = await createOfflineKnowledgeProvider(join(root, 'harness/dsh/workspace/knowledge/offline/index.json')).fetch({ url })
     assert.equal(fetched.statusCode, 200)
     assert.match(fetched.body.content, /source_revision/)
     await assert.rejects(packAgent({ ...input, knowledgeSources: [{ url, path: '../outside.md' }] }), /已冻结/)
@@ -151,7 +138,7 @@ test('外层角色的必需离线参考缺失时明确拒绝出包', async t => 
   await assert.rejects(packAgent({ ...f.input, mode: 'offline' }), /运行必需的离线知识尚未补齐/)
 })
 
-test('SDK 外层项目的 Node 与 Python 依赖不会被当作零依赖，已准备依赖按项目位置打包', async t => {
+test('SDK 外层项目依赖必须由标准镜像覆盖，宿主依赖不进入包', async t => {
   const f = sdkFixture(t), harness = join(f.candidate, 'harness.yaml')
   write(harness, readFileSync(harness, 'utf8') + '\nproject_workspace:\n  path: project\n')
   write(join(f.candidate, 'project/package.json'), JSON.stringify({ name: 'business-project', dependencies: { 'fixture-sdk-lib': '1.0.0' }, peerDependencies: { '@deepseek-ai/dsh-sdk-client': '*' } }))
@@ -163,8 +150,9 @@ test('SDK 外层项目的 Node 与 Python 依赖不会被当作零依赖，已�
   write(join(f.candidate, 'project/node_modules/fixture-sdk-lib/index.js'), 'export const ready = true\n')
   write(join(f.candidate, 'project/vendor/site-packages/fixture_py_lib/__init__.py'), 'READY = True\n')
   write(join(f.program, 'platform/plugin/lib/model-binding-runtime.js'), 'export {}\n')
+  catalog(f, { 'fixture-sdk-lib': '1.0.0' }, 'fixture_py_lib==1.0.0\n')
   const result = await packAgent(f.input), root = join(f.root, 'sdk-project-dependencies')
   tarExtract(result.archive, root)
-  assert.ok(existsSync(join(root, 'assets/candidate/project/node_modules/fixture-sdk-lib/index.js')))
-  assert.ok(existsSync(join(root, 'runtime/python/candidate/project/site-packages/fixture_py_lib/__init__.py')))
+  assert.equal(existsSync(join(root, 'harness/project/node_modules')), false)
+  assert.equal(existsSync(join(root, 'runtime')), false)
 })

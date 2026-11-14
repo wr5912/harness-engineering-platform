@@ -126,7 +126,7 @@ function pythonPackages(candidate: string, input: AgentPackageInput, extraDirect
     }
     if (ready) { try { assertDependencyArchitecture(modulesPath!, input.arch) } catch { ready = false } }
     result.push({ kind: 'python', path, name: `Python 环境（${relative(join(candidate, 'dsh'), directory).split(sep).join('/')}）`,
-      sourceFile: declaration, dependencies: names.length ? names : ['Python 项目声明'], lockSha256,
+      sourceFile: declaration, requirements: entries, unresolved, dependencies: names.length ? names : ['Python 项目声明'], lockSha256,
       ...(modulesPath ? { modulesPath } : {}), ...(modulesPath === prepared && preparedPackage?.preparedTarget ? { preparedTarget: preparedPackage.preparedTarget } : {}), ready,
       ...(!ready ? { reason: unresolved ? 'Python 声明含未解析的环境/引用，需先准备明确的便携依赖，不能按零依赖出包'
         : native ? '含原生 Python 扩展，需要与目标 DSH 镜像兼容的已准备依赖；不会复制宿主 venv 或执行安装 Hook'

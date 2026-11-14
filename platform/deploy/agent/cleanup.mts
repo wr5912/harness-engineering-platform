@@ -1,5 +1,6 @@
 import { existsSync, lstatSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { packageCompose } from './layout.mts'
 import { agentCommand } from './process.mts'
 
 /** 清理指定独立安装的过程资源，不删除 HOME、共享镜像或其他交付包。 */
@@ -7,13 +8,13 @@ export async function cleanupAgentInstallation(prefix: string) {
   const root = realpathSync(prefix)
   const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'))
   if (manifest.kind !== 'standalone-agent') throw new Error('清理目标不是独立智能体安装目录')
-  const compose = join(root, 'runtime/compose.yaml')
+  const compose = packageCompose(root)
   if (!lstatSync(compose).isFile()) throw new Error('清理目标缺少 Compose 配置')
   const deployment = join(root, 'state/deployment.env')
   const projects = new Set<string>()
   if (existsSync(deployment)) {
     if (!lstatSync(deployment).isFile()) throw new Error('清理目标的安装身份不是普通文件')
-    const project = /^COMPOSE_PROJECT_NAME=(hep-agent-[a-zA-Z0-9_-]+)$/m.exec(readFileSync(deployment, 'utf8'))?.[1]
+    const project = /^COMPOSE_PROJECT_NAME=['"]?(hep-agent-[a-zA-Z0-9_-]+)['"]?$/m.exec(readFileSync(deployment, 'utf8'))?.[1]
     if (!project) throw new Error('清理目标的容器项目身份无效')
     projects.add(project)
   }
@@ -27,7 +28,7 @@ export async function cleanupAgentInstallation(prefix: string) {
     const labels = container.Config?.Labels ?? {}
     return labels['com.docker.compose.project.working_dir'] === root
       && labels['com.docker.compose.project.config_files'] === compose
-      && container.Mounts?.some((mount: any) => mount.Source === root && mount.Destination === '/opt/standalone')
+      && container.Mounts?.some((mount: any) => (mount.Source === root && mount.Destination === '/opt/standalone') || (mount.Source === join(root, 'state/home') && mount.Destination === '/var/lib/dsh'))
   }
   for (const container of containers) {
     const project = container.Config?.Labels?.['com.docker.compose.project']
@@ -48,5 +49,5 @@ export async function cleanupAgentInstallation(prefix: string) {
     if (networks.trim()) throw new Error('清理后仍有目标网络残留；安装介质已保留，请检查 Docker 状态')
   }
   for (const name of ['images', 'offline']) rmSync(join(root, name), { recursive: true, force: true })
-  return { prefix: root, projects: [...projects], cleaned: ['containers', 'network', 'installation-media'], retained: ['image', 'assets', 'config-seed', 'state'] }
+  return { prefix: root, projects: [...projects], cleaned: ['containers', 'network', 'installation-media'], retained: manifest.schemaVersion === 2 ? ['image', 'harness', 'config', 'state'] : ['image', 'assets', 'config-seed', 'state'] }
 }

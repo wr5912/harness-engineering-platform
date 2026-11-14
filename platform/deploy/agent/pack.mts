@@ -1,16 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { collectEntries, sha256File, verifyEntries, writeChecksums } from '../manifest.mts'
+import { sha256File } from '../manifest.mts'
 import { inspectImageArchive, verifyImageInfo } from '../image.mts'
 import { safeRelative } from '../fsutil.mts'
 import { inspectKnowledge, collectKnowledge } from '../knowledge/index.mts'
-import { inspectAgentSnapshot, copyAgentSnapshot, assertDependencyArchitecture, dependencyEntries } from './snapshot.mts'
+import { inspectAgentSnapshot } from './snapshot.mts'
 import { inspectAgentResources, defaultAgentResourcesDir } from './prepare.mts'
 import { agentSeed } from './seed.mts'
 import { agentCommand } from './process.mts'
 import { writeRuntimeBundle } from './runtime/index.mts'
-import { stageSdkRuntime } from './runtime/sdk.mts'
+import { runtimeDependencies } from './dependencies.mts'
+import { copyNativeHarness, harnessDigest, writeExportRecord } from './layout.mts'
 import type { AgentPackageHooks, AgentPackageInput, AgentPackageManifest, AgentSourceSnapshot } from './types.mts'
 
 export { defaultAgentResourcesDir } from './prepare.mts'
@@ -18,10 +19,10 @@ export { agentSeed } from './seed.mts'
 export type { AgentPackageInput, AgentPackageHooks, AgentPackageManifest } from './types.mts'
 
 const knowledgeRoots = (snapshot: AgentSourceSnapshot, staging?: string) => [{
-  root: staging ? join(staging, 'assets') : snapshot.candidate,
+  root: staging ? join(staging, 'harness') : snapshot.candidate,
   label: 'candidate',
   include: snapshot.files.filter(file => file.path.startsWith('assets/'))
-    .map(file => staging ? file.path.slice('assets/'.length) : file.sourcePath),
+    .map(file => file.sourcePath),
 }]
 
 /** 预览只公开摘要和缺口，不返回连接 Header、模型 Key 或配置种子。 */
@@ -29,14 +30,14 @@ export function previewAgentPackage(input: AgentPackageInput) {
   const normalized = { ...input, resourcesDir: input.resourcesDir ?? defaultAgentResourcesDir(input) }
   const snapshot = inspectAgentSnapshot(normalized)
   const resources = inspectAgentResources(normalized)
-  const issues = [...resources.issues, ...snapshot.dependencies.filter(item => !item.ready).map(item => ({ code: 'dependencies_missing', message: `业务依赖尚未准备：${item.name}${item.reason ? `；${item.reason}` : ''}`, path: item.sourceFile ?? item.path }))]
+  const issues = [...resources.issues, ...runtimeDependencies(normalized, snapshot).filter(item => !item.ready).map(item => ({ code: 'dependencies_missing', message: `业务依赖尚未准备：${item.name}${item.reason ? `；${item.reason}` : ''}`, path: item.sourceFile ?? item.path }))]
   const knowledge = inspectKnowledge({ roots: knowledgeRoots(snapshot), mode: input.mode })
   return {
     agentId: snapshot.agentId, experimentId: snapshot.experimentId, profile: snapshot.source.profile ?? 'web', arch: input.arch, mode: input.mode,
     candidateSha256: snapshot.candidateSha256, dirty: snapshot.git.dirty,
-    files: snapshot.files.map(file => ({ path: file.path, sha256: file.sha256 })),
+    files: snapshot.files.map(file => ({ path: `harness/${file.sourcePath}`, sha256: file.sha256 })),
     omitted: snapshot.omitted,
-    dependencyPackages: snapshot.dependencies.map(({ path, kind, name, dependencies, ready, reason }) => ({ path, kind: kind ?? 'node', name, dependencies, ready, reason })),
+    dependencyPackages: runtimeDependencies(normalized, snapshot).map(({ path, kind, name, dependencies, ready, reason }) => ({ path, kind: kind ?? 'node', name, dependencies, ready, reason })),
     resourceReady: issues.length === 0, issues,
     image: resources.manifest?.image,
     knowledge,
@@ -57,15 +58,13 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
   hooks.onProgress?.({ stage: 'preview', message: '正在核对版本和运行资源' })
   const snapshot = inspectAgentSnapshot(normalized)
   const resources = inspectAgentResources(normalized)
-  const missing = snapshot.dependencies.filter(item => !item.ready)
-  if (resources.issues.length || !resources.manifest || missing.length) throw new Error([...resources.issues.map(item => item.message), ...missing.map(item => `缺少 ${item.name} 的 ${input.arch} 依赖`)].join('；'))
+  const missing = runtimeDependencies(normalized, snapshot).filter(item => !item.ready)
+  if (resources.issues.length || !resources.manifest || missing.length) throw new Error([...resources.issues.map(item => item.message), ...missing.map(item => `${item.name}：${item.reason}`)].join('；'))
   const resourceManifest = resources.manifest
   const imagePath = join(resourcesDir, safeRelative(resourceManifest.image.archive))
   const image = inspectImageArchive(imagePath, resourceManifest.image.tag!)
   const imageProblems = verifyImageInfo(image, { id: resourceManifest.image.id, arch: input.arch, fingerprint: resourceManifest.image.fingerprint })
   if (imageProblems.length) throw new Error(`标准镜像校验失败：${imageProblems.join('；')}`)
-  const dockerProblems = verifyEntries(join(resourcesDir, 'docker'), resourceManifest.docker.files)
-  if (dockerProblems.length) throw new Error(`Docker 离线资源校验失败：${dockerProblems.join('；')}`)
 
   const out = resolve(input.out ?? join(input.assetRoot, '.local/artifacts/agent-deployments'))
   mkdirSync(out, { recursive: true, mode: 0o700 })
@@ -79,68 +78,47 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
     hooks.onProgress?.({ stage: 'snapshot', message: '正在冻结所选版本的实际资产', total: snapshot.files.length })
     // 与资产一起冻结环境；后续知识下载期间不再读取源 .env。
     const supplied = agentSeed(snapshot, input.seed)
-    copyAgentSnapshot(snapshot, staging, hooks.signal)
-    if (snapshot.source.profile === 'sdk') stageSdkRuntime(staging, resolve(input.programRoot), snapshot)
-    for (const dependency of snapshot.dependencies) {
-      hooks.signal?.throwIfAborted()
-      if (dependency.preparedTarget && (dependency.preparedTarget.imageId !== image.id || dependency.preparedTarget.image !== resourceManifest.image.tag)) throw new Error(`业务依赖对应另一标准镜像：${dependency.name}；请重新准备`)
-      const prepared = resourceManifest.dependencies.find(item => item.path === dependency.path)
-      if (dependency.modulesPath?.startsWith(resourcesDir) && (!prepared || prepared.lockSha256 !== dependency.lockSha256)) throw new Error(`依赖锁已变化，请重新准备 ${dependency.name}`)
-      if (prepared && dependency.modulesPath?.startsWith(resourcesDir)) {
-        const problems = verifyEntries(dependency.modulesPath, prepared.files)
-        if (problems.length) throw new Error(`业务依赖资源已变化：${dependency.name}`)
-      }
-      assertDependencyArchitecture(dependency.modulesPath!, input.arch)
-      const destination = dependency.kind === 'python' ? join(staging, 'runtime', dependency.path, 'site-packages') : join(staging, 'assets', dependency.path, 'node_modules')
-      await copy(dependency.modulesPath!, destination, hooks)
-      if (dependency.preparedFiles && JSON.stringify(dependencyEntries(destination)) !== JSON.stringify(dependency.preparedFiles)) throw new Error(`业务依赖在导出期间变化：${dependency.name}，请重试`)
-      if (prepared && dependency.modulesPath?.startsWith(resourcesDir) && verifyEntries(destination, prepared.files).length) throw new Error(`业务依赖在导出期间变化：${dependency.name}，请重试`)
-    }
+    copyNativeHarness(snapshot, staging, hooks.signal)
     hooks.onProgress?.({ stage: 'knowledge', message: input.mode === 'offline' ? '正在收集离线知识引用' : '正在核对已有本地知识' })
     const localSources = (input.knowledgeSources ?? []).map(item => {
-      const file = snapshot.files.find(file => file.sourcePath === item.path || file.path === item.path)
+      const file = snapshot.files.find(file => file.sourcePath === item.path || `harness/${file.sourcePath}` === item.path || file.path === item.path)
       if (!file) throw new Error('提供的离线资料不在当前版本已冻结的资产中')
-      return { url: item.url, path: join(staging, file.path) }
+      return { url: item.url, path: join(staging, 'harness', file.sourcePath) }
     })
     const knowledge = await collectKnowledge({ roots: knowledgeRoots(snapshot, staging), mode: input.mode,
-      outDir: join(staging, 'assets/workspace/knowledge/offline'), signal: hooks.signal,
+      outDir: join(staging, 'harness/dsh/workspace/knowledge/offline'), signal: hooks.signal,
       localSources,
       onProgress: (progress: any) => hooks.onProgress?.({ stage: 'knowledge', message: progress.message ?? '正在收集引用资料' }) })
     if (knowledge.missing.some((item: any) => item.required)) throw new Error(`运行必需的离线知识尚未补齐（${knowledge.missing.filter((item: any) => item.required).length} 项）；请提供本地资料或恢复文档访问后重试`)
 
     const environment = supplied.environment ?? {}
-    const pythonPaths = snapshot.dependencies.filter(item => item.kind === 'python').map(item => `/opt/standalone/runtime/${item.path}/site-packages`)
-    if (pythonPaths.length) environment.PYTHONPATH = [...pythonPaths, ...(environment.PYTHONPATH ? [environment.PYTHONPATH] : [])].join(':')
     const seed = { ...supplied, environment: undefined, agentId: input.agentId, experimentId: input.experimentId,
       presetId: snapshot.source.preset_id, profilePatch: snapshot.source.patch, profile: snapshot.source.profile ?? 'web',
       environmentKeys: Object.keys(environment), sourceDigest: snapshot.candidateSha256,
       ...(input.mode === 'offline' && knowledge.indexPath ? { offlineKnowledge: { indexPath: '/work/harness/workspace/knowledge/offline/index.json' } } : {}) }
     if (/\bsk-[A-Za-z0-9_-]{12,}/.test(JSON.stringify(seed.modelPatch ?? []))) throw new Error('模型凭据须通过专用环境配置引用，不可写入模型 Patch 常量')
-    mkdirSync(join(staging, 'config-seed'), { mode: 0o700 })
-    writeFileSync(join(staging, 'config-seed/standalone.json'), JSON.stringify(seed, null, 2) + '\n', { mode: 0o600 })
-    writeFileSync(join(staging, 'config-seed/environment.llm-api-key'), JSON.stringify(environment, null, 2) + '\n', { mode: 0o600 })
+    mkdirSync(join(staging, 'config/seed'), { recursive: true, mode: 0o700 })
+    writeFileSync(join(staging, 'config/seed/standalone.json'), JSON.stringify(seed, null, 2) + '\n', { mode: 0o600 })
+    writeFileSync(join(staging, 'config/seed/environment.llm-api-key'), JSON.stringify(environment, null, 2) + '\n', { mode: 0o600 })
     hooks.onProgress?.({ stage: 'runtime', message: '正在装配独立 DSH 运行入口' })
     await writeRuntimeBundle(staging, { programRoot: resolve(input.programRoot), imageTag: resourceManifest.image.tag!, imageId: resourceManifest.image.id,
       imageFingerprint: resourceManifest.image.fingerprint,
       arch: input.arch, agentId: input.agentId, experimentId: input.experimentId, presetId: snapshot.source.preset_id,
       profile: snapshot.source.profile ?? 'web', harnessRuntime: snapshot.source.harness_runtime,
       profilePatch: snapshot.source.patch })
-    hooks.onProgress?.({ stage: 'image', message: '正在归档标准镜像与离线安装资源' })
+    hooks.onProgress?.({ stage: 'image', message: '正在归档标准运行镜像' })
     await copy(imagePath, join(staging, 'images/dsh-runtime.tar'), hooks)
-    await copy(join(resourcesDir, 'docker'), join(staging, 'offline/docker'), hooks)
-    writeFileSync(join(staging, '.gitignore'), 'state/\nconfig-seed/\n*.llm-api-key\n', { mode: 0o644 })
     const manifest: AgentPackageManifest = {
-      schemaVersion: 1, kind: 'standalone-agent', package: { name, arch: input.arch, mode: input.mode, createdAt: new Date().toISOString(), sensitive: true },
+      schemaVersion: 2, kind: 'standalone-agent', package: { name, arch: input.arch, mode: input.mode, createdAt: new Date().toISOString(), sensitive: true },
       source: { agentId: input.agentId, experimentId: input.experimentId, candidateSha256: snapshot.candidateSha256,
         commit: snapshot.git.commit, dirty: snapshot.git.dirty, profile: snapshot.source.profile ?? 'web',
-        paths: { workspace: 'assets/workspace', presets: 'assets/presets', managed: 'assets/managed',
-          profilePatch: `assets/managed/${snapshot.source.patch}`, preset: `assets/presets/${snapshot.source.preset}` },
-        files: snapshot.files, omitted: snapshot.omitted },
-      image: { ...resourceManifest.image, archive: 'images/dsh-runtime.tar' }, knowledge,
-      files: collectEntries(staging), sensitivePaths: ['config-seed/standalone.json', 'config-seed/environment.llm-api-key'],
+        paths: { workspace: 'harness/dsh/workspace', presets: 'harness/dsh/presets', managed: 'harness/dsh/managed',
+          profilePatch: `harness/dsh/managed/${snapshot.source.patch}`, preset: `harness/dsh/presets/${snapshot.source.preset}` },
+        harnessSha256: harnessDigest(join(staging, 'harness')), files: [], omitted: [] },
+      image: { ...resourceManifest.image, archive: 'images/dsh-runtime.tar' }, knowledge: { mode: input.mode, local: input.mode === 'offline' && existsSync(join(staging, 'harness/dsh/workspace/knowledge/offline/index.json')) },
+      files: [], sensitivePaths: ['config/seed/standalone.json', 'config/seed/environment.llm-api-key'],
     }
     writeFileSync(join(staging, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 })
-    writeChecksums(staging, manifest.files)
     hooks.signal?.throwIfAborted()
     hooks.onProgress?.({ stage: 'archive', message: '正在生成安装包' })
     writeFileSync(partial, '', { mode: 0o600 })
@@ -150,6 +128,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
     hooks.signal?.throwIfAborted()
     renameSync(partial, archive)
     writeFileSync(archive + '.sha256', `${sha256}  ${name}.tar.gz\n`, { mode: 0o600 })
+    writeExportRecord(input.assetRoot, name, { manifest, sourceFiles: snapshot.files, omitted: snapshot.omitted, knowledge, dependencies: runtimeDependencies(normalized, snapshot) })
     result = { archive, size: statSync(archive).size, sha256, manifest }
   } finally {
     rmSync(staging, { recursive: true, force: true })

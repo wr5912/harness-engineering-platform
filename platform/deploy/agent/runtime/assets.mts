@@ -1,7 +1,9 @@
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { collectEntries, sha256File, writeChecksums } from '../../manifest.mts'
 import { safeRelative } from '../../fsutil.mts'
+import { copyNativeHarness, harnessDigest } from '../layout.mts'
+import { runtimeDependencies } from '../dependencies.mts'
 import { copyAgentSnapshot } from '../snapshot.mts'
 import { stageManagedProjections } from './projections.mts'
 import type { AgentPackageManifest, AgentSourceSnapshot } from '../types.mts'
@@ -13,6 +15,7 @@ export function refreshAgentAssets(root: string, programRoot: string, snapshot: 
     || manifest.source.experimentId !== snapshot.experimentId || manifest.package.arch !== arch
     || manifest.image.tag !== imageTag || (snapshot.source.profile ?? 'web') !== manifest.source.profile
     || manifest.source.profile === 'sdk') throw new Error('资产更新仅支持同一智能体、版本、架构和标准镜像的 Web 安装')
+  if (manifest.schemaVersion === 2) return refreshNativeHarness(root, programRoot, snapshot, manifest)
   if (manifest.source.paths.profilePatch !== `assets/managed/${snapshot.source.patch}`
     || manifest.source.paths.preset !== `assets/presets/${snapshot.source.preset}`) throw new Error('运行入口变化，请重新导出安装包')
   const before = new Map(manifest.source.files.map(file => [file.path, file]))
@@ -83,4 +86,32 @@ export function refreshAgentAssets(root: string, programRoot: string, snapshot: 
     throw error
   } finally { rmSync(prepared, { recursive: true, force: true }) }
   return { assetsUpdated: root, changed: changed.length, backup, restartRequired: true }
+}
+
+function refreshNativeHarness(root: string, programRoot: string, snapshot: AgentSourceSnapshot, manifest: AgentPackageManifest) {
+  if (manifest.source.paths.profilePatch !== `harness/dsh/managed/${snapshot.source.patch}`
+    || manifest.source.paths.preset !== `harness/dsh/presets/${snapshot.source.preset}`) throw new Error('运行入口变化，请重新导出安装包')
+  const configured = readFileSync(join(root, 'config/deployment.env'), 'utf8').split(/\r?\n/).filter(row => /^AGENT_HARNESS_ROOT=/.test(row)).at(-1)?.split('=').slice(1).join('=').replace(/^['"]|['"]$/g, '')
+  if (configured && resolve(root, configured) !== join(root, 'harness')) throw new Error('当前使用外部 Harness，请直接维护该目录；未覆盖外部资产')
+  if (harnessDigest(join(root, 'harness')) !== manifest.source.harnessSha256) throw new Error('安装 Harness 有现场修改或冲突，未覆盖')
+  if ((manifest.knowledge as any)?.local) throw new Error('包含收集的本地知识，请重新导出以同步知识索引')
+  if (runtimeDependencies({ programRoot } as any, snapshot).some(item => !item.ready)) throw new Error('标准镜像缺少新资产的依赖，请更新镜像后重新导出')
+  if (manifest.source.candidateSha256 === snapshot.candidateSha256) return { assetsUpdated: root, changed: 0, restartRequired: false }
+  const backups = join(root, 'state/asset-updates')
+  mkdirSync(backups, { recursive: true, mode: 0o700 })
+  const backup = mkdtempSync(join(backups, 'update-')), prepared = join(backup, 'prepared'), original = readFileSync(join(root, 'manifest.json'))
+  copyNativeHarness(snapshot, prepared)
+  copyFileSync(join(root, 'manifest.json'), join(backup, 'manifest.json'))
+  let moved = false
+  try {
+    renameSync(join(root, 'harness'), join(backup, 'harness')); moved = true
+    renameSync(join(prepared, 'harness'), join(root, 'harness'))
+    manifest.source = { ...manifest.source, candidateSha256: snapshot.candidateSha256, harnessSha256: harnessDigest(join(root, 'harness')), commit: snapshot.git.commit, dirty: snapshot.git.dirty }
+    writeFileSync(join(root, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 })
+  } catch (error) {
+    if (moved) { rmSync(join(root, 'harness'), { recursive: true, force: true }); renameSync(join(backup, 'harness'), join(root, 'harness')) }
+    writeFileSync(join(root, 'manifest.json'), original)
+    throw error
+  } finally { rmSync(prepared, { recursive: true, force: true }) }
+  return { assetsUpdated: root, changed: 1, backup, restartRequired: true }
 }
