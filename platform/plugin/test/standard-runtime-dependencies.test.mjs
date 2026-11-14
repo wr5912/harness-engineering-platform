@@ -35,6 +35,23 @@ test('实例和独立包使用相同标准依赖，无宿主回执时也可运�
   assert.equal(existsSync(join(f.data, '.local/asset-dependencies')), false)
 })
 
+test('修改业务 Harness 后两条路径继续复用标准 Runtime，不要求依赖回执或重建', async t => {
+  const f = fixture(t)
+  const before = resolvePreparedAssetDependencies(f.data, 'business:demo', {}, f.candidate)
+  f.put(join(f.candidate, 'dsh/workspace/AGENTS.md'), '# 业务助手\n使用更新后的业务规则。\n')
+  f.put(join(f.candidate, 'dsh/workspace/skills/inspection/SKILL.md'), '# 巡检\n通过平台 MCP 执行巡检。\n')
+  f.put(join(f.candidate, 'dsh/managed/demo.patch.yml'), 'model: local/updated-model\nmcp:\n  servers:\n    platform:\n      type: streamable-http\n      url: http://platform.example/mcp\n')
+  const after = resolvePreparedAssetDependencies(f.data, 'business:demo', {}, f.candidate)
+  assert.equal(after.status, 'ready', after.reasons.join(';'))
+  assert.ok(before.receipt.declarations_sha256)
+  assert.equal(after.receipt.declarations_sha256, before.receipt.declarations_sha256)
+  assert.deepEqual(after.mounts, [])
+  assert.equal(runtimeDependencies({ programRoot }, f.snapshot)[0].ready, true)
+  const result = await createAssetDependenciesHandler(f.data, { command: () => assert.fail('Harness 修改不得触发安装器') })({ experiment_id: 'business:demo' })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.equal(existsSync(join(f.data, '.local/asset-dependencies')), false)
+})
+
 test('固定业务 Candidate 不能因调用方省略版本而回退到当前工作树', t => {
   const f = fixture(t)
   const commit = spawnSync('git', ['add', '.'], { cwd: join(f.data, '..', 'business'), encoding: 'utf8' })
