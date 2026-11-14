@@ -60,6 +60,16 @@ export function installRuntime(bundle: string, prefix: string, dataRoot: string)
   if (existsSync(join(offline, 'pnpm'))) {
     copyTree(join(offline, 'pnpm'), join(runtime, 'pnpm'))
     pnpm = join(runtime, 'pnpm', 'bin', 'pnpm')
+    // npm 全局前缀中的 bin 可能被资源收集器解引用；从包声明重建可迁移入口。
+    const packageRoot = join(runtime, 'pnpm/lib/node_modules/pnpm')
+    const packageJson = join(packageRoot, 'package.json')
+    if (existsSync(packageJson)) {
+      const pkg = JSON.parse(readFileSync(packageJson, 'utf8'))
+      const entry = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin?.pnpm
+      if (!entry || !existsSync(join(packageRoot, entry))) throw Error('离线 pnpm 包缺少 package.json 声明的运行入口')
+      mkdirSync(dirname(pnpm), { recursive: true })
+      writeFileSync(pnpm, `#!/bin/sh\nBASE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec node "$BASE/../lib/node_modules/pnpm/${entry}" "$@"\n`, { mode: 0o755 })
+    }
     if (existsSync(pnpm)) chmodSync(pnpm, 0o755)
   }
   if (!pnpm || !existsSync(pnpm)) {

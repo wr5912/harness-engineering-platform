@@ -18,6 +18,7 @@ export interface AgentPackageInput {
   arch: Arch
   mode: DeploymentMode
   out?: string
+  evidenceDir?: string
   resourcesDir?: string
   expectedCandidateSha256?: string
   knowledgeSources?: Array<{ url: string; path: string }>

@@ -128,7 +128,7 @@ export async function packAgent(input: AgentPackageInput, hooks: AgentPackageHoo
     hooks.signal?.throwIfAborted()
     renameSync(partial, archive)
     writeFileSync(archive + '.sha256', `${sha256}  ${name}.tar.gz\n`, { mode: 0o600 })
-    writeExportRecord(input.assetRoot, name, { manifest, sourceFiles: snapshot.files, omitted: snapshot.omitted, knowledge, dependencies: runtimeDependencies(normalized, snapshot) })
+    writeExportRecord(input.assetRoot, name, { manifest, sourceFiles: snapshot.files, omitted: snapshot.omitted, knowledge, dependencies: runtimeDependencies(normalized, snapshot) }, input.evidenceDir)
     result = { archive, size: statSync(archive).size, sha256, manifest }
   } finally {
     rmSync(staging, { recursive: true, force: true })

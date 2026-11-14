@@ -60,9 +60,10 @@ function validateOptions(command: string, options: Options): void {
     'agent-runtime-update': ['prefix', 'program-root'],
     'agent-cleanup': ['prefix'],
     'agent-preview': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'prefix'],
-    'agent-pack': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'out', 'seed-file', 'expected-candidate-sha256'],
+    'agent-pack': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'out', 'seed-file', 'expected-candidate-sha256', 'evidence-dir'],
     'agent-prepare': ['program-root', 'data-root', 'agent-id', 'source', 'arch', 'mode', 'resources-dir', 'image-archive'],
     pack: ['out', 'program-root', 'data-root', 'assets-dir', 'knowledge-dir', 'image-archive', 'image-tag', 'image-id', 'image-fingerprint', 'arch'],
+    'release-plan': ['program-root', 'data-root', 'environment'],
     install: ['bundle-root', 'prefix', 'data-root', 'host', 'port', 'gateway-port', 'public-url'],
     verify: ['prefix', 'data-root', 'url'],
     relocate: ['prefix', 'from-data-root', 'data-root', 'ssh'],
@@ -76,6 +77,7 @@ function validateOptions(command: string, options: Options): void {
     'agent-cleanup': [],
     'agent-preview': ['update-assets'], 'agent-pack': [], 'agent-prepare': [],
     pack: ['no-image', 'no-data', 'allow-dirty', 'include-working-tree', 'allow-fixture-data', 'keep-staging'],
+    'release-plan': [],
     install: ['dry-run', 'skip-image', 'skip-prepare', 'strict-paths', 'allow-fixture-data', 'start', 'update'],
     verify: [],
     relocate: ['dry-run', 'resume'],
@@ -159,11 +161,15 @@ function usage(): string {
     --program-root <目录>       程序根，默认当前仓库
     --data-root <目录>          数据工作区，默认当前关联工作区
     --out <目录>                agent-pack 输出目录
+    --evidence-dir <目录>       导出证据目录，默认数据仓本地制品目录
     --seed-file <*.llm-api-key> agent-pack 连接与凭据种子；不传时保留原生资产配置和工作区环境
     --expected-candidate-sha256 <摘要>  agent-pack 核对先前预览的实际资产
     --prefix <目录>             agent-preview 刷新已有独立预览的运行器；保留资产、配置、会话和镜像，随后用 ./standalone_agent_launcher restart 生效
     --update-assets             与 --prefix 合用，改为更新同版本 Harness 资产及投影；现场冲突停止，保留备份、连接、HOME 和镜像
     --image-archive <tar>       agent-prepare 导入该架构标准镜像
+
+  dsh-deploy release-plan --environment <环境> [--program-root <目录>] [--data-root <目录>]
+    解析 data/config/deployment.yaml 的文件引用并输出打包计划及配置摘要，不输出连接内容。
 
   dsh-deploy pack [选项]
     --out <目录>                 输出目录，默认 ./dist
@@ -293,6 +299,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         programRoot: resolve(text(options, 'program-root', REPO)!), assetRoot: resolve(text(options, 'data-root', defaultAssetRoot())!),
         agentId, experimentId: source, arch: archOf(text(options, 'arch')), mode,
         resourcesDir: text(options, 'resources-dir'), out: text(options, 'out'), expectedCandidateSha256: text(options, 'expected-candidate-sha256'),
+        evidenceDir: text(options, 'evidence-dir'),
       }
       if (command === 'agent-preview') {
         const { previewAgentPackage } = await import('./agent/pack.mts')
@@ -349,6 +356,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
           agentId, experimentId: input.experimentId, arch: input.arch, mode: input.mode }, null, 2))
         return 0
       } finally { process.off('SIGINT', cancel); process.off('SIGTERM', cancel) }
+    }
+    if (command === 'release-plan') {
+      const { releasePlan } = await import('./release-config.mts')
+      const environment = text(options, 'environment')
+      if (!environment) throw Error('release-plan 需要 --environment')
+      console.log(JSON.stringify(releasePlan(resolve(text(options, 'program-root', REPO)!), resolve(text(options, 'data-root', defaultAssetRoot())!), environment), null, 2))
+      return 0
     }
     if (command === 'pack') {
       const { pack } = await import('./pack.mts')

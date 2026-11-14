@@ -14,9 +14,9 @@ export function copyNativeHarness(snapshot: AgentSourceSnapshot, root: string, s
   copyAgentSnapshot({ ...snapshot, files: snapshot.files.map(file => ({ ...file, path: `harness/${file.sourcePath}` })) }, root, signal)
 }
 
-/** 详细证据只留在平台数据根；归档中的 manifest 保持简短。 */
-export function writeExportRecord(assetRoot: string, name: string, value: unknown) {
-  const path = join(assetRoot, '.local/artifacts/agent-deployments', `${name}.export.json`)
+/** 详细证据留在调用方指定目录或平台本地制品目录；包内 manifest 保持简短。 */
+export function writeExportRecord(assetRoot: string, name: string, value: unknown, evidenceDir?: string) {
+  const path = join(evidenceDir ?? join(assetRoot, '.local/artifacts/agent-deployments'), `${name}.export.json`)
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   writeFileSync(path, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 })
   return path

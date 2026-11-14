@@ -46,6 +46,22 @@ function manifest(path, image) {
 const options = (path, prefix) => ({ bundleRoot: path, prefix, dataRoot: prefix + '-data', skipImage: false,
   skipPrepare: false, allowFixtureData: false, strictPaths: false, start: false, dryRun: false, json: false, port: 18120 })
 
+test('npm 全局布局的 pnpm 入口被解引用后仍从包目录启动并支持安装目录迁移', () => {
+  const path = bundle('pnpm-global-layout'), prefix = join(root, 'pnpm-global-program')
+  write(join(path, 'offline/pnpm/bin/pnpm'), '#!/usr/bin/env node\nrequire("../dist/probe.cjs")\n', true)
+  write(join(path, 'offline/pnpm/lib/node_modules/pnpm/package.json'), JSON.stringify({ bin: { pnpm: 'bin/pnpm.cjs' } }))
+  write(join(path, 'offline/pnpm/lib/node_modules/pnpm/bin/pnpm.cjs'), 'require("../dist/probe.cjs")\n')
+  write(join(path, 'offline/pnpm/lib/node_modules/pnpm/dist/probe.cjs'), 'console.log("11.28.5")\n')
+  copyTree(join(path, 'program'), prefix)
+  const runtime = installRuntime(path, prefix, prefix + '-data')
+  assert.equal(runtime.versions.pnpm, '11.28.5')
+  const moved = prefix + '-moved'
+  renameSync(prefix, moved)
+  const result = spawnSync(join(moved, 'runtime/pnpm/bin/pnpm'), ['--version'], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout.trim(), '11.28.5')
+})
+
 test('全量更新保留现场身份、配置和会话，删除旧业务资产；prepare 失败恢复后可重试', async () => {
   const path = bundle('full-update-bundle'), prefix = join(root, 'full-update-program'), dataRoot = prefix + '-data'
   write(join(path, 'data/workspace.json'), JSON.stringify({ id: 'source-workspace', extensions: [{ id: 'new-extension', path: 'mcp' }] }))

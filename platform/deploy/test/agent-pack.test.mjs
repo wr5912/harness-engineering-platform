@@ -70,6 +70,13 @@ test('仅配置模型的独立包生成可初始化的空 MCP 配置，不要求
   assert.deepEqual(config.mcp.groups, [])
 })
 
+test('控制仓指定证据目录后，独立包导出记录不回写数据仓', async t => {
+  const f = fixture(t), evidenceDir = join(f.root, 'release/evidence')
+  const result = await packAgent({ ...f.input, evidenceDir })
+  assert.equal(existsSync(join(evidenceDir, result.manifest.package.name + '.export.json')), true)
+  assert.equal(existsSync(join(f.input.assetRoot, '.local/artifacts/agent-deployments', result.manifest.package.name + '.export.json')), false)
+})
+
 test('出包保留原生模型及环境表达式，显式投影覆盖对应配置', t => {
   const f = fixture(t)
   write(join(f.candidate, 'dsh/managed/alpha.patch.yml'), '- id: llm-pi-ai\n  config:\n    providers:\n      local:\n        baseURL: !!js process.env.MODEL_URL\n- id: agent-default-model\n  config: {provider: local, model: qwen}\n')
