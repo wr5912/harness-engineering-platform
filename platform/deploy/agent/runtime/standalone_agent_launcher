@@ -191,7 +191,7 @@ ensure_image() {
     echo '标准 Runtime 镜像 ID、系统、架构或构建指纹不符，已拒绝启动。' >&2; exit 2;
   }
   # 在已核验的标准镜像内解析清单和 Compose，无需宿主安装 Node/Python。
-  compose config --format json | docker run --rm -i --network none --read-only \
+  compose config --format json | docker run --rm -i --user 0:0 --network none --read-only \
     --mount "type=bind,source=$ROOT/manifest.json,target=/runtime-manifest.json,readonly" \
     --entrypoint node "$IMAGE_ID" -e '
     try {
