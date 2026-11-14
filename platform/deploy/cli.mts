@@ -152,7 +152,7 @@ function usage(): string {
 
   dsh-deploy agent-preview|agent-pack|agent-prepare [选项]
     --agent-id <智能体>          明确的业务智能体
-    --source experiment:<ID>    已保存的固定版本，包含实际未提交资产
+    --source business:<ID>[@<tag>]  业务仓当前 Harness 或固定 Git tag
     --arch amd64|arm64          目标架构，默认本机架构
     --mode online|offline      部署方式，默认 online
     --resources-dir <目录>      目标运行资源，默认 .local/deploy-assets/<arch>

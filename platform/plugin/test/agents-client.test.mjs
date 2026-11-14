@@ -5,7 +5,7 @@ import test from 'node:test'
 import { build } from 'esbuild'
 
 const require = createRequire(import.meta.url)
-const source = (await build({ entryPoints: [new URL('../src/agents/business-client.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'], plugins: [{ name: 'page-components', setup(builder) { builder.onLoad({ filter: /detail-drawer\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function DetailDrawer(p) { return createElement('section', { 'data-drawer-title': p.title }, createElement('button', { type: 'button' }, p.trigger || p.title), p.children) }` })); builder.onLoad({ filter: /search-select\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function SearchSelect(p) { const option = o => createElement('option', { key:o.value, value:o.value }, o.label + ' ' + (o.description || '')); return createElement('select', { 'aria-label': p.label, value: p.value, onChange: e => p.onChange(e.target.value) }, p.groups ? p.groups.map(group => createElement('optgroup', { key:group, label:group }, p.options.filter(o => o.group === group).map(option))) : p.options.map(option)) }` })); builder.onLoad({ filter: /overview\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function AgentEvaluationOverview(p) { return createElement('div', {}, p.value?.phase || '') }` })); builder.onLoad({ filter: /description-client\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function AgentDescriptionPanel(p) { return createElement('div', { 'data-description-version': p.detail.experiment.id }, '版本资料与技能') }` })) } }] })).outputFiles[0].text
+const source = (await build({ entryPoints: [new URL('../src/agents/business-client.tsx', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react/jsx-runtime', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'], plugins: [{ name: 'page-components', setup(builder) { builder.onLoad({ filter: /detail-drawer\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function DetailDrawer(p) { return createElement('section', { 'data-drawer-title': p.title }, createElement('button', { type: 'button' }, p.trigger || p.title), p.children) }` })); builder.onLoad({ filter: /search-select\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function SearchSelect(p) { const option = o => createElement('option', { key:o.value, value:o.value }, o.label + ' ' + (o.description || '')); return createElement('select', { 'aria-label': p.label, value: p.value, onChange: e => p.onChange(e.target.value) }, p.groups ? p.groups.map(group => createElement('optgroup', { key:group, label:group }, p.options.filter(o => o.group === group).map(option))) : p.options.map(option)) }` })); builder.onLoad({ filter: /deployment\/client\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function DeploymentDialog(p) { return createElement('section', { 'data-deployment': p.target, 'data-active': p.active }, createElement('button', { onClick:p.onClose }, '关闭导出')) }` })); builder.onLoad({ filter: /overview\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function AgentEvaluationOverview(p) { return createElement('div', {}, p.value?.phase || '') }` })); builder.onLoad({ filter: /description-client\.tsx$/ }, () => ({ loader: 'tsx', contents: `import { createElement } from 'react'; export function AgentDescriptionPanel(p) { return createElement('div', { 'data-description-version': p.detail.experiment.id }, '版本资料与技能') }` })) } }] })).outputFiles[0].text
 
 function catalog(id = 'first-agent') {
   return { id, name: `名称 ${id}`, notes: '业务用途', source_id: `business:${id}`, repository: '/business', path: `/business/agents/${id}`, branch: 'main', commit: 'c'.repeat(40), asset_commit: 'c'.repeat(40), dirty: false, digest: 'sha256:current', profile: 'web', tag: null, files: ['harness.yaml', 'dsh/presets/demo/AGENTS.md'], versions: [] }
@@ -77,6 +77,9 @@ test('tag 选项来自业务仓且切换时传递原生来源，不写入登记'
   selector.props.onChange({target:{value:'business:first-agent@v1'}}); await ui.settle()
   assert.ok(ui.calls.some(call => call.endpoint === 'agents/business/detail' && call.payload.source === 'business:first-agent@v1'))
   assert.equal(ui.calls.some(call => /apply|activate|create/.test(call.endpoint)), false)
+  ui.button('导出独立运行包').props.onClick(); await ui.settle()
+  assert.equal(ui.nodes().find(node => node.props?.['data-deployment']).props['data-deployment'].experiment_id, 'business:first-agent@v1')
+  ui.button('关闭导出').props.onClick(); await ui.settle()
   ui.button('查看当前工作树').props.onClick(); await ui.settle()
   assert.match(ui.text(ui.render()), /当前工作树/)
 })
@@ -97,14 +100,18 @@ test('资产编辑冲突保留正文和草稿，未保存时不能切换智能�
   assert.match(ui.text(ui.nodes().find(node => node.props?.id === 'agent-identity')), /名称 first-agent/)
 })
 
-test('评测和实例入口携带当前业务来源，独立包入口交给管理助手', async () => {
+test('评测和实例入口携带当前业务来源，独立包直接打开所选来源的导出窗口', async () => {
   const ui = page(); await ui.settle()
   ui.button('发起评测').props.onClick(); await ui.settle()
   assert.equal(ui.navigations.at(-1).source_id, 'business:first-agent')
   assert.equal(ui.navigations.at(-1).experiment_id, 'business:first-agent')
   ui.props.active = true; ui.render(); await ui.settle()
   await ui.button('导出独立运行包').props.onClick()
-  assert.equal(ui.assistantTasks.at(-1).context.source_id, 'business:first-agent')
+  await ui.settle()
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.nodes().find(node => node.props?.['data-deployment']).props['data-deployment'])), { agent_id: 'first-agent', experiment_id: 'business:first-agent', label: '名称 first-agent' })
+  assert.equal(ui.assistantTasks.length, 0)
+  ui.button('关闭导出').props.onClick(); await ui.settle()
+  assert.equal(ui.nodes().some(node => node.props?.['data-deployment']), false)
 })
 
 test('隐藏页面不读取业务目录，恢复可见后读取', async () => {

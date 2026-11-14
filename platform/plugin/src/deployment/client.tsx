@@ -107,7 +107,7 @@ export function DeploymentDialog({ rpc, active, target, onClose }: Pick<Platform
           {issues.length > 0 && <ul className="agent-deployment-issues">{issues.map((issue: any, index: number) => <li key={index}>{issue.message ?? String(issue)}</li>)}</ul>}
           {!preview.resourceReady && !preview.canPrepareResources && <>
             <button type="button" onClick={() => setResourcesHelp(!resourcesHelp)}>查看运行资源准备步骤</button>
-            {resourcesHelp && <section aria-label="运行资源准备步骤"><p>在所选架构的在线准备机上，使用相同程序与数据版本运行：</p><pre className="harness-asset-content">{`./platform/dsh-deploy agent-prepare --agent-id ${target.agent_id} --source experiment:${target.experiment_id} --arch ${arch} --mode ${mode}`}</pre><p>将生成的 .local/deploy-assets/{arch}/ 复制到当前平台程序目录中的同名位置，再点击“检查安装包”。准备机需具备匹配的标准 DSH 镜像；新增运行依赖须先纳入标准镜像的依赖清单。</p><p className="agent-muted">也可通过 CLI 的 --image-archive 导入对应架构的标准镜像。目标机需预装 Docker 和 Compose。</p></section>}
+            {resourcesHelp && <section aria-label="运行资源准备步骤"><p>在所选架构的在线准备机上，使用相同程序与数据版本运行：</p><pre className="harness-asset-content">{`./platform/dsh-deploy agent-prepare --agent-id ${target.agent_id} --source ${target.experiment_id} --arch ${arch} --mode ${mode}`}</pre><p>将生成的 .local/deploy-assets/{arch}/ 复制到当前平台程序目录中的同名位置，再点击“检查安装包”。准备机需具备匹配的标准 DSH 镜像；新增运行依赖须先纳入标准镜像的依赖清单。</p><p className="agent-muted">也可通过 CLI 的 --image-archive 导入对应架构的标准镜像。目标机需预装 Docker 和 Compose。</p></section>}
           </>}
           {preview.notices?.map((notice: string) => <p key={notice} className="agent-muted">{notice}</p>)}
           {mode === 'offline' && preview.knowledge?.references?.some((ref: any) => ref.kind === 'document') && <>
